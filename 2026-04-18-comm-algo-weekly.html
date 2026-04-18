@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📡 通信库周度追踪报告 2026-04-18</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 30%, #0f3460 60%, #533483 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #e0e0e0;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* 顶部标题 */
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(8px);
+    border-radius: 24px;
+    padding: 32px 20px;
+    border: 2px solid rgba(255,255,255,0.15);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .header h1 {
+    font-size: 34px;
+    margin-bottom: 12px;
+    background: linear-gradient(90deg, #ffd166, #51cf66, #339af0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header .subtitle {
+    font-size: 16px;
+    opacity: 0.75;
+  }
+
+  .header .date-range {
+    display: inline-block;
+    background: rgba(255,209,102,0.2);
+    color: #ffd166;
+    padding: 6px 20px;
+    border-radius: 12px;
+    margin-top: 12px;
+    font-size: 15px;
+  }
+
+  /* 导航标签 */
+  .nav-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    position: sticky;
+    top: 12px;
+    z-index: 100;
+    background: rgba(26,26,46,0.9);
+    backdrop-filter: blur(10px);
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .nav-tab {
+    display: inline-block;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    color: #ccc;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 600;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .nav-tab:hover {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    transform: translateY(-2px);
+  }
+
+  .nav-tab.active {
+    background: linear-gradient(135deg, #51cf66, #339af0);
+    color: #fff;
+    border-color: transparent;
+  }
+
+  /* 章节卡片 */
+  .section {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(6px);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    cursor: pointer;
+    border-radius: 14px;
+    transition: background 0.2s;
+    margin-bottom: 16px;
+  }
+
+  .section-header:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .section-header h2 {
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-header .toggle-icon {
+    font-size: 22px;
+    transition: transform 0.3s;
+  }
+
+  .section-header.active .toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  .section-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+  }
+
+  .section-content.open {
+    max-height: 10000px;
+  }
+
+  /* 更新条目 */
+  .update-item {
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    border-left: 4px solid #ffd166;
+  }
+
+  .update-item h3 {
+    font-size: 18px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .update-item p {
+    font-size: 15px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+  }
+
+  .ref-link {
+    display: inline-block;
+    color: #339af0;
+    text-decoration: none;
+    font-size: 13px;
+    padding: 3px 10px;
+    background: rgba(51,154,240,0.15);
+    border-radius: 8px;
+    transition: all 0.2s;
+    margin: 2px 4px 2px 0;
+  }
+
+  .ref-link:hover {
+    background: rgba(51,154,240,0.3);
+    color: #fff;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .tag-new { background: rgba(81,207,102,0.25); color: #51cf66; }
+  .tag-update { background: rgba(255,209,102,0.25); color: #ffd166; }
+  .tag-research { background: rgba(156,39,176,0.25); color: #cc5de8; }
+  .tag-community { background: rgba(33,150,243,0.25); color: #339af0; }
+
+  /* 对比表格 */
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    margin-top: 16px;
+  }
+
+  .compare-table th {
+    background: rgba(255,255,255,0.12);
+    padding: 14px 12px;
+    font-size: 15px;
+    text-align: left;
+    border-radius: 10px;
+  }
+
+  .compare-table td {
+    background: rgba(255,255,255,0.05);
+    padding: 14px 12px;
+    font-size: 14px;
+  }
+
+  .compare-table tr td:first-child {
+    border-radius: 10px 0 0 10px;
+    font-weight: 600;
+  }
+
+  .compare-table tr td:last-child {
+    border-radius: 0 10px 10px 0;
+  }
+
+  /* 趋势展望 */
+  .trend-item {
+    background: linear-gradient(135deg, rgba(81,207,102,0.1), rgba(51,154,240,0.1));
+    border-radius: 16px;
+    padding: 22px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(81,207,102,0.2);
+  }
+
+  .trend-item h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #51cf66;
+  }
+
+  /* 无更新提示 */
+  .no-update {
+    text-align: center;
+    padding: 24px;
+    opacity: 0.6;
+    font-size: 16px;
+  }
+
+  /* 底部总结 */
+  .summary {
+    text-align: center;
+    padding: 28px;
+    background: linear-gradient(135deg, rgba(255,209,102,0.15), rgba(239,71,111,0.15));
+    border-radius: 20px;
+    margin-bottom: 28px;
+    border: 2px solid rgba(255,209,102,0.3);
+  }
+
+  .summary h2 {
+    font-size: 26px;
+    margin-bottom: 16px;
+  }
+
+  .summary p {
+    font-size: 16px;
+    max-width: 800px;
+    margin: 0 auto 10px;
+    opacity: 0.85;
+  }
+
+  /* 响应式 */
+  @media (max-width: 599px) {
+    body { padding: 12px; }
+    .header h1 { font-size: 24px; }
+    .nav-tabs { gap: 6px; padding: 10px; }
+    .nav-tab { padding: 8px 14px; font-size: 13px; }
+    .section { padding: 18px; }
+    .section-header h2 { font-size: 20px; }
+    .compare-table { font-size: 13px; }
+    .compare-table th, .compare-table td { padding: 10px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 顶部 -->
+  <div class="header">
+    <h1>📡 通信库周度追踪报告</h1>
+    <p class="subtitle">NCCL · DeepEP · NVSHMEM · 竞品动态</p>
+    <span class="date-range">2026年4月11日 — 4月18日</span>
+  </div>
+
+  <!-- 导航 -->
+  <div class="nav-tabs">
+    <a href="#nccl" class="nav-tab active">🟢 NCCL</a>
+    <a href="#deepep" class="nav-tab">🔵 DeepEP</a>
+    <a href="#nvshmem" class="nav-tab">🟣 NVSHMEM</a>
+    <a href="#others" class="nav-tab">🔶 其他通信库</a>
+    <a href="#compare" class="nav-tab">📊 技术对比</a>
+    <a href="#trend" class="nav-tab">🚀 趋势展望</a>
+  </div>
+
+  <!-- NCCL -->
+  <div class="section" id="nccl">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>🟢 NVIDIA NCCL</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="update-item">
+        <h3>NCCL v2.30.3-1 发布 — 引入 Device API <span class="tag tag-new">新版本</span></h3>
+        <p>NCCL 发布 v2.30.3-1 版本，最大亮点是引入了 <strong>Device-side API</strong>，允许在GPU端直接发起集合通信操作，而不再完全依赖Host端调度。这为低延迟推理场景和GPU-initiated通信打开了新可能性。</p>
+        <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases" target="_blank">GitHub Releases</a>
+        <a class="ref-link" href="https://github.com/nvidia/nccl/issues/2105" target="_blank">Issue #2105</a>
+      </div>
+
+      <div class="update-item">
+        <h3>NCCL EP 论文公开 — 统一Expert Parallel通信API <span class="tag tag-research">研究</span></h3>
+        <p>NVIDIA 在 arXiv 发布 <strong>"NCCL EP: Towards a Unified Expert Parallel Communication API"</strong> 论文（2603.13606），提出基于Device API构建的MoE通信扩展。核心特点：</p>
+        <ul style="margin: 10px 0 10px 24px; opacity: 0.85;">
+          <li><strong>LL模式（Low-Latency）</strong>：针对1-128 token小批量，采用直接all-to-all网格连接 + 双缓冲重叠通信</li>
+          <li><strong>HT模式（High-Throughput）</strong>：针对4096+ token大批量，NVLink域内聚合后再节点间RDMA</li>
+          <li>完全基于NCCL Device API重构，提供C/Python标准接口 <code>ncclEpDispatch</code> / <code>ncclEpCombine</code></li>
+          <li>已在vLLM中集成验证端到端可用性</li>
+        </ul>
+        <p>与DeepEP等独立专用库不同，NCCL EP选择将MoE通信原生集成在NCCL内部，依托官方生态降低碎片化。</p>
+        <a class="ref-link" href="https://arxiv.org/abs/2603.13606" target="_blank">arXiv 论文</a>
+        <a class="ref-link" href="https://github.com/NVIDIA/nccl/blob/master/contrib/nccl_ep/RELEASE.md" target="_blank">GitHub NCCL EP</a>
+      </div>
+
+      <div class="update-item">
+        <h3>NCCL Q2 2026 Roadmap 公布 <span class="tag tag-community">社区</span></h3>
+        <p>NVIDIA 在 GitHub Issue #2090 中公布了 Q2 2026（4月-6月）的NCCL路线图，包含计划支持的新特性和时间表。</p>
+        <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Roadmap Issue #2090</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DeepEP -->
+  <div class="section" id="deepep">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>🔵 DeepSeek DeepEP</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="update-item">
+        <h3>DeepEP v1.2.1 Stable Release <span class="tag tag-update">稳定版</span></h3>
+        <p>DeepEP 发布 v1.2.1 稳定版本。DeepEP 是 DeepSeek 开源的 Expert Parallel 通信库，专为MoE模型优化，支持节点内NVLink + 节点间RDMA的混合通信。</p>
+        <p>社区有用户提出将 v1.2.1 发布到 PyPI 以方便安装使用。</p>
+        <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/releases" target="_blank">GitHub Releases</a>
+        <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/issues/446" target="_blank">Issue #446 PyPI</a>
+      </div>
+
+      <div class="update-item">
+        <h3>DeepEP 生态集成：vLLM Expert Parallel 支持 <span class="tag tag-community">社区</span></h3>
+        <p>vLLM 文档更新了 Expert Parallel 部署指南，支持 DeepEP 作为后端通信库。同时社区讨论中出现了"不使用NVLink和DeepEP的EP All-to-All通信"方案，说明EP通信方案正在多元化。</p>
+        <a class="ref-link" href="https://docs.vllm.ai/en/latest/serving/expert_parallel_deployment/" target="_blank">vLLM EP文档</a>
+        <a class="ref-link" href="https://discuss.vllm.ai/t/expert-parallelism-all-to-all-communication-without-nvlink-and-deepep/2421" target="_blank">vLLM讨论</a>
+      </div>
+
+      <div class="update-item">
+        <h3>DeepSeek V4 动态 — FP4/FP8精度支持 <span class="tag tag-new">模型</span></h3>
+        <p>DeepSeek V4 预计2026年4月底发布，确认支持FP4和FP8精度。FP8支持此前已确认，FP4在2026年算较新的精度方案，将影响通信库的精度压缩需求。</p>
+        <a class="ref-link" href="https://news.mydrivers.com/1/1116/1116280.htm" target="_blank">快科技报道</a>
+        <a class="ref-link" href="https://evolink.ai/zh/blog/deepseek-v4-release-window-prep" target="_blank">EvoLink追踪</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- NVSHMEM -->
+  <div class="section" id="nvshmem">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>🟣 NVIDIA NVSHMEM</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="update-item">
+        <h3>NVSHMEM 3.6.5 发布 — 配置文件支持 + IBGDA优化 <span class="tag tag-new">新版本</span></h3>
+        <p>NVIDIA 发布 NVSHMEM 3.6.5，主要更新：</p>
+        <ul style="margin: 10px 0 10px 24px; opacity: 0.85;">
+          <li><strong>配置文件支持</strong>：新增类似NCCL的配置机制，方便运行时调优</li>
+          <li><strong>IBGDA CST优化</strong>：修复IBGDA在支持CST的交换机上激活优化的问题</li>
+          <li>持续改进性能和可用性</li>
+        </ul>
+        <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">官方Release Notes</a>
+        <a class="ref-link" href="https://github.com/NVIDIA/nvshmem/blob/devel/changelog" target="_blank">GitHub Changelog</a>
+        <a class="ref-link" href="https://www.linkedin.com/posts/benjamin-glick_client-challenge-activity-7442328238347149312--IYg" target="_blank">LinkedIn分享</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 其他通信库 -->
+  <div class="section" id="others">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>🔶 其他通信库动态</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="update-item">
+        <h3>Meta 开源 RCCLX — AMD GPU通信增强 <span class="tag tag-new">新库</span></h3>
+        <p>Meta 开源了 <strong>RCCLX</strong>，基于AMD RCCL的增强版通信库，完全集成到 Torchcomms 框架。</p>
+        <ul style="margin: 10px 0 10px 24px; opacity: 0.85;">
+          <li><strong>DDA算法</strong>：Direct Data Access flat/tree算法优化节点内消息，MI300X上decode提升10-50%，prefill提升10-30%</li>
+          <li><strong>低精度集合</strong>：FP8量化压缩，计算保持高精度，延迟降低~9-10%，吞吐提升~7%，精度损失仅~0.3%</li>
+          <li><strong>统一API</strong>：与NVIDIA NCCLX共享Torchcomms接口，跨GPU厂商无需改API</li>
+        </ul>
+        <a class="ref-link" href="https://engineering.fb.com/2026/02/24/data-center-engineering/rrcclx-innovating-gpu-communications-amd-platforms-meta/" target="_blank">Meta Engineering博客</a>
+      </div>
+
+      <div class="update-item">
+        <h3>MSCCL++ 论文更新 — GPU通信抽象重构 <span class="tag tag-research">研究</span></h3>
+        <p>Microsoft MSCCL++ 论文更新（arXiv 2504.09014v3），提出新型GPU通信抽象方法，允许用户自定义通信kernel。论文标题"Rethinking GPU Communication Abstractions for AI Inference"。</p>
+        <a class="ref-link" href="https://arxiv.org/html/2504.09014v3" target="_blank">arXiv MSCCL++</a>
+        <a class="ref-link" href="https://github.com/microsoft/msccl" target="_blank">GitHub MSCCL</a>
+      </div>
+
+      <div class="update-item">
+        <h3>集合通信库综述论文发表 <span class="tag tag-research">研究</span></h3>
+        <p>JCST 发表 "xCCL: A Survey of Industry-Led Collective Communication Libraries for Deep Learning" 综述，系统梳理NCCL、RCCL、HCCL、OneCCL等工业界通信库的发展现状与挑战。</p>
+        <a class="ref-link" href="https://jcst.ict.ac.cn/EN/10.1007/s11390-023-2894-6" target="_blank">JCST论文</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 技术对比 -->
+  <div class="section" id="compare">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>📊 技术对比</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <h3 style="margin-bottom: 16px; font-size: 20px;">MoE通信方案对比</h3>
+      <table class="compare-table">
+        <tr>
+          <th>维度</th>
+          <th>NCCL EP</th>
+          <th>DeepEP</th>
+          <th>NCCL (标准)</th>
+        </tr>
+        <tr>
+          <td>定位</td>
+          <td>MoE专用（NCCL扩展）</td>
+          <td>MoE专用独立库</td>
+          <td>通用集合通信</td>
+        </tr>
+        <tr>
+          <td>通信发起方</td>
+          <td>GPU Device API</td>
+          <td>GPU Device</td>
+          <td>Host CPU</td>
+        </tr>
+        <tr>
+          <td>低延迟模式</td>
+          <td>直接all-to-all + 双缓冲</td>
+          <td>NVLink直连 + RDMA</td>
+          <td>Ring/Tree算法</td>
+        </tr>
+        <tr>
+          <td>高吞吐模式</td>
+          <td>NVLink域聚合 → RDMA</td>
+          <td>分层all-to-all</td>
+          <td>Ring/Tree</td>
+        </tr>
+        <tr>
+          <td>生态依赖</td>
+          <td>NCCL原生</td>
+          <td>NVSHMEM + RDMA</td>
+          <td>NCCL标准</td>
+        </tr>
+        <tr>
+          <td>官方支持</td>
+          <td>NVIDIA官方</td>
+          <td>DeepSeek开源</td>
+          <td>NVIDIA官方</td>
+        </tr>
+      </table>
+
+      <h3 style="margin: 24px 0 16px; font-size: 20px;">多厂商通信库生态</h3>
+      <table class="compare-table">
+        <tr>
+          <th>厂商</th>
+          <th>库名</th>
+          <th>最新动态</th>
+          <th>特色</th>
+        </tr>
+        <tr>
+          <td>NVIDIA</td>
+          <td>NCCL + NVSHMEM</td>
+          <td>v2.30.3 Device API + NCCL EP</td>
+          <td>拓扑感知、GPU-initiated通信</td>
+        </tr>
+        <tr>
+          <td>AMD (Meta)</td>
+          <td>RCCLX</td>
+          <td>首次开源，集成Torchcomms</td>
+          <td>DDA算法、FP8低精度集合</td>
+        </tr>
+        <tr>
+          <td>DeepSeek</td>
+          <td>DeepEP</td>
+          <td>v1.2.1稳定版</td>
+          <td>MoE专用、NVLink+RDMA混合</td>
+        </tr>
+        <tr>
+          <td>Microsoft</td>
+          <td>MSCCL++</td>
+          <td>论文更新v3</td>
+          <td>自定义通信kernel DSL</td>
+        </tr>
+      </table>
+
+    </div>
+  </div>
+
+  <!-- 趋势展望 -->
+  <div class="section" id="trend">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>🚀 趋势展望</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="trend-item">
+        <h3>🔥 GPU-Initiated通信成为主流</h3>
+        <p>NCCL v2.30.3引入Device API、NCCL EP基于Device API构建，标志着GPU自主发起集合通信正在成为行业标准。这将显著降低推理场景下的通信延迟，特别是对MoE模型的All-to-All操作。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>⚔️ NCCL EP vs DeepEP：MoE通信路线之争</h3>
+        <p>NCCL EP选择将MoE通信原生集成在NCCL内部，而DeepEP是独立专用库。NVIDIA官方路线的加入可能改变MoE通信的竞争格局，未来MoE训练/推理框架（如vLLM）可能优先采用NCCL EP作为标准后端。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>🌐 跨厂商统一API趋势</h3>
+        <p>Meta RCCLX与NVIDIA NCCLX共享Torchcomms接口，表明业界正在向"一次编写、跨厂商运行"的方向迈进。开发者无需因GPU品牌切换而修改通信代码，这将降低AI基础设施的厂商锁定风险。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>📉 低精度通信加速落地</h3>
+        <p>DeepSeek V4确认FP4/FP8支持、RCCLX实现FP8低精度集合（精度损失仅0.3%）、NCCL EP双模式架构——2026年低精度通信正在从研究走向生产环境，成为降低通信带宽需求的关键手段。</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 本周观察 -->
+  <div class="summary">
+    <h2>📌 本周观察</h2>
+    <p><strong>通信库领域正在经历"GPU-initiated革命"</strong>：NCCL的Device API和NCCL EP标志着通信控制权从Host向GPU转移的重大转变。与此同时，MoE通信路线开始分化（NCCL EP vs DeepEP），而Meta RCCLX的开源进一步推动了跨厂商API统一的趋势。本周是通信库生态格局变化的关键一周。</p>
+  </div>
+
+</div>
+
+<script>
+// 展开/收起
+function toggleSection(header) {
+  header.classList.toggle('active');
+  const content = header.nextElementSibling;
+  content.classList.toggle('open');
+}
+
+// 导航高亮
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', function(e) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// 滚动时自动高亮对应标签
+window.addEventListener('scroll', function() {
+  const sections = document.querySelectorAll('.section[id]');
+  const scrollPos = window.scrollY + 100;
+
+  sections.forEach(section => {
+    if (section.offsetTop <= scrollPos && section.offsetTop + section.offsetHeight > scrollPos) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      const activeTab = document.querySelector(`.nav-tab[href="#${section.id}"]`);
+      if (activeTab) activeTab.classList.add('active');
+    }
+  });
+});
+</script>
+</body>
+</html>

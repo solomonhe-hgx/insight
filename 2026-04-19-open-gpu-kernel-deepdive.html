@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NVIDIA Open GPU Kernel 源码深度解析 2026-04-19</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: linear-gradient(180deg, #0d1117 0%, #161b22 30%, #1a2332 60%, #21283b 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #e6edf3;
+    line-height: 1.6;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(8px);
+    border-radius: 24px;
+    padding: 32px 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .header h1 {
+    font-size: 30px;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg, #76b900, #00a3e0, #bc8cff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header .subtitle { font-size: 14px; opacity: 0.7; }
+
+  .header .date-range {
+    display: inline-block;
+    background: rgba(118,185,0,0.15);
+    color: #76b900;
+    padding: 6px 20px;
+    border-radius: 12px;
+    margin-top: 12px;
+    font-size: 13px;
+  }
+
+  .nav-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 28px;
+    position: sticky;
+    top: 12px;
+    z-index: 100;
+    background: rgba(13,17,23,0.92);
+    backdrop-filter: blur(10px);
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .nav-tab {
+    display: inline-block;
+    padding: 9px 18px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    color: #8b949e;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .nav-tab:hover {
+    background: rgba(255,255,255,0.12);
+    color: #e6edf3;
+    transform: translateY(-1px);
+  }
+
+  .nav-tab.active {
+    background: linear-gradient(135deg, rgba(118,185,0,0.3), rgba(0,163,224,0.3));
+    color: #e6edf3;
+    border-color: rgba(118,185,0,0.5);
+  }
+
+  .section {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(6px);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    cursor: pointer;
+    border-radius: 14px;
+    transition: background 0.2s;
+    margin-bottom: 14px;
+  }
+
+  .section-header:hover { background: rgba(255,255,255,0.04); }
+
+  .section-header h2 {
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-header .toggle-icon {
+    font-size: 18px;
+    transition: transform 0.3s;
+    color: #8b949e;
+  }
+
+  .section-header.active .toggle-icon { transform: rotate(180deg); }
+
+  .section-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+  }
+
+  .section-content.open { max-height: 30000px; }
+
+  .subsection {
+    background: rgba(255,255,255,0.03);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border-left: 4px solid #76b900;
+  }
+
+  .subsection.hw { border-left-color: #76b900; }
+  .subsection.macro { border-left-color: #00a3e0; }
+  .subsection.gen { border-left-color: #bc8cff; }
+  .subsection.algo { border-left-color: #d29922; }
+
+  .subsection h3 {
+    font-size: 17px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .subsection p, .subsection li {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+  }
+
+  .subsection ul { margin: 8px 0 8px 20px; }
+
+  .subsection code {
+    background: rgba(255,255,255,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    color: #f0883e;
+  }
+
+  .ref-link {
+    display: inline-block;
+    color: #00a3e0;
+    text-decoration: none;
+    font-size: 12px;
+    padding: 3px 10px;
+    background: rgba(0,163,224,0.12);
+    border-radius: 8px;
+    transition: all 0.2s;
+    margin: 2px 4px 2px 0;
+    border: 1px solid rgba(0,163,224,0.2);
+  }
+
+  .ref-link:hover { background: rgba(0,163,224,0.25); color: #fff; }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .tag-hw { background: rgba(118,185,0,0.2); color: #76b900; }
+  .tag-macro { background: rgba(0,163,224,0.2); color: #00a3e0; }
+  .tag-gen { background: rgba(188,140,255,0.2); color: #bc8cff; }
+  .tag-algo { background: rgba(210,153,34,0.2); color: #d29922; }
+
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 6px;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+
+  .compare-table th {
+    background: rgba(255,255,255,0.1);
+    padding: 11px 10px;
+    text-align: left;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  .compare-table td {
+    background: rgba(255,255,255,0.04);
+    padding: 11px 10px;
+  }
+
+  .compare-table tr td:first-child {
+    border-radius: 8px 0 0 8px;
+    font-weight: 600;
+    color: #76b900;
+  }
+
+  .compare-table tr td:last-child { border-radius: 0 8px 8px 0; }
+
+  .trend-item {
+    background: linear-gradient(135deg, rgba(118,185,0,0.08), rgba(0,163,224,0.08));
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 14px;
+    border: 1px solid rgba(118,185,0,0.15);
+  }
+
+  .trend-item h3 { font-size: 17px; margin-bottom: 8px; color: #76b900; }
+  .trend-item p { font-size: 14px; opacity: 0.85; }
+
+  .summary {
+    text-align: center;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(118,185,0,0.12), rgba(0,163,224,0.12));
+    border-radius: 20px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(118,185,0,0.25);
+  }
+
+  .summary h2 { font-size: 24px; margin-bottom: 14px; color: #76b900; }
+  .summary p { font-size: 15px; max-width: 800px; margin: 0 auto 8px; opacity: 0.85; }
+
+  .arch-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 2px;
+  }
+
+  .arch-pascal { background: rgba(118,185,0,0.2); color: #76b900; }
+  .arch-volta { background: rgba(0,163,224,0.2); color: #00a3e0; }
+  .arch-turing { background: rgba(188,140,255,0.2); color: #bc8cff; }
+  .arch-ampere { background: rgba(210,153,34,0.2); color: #d29922; }
+  .arch-hopper { background: rgba(240,136,62,0.2); color: #f0883e; }
+  .arch-blackwell { background: rgba(248,81,73,0.2); color: #f85149; }
+
+  @media (max-width: 599px) {
+    body { padding: 12px; }
+    .header h1 { font-size: 22px; }
+    .nav-tabs { gap: 6px; padding: 10px; }
+    .nav-tab { padding: 8px 12px; font-size: 12px; }
+    .section { padding: 16px; }
+    .section-header h2 { font-size: 18px; }
+    .compare-table { font-size: 11px; }
+    .compare-table th, .compare-table td { padding: 8px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>NVIDIA Open GPU Kernel 源码深度解析</h1>
+    <p class="subtitle">NVLink NVSwitch NVLink-C2C MMU 硬件特性与驱动实现</p>
+    <span class="date-range">基于 open-gpu-kernel-modules 最新源码</span>
+  </div>
+
+  <div class="nav-tabs">
+    <a href="#nvlink" class="nav-tab active">NVLINK</a>
+    <a href="#nvswitch" class="nav-tab">NVSWITCH</a>
+    <a href="#nvlc2c" class="nav-tab">NVLINK C2C</a>
+    <a href="#mmu" class="nav-tab">MMU</a>
+    <a href="#compare" class="nav-tab">代际对比</a>
+    <a href="#trend" class="nav-tab">趋势展望</a>
+  </div>
+
+  <!-- ========== NVLINK ========== -->
+  <div class="section" id="nvlink">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>NVLINK 深度解析</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="subsection hw">
+        <h3>硬件特性 <span class="tag tag-hw">Hardware</span></h3>
+        <p>NVLink 驱动代码覆盖从 1.0 到 5.0 共六个代际，支持 5 种端点类型（GPU、NVSwitch、EBridge、IBM NPU、TegraShim）。系统最大支持 <code>NVLINK_MAX_SYSTEM_LINK_NUM = 624</code> 条链路，可构建超大规模 NVSwitch Fabric 拓扑。</p>
+        <p>链路状态机包含 30 种离散状态，分为核心状态（OFF/HS/SAFE/FAULT/RECOVERY）、电源管理状态（SLEEP/ENABLE_PM/DISABLE_PM）、训练序列状态（INITPHASE1/INITNEGOTIATE/INITOPTIMIZE/ALI）以及预/后活动状态。TX/RX 子链路各自独立管理状态，各有 14 种状态（TX_HS/TX_LOW_POWER/TX_TRAIN/TX_EQ 等）。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvlink/interface/nvlink.h" target="_blank">nvlink.h 完整定义</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvlink/kernel/nvlink/core/nvlink_discovery.c" target="_blank">拓扑发现代码</a>
+      </div>
+
+      <div class="subsection macro">
+        <h3>微架构参数 <span class="tag tag-macro">Microarchitecture</span></h3>
+        <ul>
+          <li><strong>训练超时：</strong>OFF 1ms → SAFE 70ms → HS 7000ms（7秒）→ ACTIVE_PENDING 2000ms</li>
+          <li><strong>重试机制：</strong>SAFE 最多 7 次重试，发现包最多 4 次重试，训练种子 6 个</li>
+          <li><strong>Inband 重试超时：</strong><code>KNVLINK_INBAND_RETRY_TIMEOUT_US = 4000000</code>（4秒）</li>
+          <li><strong>ALI 训练超时：</strong><code>linkTrainingTimeout = 15000000</code>（15秒）</li>
+          <li><strong>Inband 消息最大尺寸：</strong>5120 字节</li>
+        </ul>
+        <p>Inband 协议定义了 10+ 种消息类型（GPU_PROBE_REQ/RSP、MC_TEAM_SETUP_REQ/RSP、GPU_PROBE_UPDATE_REQ 等），Fabric Manager 通过 Probe Response 下发 gfId、GPA/FLA 地址范围、cliqueId、fabricHealthMask 等关键参数。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvlink/inband/interface/nvlink_inband_msg.h" target="_blank">Inband 消息定义</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/inc/swref/common_def_nvlink.h" target="_blank">寄存器定义 common_def</a>
+      </div>
+
+      <div class="subsection gen">
+        <h3>芯片代际差异 <span class="tag tag-gen">Generation</span></h3>
+        <table class="compare-table">
+          <tr><th>特性</th><th>Pascal GP100</th><th>Volta/Turing</th><th>Ampere GA100</th><th>Hopper GH100</th><th>Blackwell GB100</th></tr>
+          <tr><td>NVLink 版本</td><td>1.0</td><td>2.0/2.2</td><td>3.0/3.1</td><td>4.0</td><td>5.0</td></tr>
+          <tr><td>训练方式</td><td>Legacy PRBS</td><td>Legacy</td><td>ALT 训练</td><td>ALT + ALI 固件</td><td>ALI 固件驱动</td></tr>
+          <tr><td>NVSwitch 映射</td><td>8K×16GB</td><td>8K×16GB Willow</td><td>2K×64GB Limerock</td><td>2K×512GB</td><td>64 项 GPA 重映射表</td></tr>
+          <tr><td>Fabric 地址对齐</td><td>-</td><td>34-bit (16GB)</td><td>36-bit (64GB)</td><td>39-bit (512GB)</td><td>42-bit (4TB)</td></tr>
+          <tr><td>Peer Reset 范围</td><td>所有 Peer</td><td>所有 Peer</td><td>单 Peer</td><td>单 Peer</td><td>单 Peer</td></tr>
+          <tr><td>NVLink 加密</td><td>无</td><td>无</td><td>无</td><td>NVLE (FSP)</td><td>NVLE (ALID/CLID)</td></tr>
+          <tr><td>EGM 支持</td><td>无</td><td>无</td><td>无</td><td>有</td><td>有 (HW WAR)</td></tr>
+          <tr><td>自适应带宽</td><td>无</td><td>无</td><td>无</td><td>1Hz Callback</td><td>有</td></tr>
+          <tr><td>RBM 模式</td><td>无</td><td>无</td><td>无</td><td>Full/Off/Min/Half/3Q</td><td>按链路数 (0-12)</td></tr>
+          <tr><td>子链路 SW 控制</td><td>完整</td><td>完整</td><td>完整</td><td>完整</td><td>旁路 (HW/FW)</td></tr>
+        </table>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/nvlink/arch/pascal/kernel_nvlink_gp100.c" target="_blank">Pascal 代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/nvlink/arch/volta/kernel_nvlink_gv100.c" target="_blank">Volta 代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/nvlink/arch/ampere/kernel_nvlink_ga100.c" target="_blank">Ampere 代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/nvlink/arch/hopper/kernel_nvlink_gh100.c" target="_blank">Hopper 代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/nvlink/arch/blackwell/kernel_nvlink_gb100.c" target="_blank">Blackwell 代码</a>
+      </div>
+
+      <div class="subsection algo">
+        <h3>驱动实现算法 <span class="tag tag-algo">Algorithm</span></h3>
+        <p><strong>链路训练（三套算法）：</strong></p>
+        <ul>
+          <li><strong>Legacy（NVL&lt;3.0）：</strong>PRBS 发生器 → TX_HS → 轮询两端 RX_HS（7s 超时）→ PRE_HS → HS → TRAFFIC_SETUP → ENABLE_PM</li>
+          <li><strong>ALT（NVL≥3.0）：</strong>INITOPTIMIZE → POST_INITOPTIMIZE → PRE_HS → HS → TRAFFIC_SETUP → ENABLE_PM</li>
+          <li><strong>ALI（NVL≥4.0）：</strong>固件驱动 — INITPHASE1 → 逐链路训练 → 轮询两端 postRxDetLinkMask → 获取 SID 信息</li>
+        </ul>
+        <p><strong>L2 退出训练（11 步）：</strong>RESET → INITPHASE1 → RESTORE_STATE → RX_INIT_TERM → TX_COMMON_MODE → RX_RXCAL → TX_COMMON_MODE_DISABLE → TX_DATA_READY → SAFE（轮询两端）→ INITNEGOTIATE → ALT/Legacy 训练</p>
+        <p><strong>拓扑发现：</strong>AN0 包注入 + 令牌匹配。NVL&lt;3.0 由 SW 写入发现令牌；NVL≥3.0 由 Minion 固件处理，SW 直接获取 SID 值。</p>
+        <p><strong>自适应带宽管理（Hopper+）：</strong>1Hz 回调检测 P2P 空闲状态，空闲时暂停/更新 Fabric Probe，以新的 RBM 模式恢复。支持 Full/Off/Min/Half/3Quarter 五种模式（直连），NVSwitch 仅支持 Min/Full。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvlink/kernel/nvlink/core/nvlink_training.c" target="_blank">训练算法源码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvlink/kernel/nvlink/core/nvlink_initialize.c" target="_blank">初始化序列</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/nvlink/kernel_nvlinkstate.c" target="_blank">电源管理状态机</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== NVSWITCH ========== -->
+  <div class="section" id="nvswitch">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>NVSwitch 深度解析</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="subsection hw">
+        <h3>硬件特性 <span class="tag tag-hw">Hardware</span></h3>
+        <p>NVSwitch 支持两代芯片：<strong>LS10（Laguna，Hopper 代）</strong>和 <strong>LR10（Limerock，Blackwell 代）</strong>。LS10 有 64 个 NVLink 端口（每端口 2 条 lane），LR10 有 36 个端口（每端口 4 条 lane）。</p>
+        <p>路由引擎（NV_ROUTE，0x5000-0x5FFF）支持三种转发模式：SPRAY（轮询分发）、RANDOM（随机选择）、ALTERNATE（交替路径）。组播最多支持 16 个 spray 组、每组 32 个 TCP directive、最多 11 轮转发。</p>
+        <p>错误检测包括：每 lane CRC 计数器、Flit 级 CRC、ECC 保护（Ganged Link Table Data2、Ingress 重映射表均有 ECC 字段）、Credit 超时检测。错误严重度分为 FATAL（需芯片复位）和 NONFATAL（可纠正）。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/nvswitch.c" target="_blank">NVSwitch 核心代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/ls10/multicast_ls10.c" target="_blank">组播路由代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/error_nvswitch.c" target="_blank">错误处理代码</a>
+      </div>
+
+      <div class="subsection macro">
+        <h3>微架构参数 <span class="tag tag-macro">Microarchitecture</span></h3>
+        <table class="compare-table">
+          <tr><th>参数</th><th>LS10 Laguna</th><th>LR10 Limerock</th></tr>
+          <tr><td>端口数</td><td>64</td><td>36</td></tr>
+          <tr><td>每端口 Lane</td><td>2</td><td>4</td></tr>
+          <tr><td>NPG 引擎</td><td>16</td><td>9</td></tr>
+          <tr><td>NXBAR 引擎</td><td>3</td><td>4</td></tr>
+          <tr><td>每 NXBAR Tile</td><td>12</td><td>4</td></tr>
+          <tr><td>总 Crossbar Tile</td><td>36</td><td>16</td></tr>
+          <tr><td>GLT 表项</td><td>256 × 64-bit</td><td>512 × 32-bit</td></tr>
+          <tr><td>Ingress 地址位</td><td>51:39</td><td>46:36</td></tr>
+          <tr><td>延迟计数器窗口</td><td>~12 小时 (48-bit)</td><td>~3.3 秒 (32-bit)</td></tr>
+          <tr><td>PCI 设备 ID</td><td>0x22A0-0x22AF</td><td>0x1AE8, 0x1AF0-0x1AFF</td></tr>
+        </table>
+        <p>FSP（Fabric State Manager）通过 MCTP over EMEM 与 CPU 通信，支持多包分片（SOM/EOM 标志、0-3 序列号）。InfoROM 使用格式字符串解析（S08/U04/U08/U16/U24/U32/U64/BINARY），小端字节序。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/inc/ls10/ls10.h" target="_blank">LS10 头文件</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/inc/lr10/lr10.h" target="_blank">LR10 头文件</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/fsprpc_nvswitch.c" target="_blank">FSP RPC 代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/inforom/inforom_nvswitch.c" target="_blank">InfoROM 解析代码</a>
+      </div>
+
+      <div class="subsection gen">
+        <h3>芯片代际差异 <span class="tag tag-gen">Generation</span></h3>
+        <p>LR10 相比 LS10 的关键变化：端口数减少但每端口带宽提升（36×4 lane vs 64×2 lane）；新增 XP3G/ XVE/ PRIVLOC 硬件块；移除了 CPR/XAL/XPL/XTL 块；增强安全性（TNVL 模式，含认证证书链和安全锁）；地址支持从 52 位缩减到 47 位。</p>
+        <p>寄存器定义文件：LS10 有 48 个 dev_*.h 文件，LR10 有 42 个，覆盖 ROUTE、INGRESS、EGRESS、NPORT、NVLW、NVLDL、NVLTLC、NXBAR、TSTATE、FALCON、SOE 等完整硬件块。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/tree/main/src/common/inc/swref/published/nvswitch/ls10" target="_blank">LS10 寄存器定义</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/tree/main/src/common/inc/swref/published/nvswitch/lr10" target="_blank">LR10 寄存器定义</a>
+      </div>
+
+      <div class="subsection algo">
+        <h3>驱动实现算法 <span class="tag tag-algo">Algorithm</span></h3>
+        <p><strong>初始化序列（22 步）：</strong>平台检测 → HAL 设置 → 寄存器键加载 → SOE 构建 → CCI 构建 → DMA Mask → 设备状态 → UUID → InfoROM → 黑名单检查 → Fabric 心跳 → 链路创建 → 训练模式 → Scratch → 错误日志 → PRI Ring → IP Wrapper → 路由初始化 → 端口计数器 → 后置初始化 → 后台任务 → 中断使能。</p>
+        <p><strong>Fabric Manager 集成：</strong>状态机从 OFFLINE → STANDBY → CONFIGURED，心跳超时后转为 MANAGER_TIMEOUT。黑名单原因包括 MANUAL_OUT_OF_BAND、TRUNK_LINK_FAILURE、ACCESS_LINK_FAILURE 等 8 种。</p>
+        <p><strong>链路复位和 Drain 序列：</strong>检查 NXBAR 错误（始终为 FATAL）→ 禁用中断 → 等待紧急关机 → SOE NPort 复位 → Minion 链路复位（最多 3 次重试）→ 状态恢复 → 重编程路由表 → 重新注册链路 → ALI 训练 → 等待 DL 时钟 → 重新使能中断。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/nvswitch.c" target="_blank">初始化序列代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/nvswitch/kernel/ls10/ls10.c" target="_blank">LS10 链路复位代码</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== NVLINK C2C ========== -->
+  <div class="section" id="nvlc2c">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>NVLink C2C 深度解析</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="subsection hw">
+        <h3>硬件特性 <span class="tag tag-hw">Hardware</span></h3>
+        <p>NVLink C2C 是 Grace-Hopper 和 Vera-Rubin Superchip 中 CPU 与 GPU 之间的芯片间互联。驱动接口支持最多 <strong>2 个 C2C 实例 × 7 条链路 = 14 条链路</strong>。每条链路的带宽和 lane 宽度由固件动态上报（驱动中无硬编码数值）。</p>
+        <p>Blackwell 在 DVSEC 寄存器中新增了两个独立的 C2C 错误类别：<code>C2C_MISC_LINK_ERROR</code>（bit 8）和 <code>C2C_HBI_LINK_ERROR</code>（bit 9）。一致性模型通过 ATS（地址转换服务）和 SVA（共享虚拟寻址）实现，GPU 与 CPU 共享页表，由 ARM SMMU 管理。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/sdk/nvidia/inc/ctrl/ctrl2080/ctrl2080bus.h" target="_blank">C2C 控制命令定义</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/common/inc/swref/published/blackwell/gb100/dev_pcfg_pf0.h" target="_blank">Blackwell C2C 寄存器</a>
+      </div>
+
+      <div class="subsection macro">
+        <h3>微架构参数 <span class="tag tag-macro">Microarchitecture</span></h3>
+        <ul>
+          <li><strong>coherentCpuFbBase：</strong>CPU 一致帧缓冲基地址，GPU 物理地址 + 此偏移 = CPU 可访问 GPA</li>
+          <li><strong>NUMA Online 区域：</strong>从 coherent FB 中 carve out，按 memblock 大小对齐</li>
+          <li><strong>ATS 粒度：</strong><code>UVM_GMMU_ATS_GRANULARITY = 512MB</code>（PDE1 级别）</li>
+          <li><strong>NOATS 位：</strong>位于 PDE1，可按 512MB 区域禁用 ATS 查找</li>
+          <li><strong>EGM Peer ID：</strong>固定为 7（vGPU 迁移安全），通过 HSHUB EGM_CONFIG 编程</li>
+        </ul>
+        <p>HSHUB（High-Speed Hub）是 GPU 端连接 C2C/NVLink/PCIe 的枢纽。控制命令包括 PEER_CONN_CONFIG、GET_HSHUB_ID_FOR_LINKS、EGM_CONFIG 等。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/generated/g_kern_mem_sys_nvoc.h" target="_blank">内存系统生成头</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_ats_sva.c" target="_blank">ATS/SVA 代码</a>
+      </div>
+
+      <div class="subsection gen">
+        <h3>芯片代际差异 <span class="tag tag-gen">Generation</span></h3>
+        <table class="compare-table">
+          <tr><th>特性</th><th>Grace-Hopper GH100</th><th>Grace-Blackwell GB100</th></tr>
+          <tr><td>BAR1</td><td>禁用</td><td>重新使能（支持同时访问）</td></tr>
+          <tr><td>C2C LCE 类型</td><td>统一 C2C</td><td>分离 C2C_H2D + C2C_D2H</td></tr>
+          <tr><td>CE 物理 vidmem 写入</td><td>非一致</td><td>未明确</td></tr>
+          <tr><td>C2C 故障寄存器</td><td>无</td><td>MISC_LINK_ERROR + HBI_LINK_ERROR</td></tr>
+          <tr><td>SMMU WAR</td><td>Bug 4130089</td><td>Bug 4686457（BAR1/FLA 缓存刷新）</td></tr>
+        </table>
+        <p>Grace CPU（TH500）通过 6 种 PCIe 设备 ID 识别（0x22B1-0x22B4, 0x22B8, 0x22B9），对应 x16/x4/x1/x8/x2 不同 lane 配置。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/ce/arch/hopper/kernel_ce_gh100.c" target="_blank">GH100 CE 映射</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/ce/arch/blackwell/kernel_ce_gb100.c" target="_blank">GB100 CE 映射</a>
+      </div>
+
+      <div class="subsection algo">
+        <h3>驱动实现算法 <span class="tag tag-algo">Algorithm</span></h3>
+        <p><strong>C2C 链路检测：</strong>BIF 层读取 <code>PDB_PROP_KBIF_IS_C2C_LINK_UP</code> → GSP 静态配置提供 <code>bAtsSupported</code> → 内存系统层调用 <code>kmemsysSetupCoherentCpuLink()</code>。</p>
+        <p><strong>一致性 CPU 映射创建（GH100）：</strong>检查 Self-Hosted + C2C 链路 UP → 读取 coherentCpuFbBase → 确定 coherentCpuFbSize → carve out 保留区域（WPR）→ 计算 NUMA Online 大小 → 注册 GPU 内存为 Linux NUMA 节点。</p>
+        <p><strong>SMMU TLB 无效（GH180 WAR）：</strong>针对 Bug 4130089，驱动直接编程 ARM SMMU VCMDQ（通过 MMIO，使用 VINTF63 和 VCMDQ127），支持按 ASID 整体无效和按 VA 逐页无效，操作码为 <code>TLBI_EL2_ASID (0x21)</code>、<code>TLBI_EL2_VA (0x22)</code>、<code>CMD_SYNC (0x46)</code>。</p>
+        <p><strong>P2P/RDMA over C2C：</strong>本地分配上的 RDMA 不支持（返回 NOT_SUPPORTED）→ 转换为 CPU 一致的 GPA（+coherentCpuFbBase）→ 映射标记为 CPU 可缓存。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/mem_sys/kern_mem_sys.c" target="_blank">一致性链路设置</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/bus/arch/hopper/kern_bus_gh100.c" target="_blank">GH100 CPU 映射</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/bus/p2p.c" target="_blank">P2P/RDMA 映射</a>
+      </div>
+
+      <div class="subsection info">
+        <h3>不在本仓库的内容</h3>
+        <p>C2C PHY/链路训练由 GPU 固件（Minion/FSP/GSP）处理，非开源驱动。ARM CMN/CCI 一致性互连由 ARM 固件/Linux 配置。ARM SMMU v3 驱动在 Linux 内核中（drivers/iommu/arm-smmu-v3/），本仓库仅通过 IOMMU 子系统 API 使用。带宽/延迟规格、物理 lane 数量和精确拓扑均不在驱动代码中描述。</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== MMU ========== -->
+  <div class="section" id="mmu">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>MMU 深度解析</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="subsection hw">
+        <h3>硬件特性 <span class="tag tag-hw">Hardware</span></h3>
+        <p>GPU MMU 页表层级从 Pascal 的 5 级演进到 Hopper/Blackwell 的 6 级。VA 空间从 Pascal/Turing/Ampere 的 49-bit 扩展到 Hopper/Blackwell 的 <strong>57-bit（128PB）</strong>。Blackwell 独有 <strong>256GB 巨型页</strong>支持（PDE2 可作为叶 PTE）。</p>
+        <p>支持的页大小：Blackwell 离散 GPU 支持 4K/64K/2M/512M/<strong>256G</strong> 五种；集成 GPU 仅支持 4K/64K/2M。ATS（地址转换服务）从 Volta 引入，在 Hopper+ 上 UVM 对所有映射设置 <code>ATS_NOT_ALLOWED</code>，由 CUDA 确保所有分配在 512MB 对齐区域中。</p>
+        <p>故障缓冲分两种：<strong>可重放</strong>（Graphics/SM，"Fault and Stall"，UVM 独占所有权）和<strong>不可重放</strong>（CE/PBDMA，"Fault and Switch"，RM 拥有 HW 缓冲，UVM 读 shadow 缓冲）。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_mmu.c" target="_blank">UVM MMU 核心</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_mmu.h" target="_blank">MMU 头文件</a>
+      </div>
+
+      <div class="subsection macro">
+        <h3>微架构参数 <span class="tag tag-macro">Microarchitecture</span></h3>
+        <table class="compare-table">
+          <tr><th>架构</th><th>页表深度</th><th>VA 位</th><th>页大小</th><th>MMU 版本</th><th>LTP 数</th></tr>
+          <tr><td>Pascal GP100</td><td>5 (PD3→PD0→PTE)</td><td>49</td><td>4K/64K/2M</td><td>VER2</td><td>-</td></tr>
+          <tr><td>Volta GV100</td><td>5 (PD3→PD0→PTE)</td><td>49</td><td>4K/64K/2M</td><td>VER2</td><td>-</td></tr>
+          <tr><td>Turing TU102</td><td>5 (PD3→PD0→PTE)</td><td>49</td><td>4K/64K/2M</td><td>VER2</td><td>-</td></tr>
+          <tr><td>Ampere GA100</td><td>5 (PD3→PD0→PTE)</td><td>49</td><td>4K/64K/2M/512M</td><td>VER2</td><td>-</td></tr>
+          <tr><td>Hopper GH100</td><td>6 (PD4→PD0→PTE)</td><td>57</td><td>4K/64K/2M/512M</td><td>VER3</td><td>18</td></tr>
+          <tr><td>Blackwell GB100</td><td>6 (+256G 叶)</td><td>57</td><td>4K/64K/2M/512M/256G</td><td>VER3</td><td>20</td></tr>
+        </table>
+        <p><strong>PTE 格式（MMU_VER3，Hopper/Blackwell）：</strong>64 位，Bit 0=VALID，Bit 2:1=APERTURE（SYS_COHERENT/SYS_NONCOHERENT/VIDMEM/PEER），Bit 7:3=PCF（16 种权限组合），Bit 11:8=KIND（压缩格式），Bit 39:12/51:12=ADDRESS，Bit 63:61=PEER_ID。</p>
+        <p><strong>PCF 权限控制标志：</strong>支持 RW/RO × ATOMIC/NO_ATOMIC × CACHED/UNCACHED × ACE/ACD 共 16 种组合。另有 SPARSE、MAPPING_NOWHERE、NO_VALID_4KB_PAGE 特殊值。</p>
+        <p><strong>PDE 格式：</strong>PD4/PD3/PD2 使用单 PDE（8 字节），PD0 使用双 PDE（16 字节，同时包含 64K 和 4K 子项）。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_hopper_mmu.c" target="_blank">Hopper MMU 代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_blackwell_mmu.c" target="_blank">Blackwell MMU 代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/hwref/hopper/gh100/dev_mmu.h" target="_blank">MMU 寄存器定义</a>
+      </div>
+
+      <div class="subsection gen">
+        <h3>芯片代际差异 <span class="tag tag-gen">Generation</span></h3>
+        <table class="compare-table">
+          <tr><th>新特性</th><th>引入代际</th><th>说明</th></tr>
+          <tr><td>可重放故障缓冲</td><td>Pascal</td><td>Graphics 引擎 "Fault and Stall"</td></tr>
+          <tr><td>ATS 支持</td><td>Volta</td><td>CPU/GPU 共享页表，NV4K 编码</td></tr>
+          <tr><td>不可重放故障</td><td>Volta</td><td>CE/PBDMA "Fault and Switch"</td></tr>
+          <tr><td>基于消息的 MMU 中断</td><td>Turing</td><td>替代传统中断</td></tr>
+          <tr><td>Poisoned PTE</td><td>Turing</td><td>调试机制</td></tr>
+          <tr><td>512MB 巨型页</td><td>Ampere</td><td>PDE1 可作为叶 PTE</td></tr>
+          <tr><td>访问计数器</td><td>Ampere</td><td>ACE/ACD 在 PCF 标志中</td></tr>
+          <tr><td>机密计算</td><td>Ampere</td><td>CC/Fabric 加密</td></tr>
+          <tr><td>57-bit VA / 6 级页表</td><td>Hopper</td><td>PD4 级（2 项），MMU_VER3</td></tr>
+          <tr><td>统一 ADDRESS 字段</td><td>Hopper</td><td>无 comptagline 重叠</td></tr>
+          <tr><td>256GB 巨型页</td><td>Blackwell</td><td>PDE2 可作为叶 PTE</td></tr>
+          <tr><td>20 LTPs</td><td>Blackwell</td><td>Hopper 为 18</td></tr>
+        </table>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/mmu/arch/hopper/kern_gmmu_fmt_gh10x.c" target="_blank">Hopper 格式定义</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/mmu/arch/blackwell/kern_gmmu_fmt_gb10x.c" target="_blank">Blackwell 格式定义</a>
+      </div>
+
+      <div class="subsection algo">
+        <h3>驱动实现算法 <span class="tag tag-algo">Algorithm</span></h3>
+        <p><strong>页树分配：</strong>从根节点走查，从 VA 位计算入口索引 → 若为空则分配新页目录 → 重试循环处理并发竞争（dir_cache）→ 新目录清零（通过 CE 或 CPU）→ 自底向上写 PDE → TLB 无效。页表位置策略：默认优先 vidmem 回退 sysmem；SR-IOV 必须 vidmem；机密计算必须 vidmem；集成 GPU 必须 sysmem。</p>
+        <p><strong>VA 空间布局（Hopper+）：</strong>0→64PB（RM 管理）→ 64PB→64PB+32TB（Peer 身份映射 32×1TB）→ 64PB+32TB→64PB+384TB（Flat Vidmem 最多 1TB）→ 64PB+384TB→64PB+512TB（UVM 内部 128GB）。</p>
+        <p><strong>可重放故障处理流程：</strong>中断触发 → 从 HW 缓冲拷贝到 shadow → 解析故障包（VA/类型/访问类型/引擎/客户端）→ 批量服务故障 → 填充页表 → TLB 无效 → 更新 PUT 指针触发重放 → 通知客户端。</p>
+        <p><strong>HMM 集成：</strong>x86_64 默认开启，ARM64 默认关闭。通过 <code>mmu_interval_notifier</code> 跟踪 CPU 页表变化。设备私有页（devmem）表示 GPU 内存映射到 CPU 地址空间。迁移使用 Linux <code>migrate_vma_*</code> API，通过 CE 在 GPU↔CPU 间拷贝数据。</p>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_mmu.c" target="_blank">页树分配代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/src/nvidia/src/kernel/gpu/mmu/mmu_fault_buffer.c" target="_blank">故障缓冲代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_hmm.c" target="_blank">HMM 集成代码</a>
+        <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/blob/main/kernel-open/nvidia-uvm/uvm_migrate.c" target="_blank">内存迁移代码</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== 代际对比 ========== -->
+  <div class="section" id="compare">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>全代际技术对比</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <h3 style="margin-bottom: 14px; font-size: 18px;">NVLink 代际演进</h3>
+      <table class="compare-table">
+        <tr><th>代际</th><th>Pascal</th><th>Volta/Turing</th><th>Ampere</th><th>Hopper</th><th>Blackwell</th></tr>
+        <tr><td>版本</td><td>NVL 1.0</td><td>NVL 2.0/2.2</td><td>NVL 3.0</td><td>NVL 4.0</td><td>NVL 5.0</td></tr>
+        <tr><td>训练算法</td><td>Legacy PRBS</td><td>Legacy</td><td>ALT</td><td>ALT+ALI</td><td>ALI</td></tr>
+        <tr><td>Fabric 地址对齐</td><td>-</td><td>16GB</td><td>64GB</td><td>512GB</td><td>4TB</td></tr>
+        <tr><td>加密</td><td>✗</td><td>✗</td><td>✗</td><td>NVLE</td><td>NVLE+ALID/CLID</td></tr>
+        <tr><td>自适应带宽</td><td>✗</td><td>✗</td><td>✗</td><td>✓ 5 模式</td><td>✓ 链路计数</td></tr>
+      </table>
+
+      <h3 style="margin: 24px 0 14px; font-size: 18px;">NVSwitch 代际对比</h3>
+      <table class="compare-table">
+        <tr><th>参数</th><th>LS10 Laguna</th><th>LR10 Limerock</th></tr>
+        <tr><td>代际</td><td>Hopper GH200</td><td>Blackwell B200/GB200</td></tr>
+        <tr><td>端口 × Lane</td><td>64 × 2</td><td>36 × 4</td></tr>
+        <tr><td>Crossbar</td><td>3 NXBAR × 12 Tile</td><td>4 NXBAR × 4 Tile</td></tr>
+        <tr><td>GLT 表项</td><td>256 × 64-bit</td><td>512 × 32-bit</td></tr>
+        <tr><td>地址位宽</td><td>52-bit</td><td>47-bit</td></tr>
+        <tr><td>延迟计数器</td><td>48-bit (~12h)</td><td>32-bit (~3.3s)</td></tr>
+        <tr><td>安全增强</td><td>基础</td><td>TNVL 认证 + 安全锁</td></tr>
+      </table>
+
+      <h3 style="margin: 24px 0 14px; font-size: 18px;">MMU 代际演进</h3>
+      <table class="compare-table">
+        <tr><th>特性</th><th>Pascal→Ampere</th><th>Hopper</th><th>Blackwell</th></tr>
+        <tr><td>页表深度</td><td>5 级</td><td>6 级</td><td>6 级 + 256G 叶</td></tr>
+        <tr><td>VA 空间</td><td>49-bit</td><td>57-bit</td><td>57-bit</td></tr>
+        <tr><td>最大页</td><td>512MB</td><td>512MB</td><td>256GB</td></tr>
+        <tr><td>PTE 格式</td><td>VER2（分离地址）</td><td>VER3（统一地址）</td><td>VER3</td></tr>
+        <tr><td>PCF 组合</td><td>独立标志</td><td>16 种编码</td><td>16 种编码</td></tr>
+        <tr><td>故障类型</td><td>可重放+不可重放</td><td>同左+CC 支持</td><td>同左</td></tr>
+      </table>
+
+    </div>
+  </div>
+
+  <!-- ========== 趋势展望 ========== -->
+  <div class="section" id="trend">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>趋势展望</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="trend-item">
+        <h3>Fabric 地址空间指数增长</h3>
+        <p>从 Volta 的 16GB 到 Blackwell 的 4TB，Fabric 地址对齐每代增长 4-8 倍。Blackwell 的 64 项 GPA 重映射表每项 4TB，总覆盖 256TB。这反映了 NVLink 拓扑从单机架向多机架扩展的趋势，地址管理复杂度将持续上升。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>训练控制权从驱动向固件转移</h3>
+        <p>NVLink 训练从 Pascal 的完全 SW 控制（Legacy PRBS）到 Hopper 的 ALI 固件驱动，再到 Blackwell 子链路状态也旁路给 HW/FW。开源驱动的角色正从"直接操控硬件"变为"协调固件和 Fabric Manager"，代码可见度下降但系统可靠性提升。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>MMU 页表深度与 VA 空间的军备竞赛</h3>
+        <p>Hopper 将页表从 5 级扩展到 6 级、VA 从 49-bit 扩展到 57-bit，Blackwell 进一步在 PD2 级引入 256GB 巨型页。这对应着 LLM 训练中对单 GPU 管理 TB 级显存的需求。未来 Rubin 架构可能扩展至 64-bit VA 或 7 级页表。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>NVSwitch 端口收敛、Lane 扩张</h3>
+        <p>从 LS10 的 64×2 lane 到 LR10 的 36×4 lane，端口数减少但每端口带宽翻倍。这暗示 NVLink 5.0 单 lane 速率显著提升，使得更少的物理端口即可满足更高总带宽。NXBAR 从 3 增加到 4 表明 crossbar 架构也在同步演进。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>C2C 一致性生态逐渐成熟</h3>
+        <p>从 Grace-Hopper 到 Grace-Blackwell，C2C 驱动路径从禁用 BAR1 到重新使能（同时访问）、从统一 C2C LCE 到分离 H2D/D2H 类型、从缺少故障寄存器到增加 MISC/HBI 双错误类别。Blackwell 的 Bug 4686457 WAR 显示一致性内存路径仍在调优中。随着 Vera-Rubin 发布，C2C 带宽预计将从 900GB/s 翻倍到 1.8TB/s。</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 本周观察 -->
+  <div class="summary">
+    <h2>总结</h2>
+    <p>open-gpu-kernel-modules 源码揭示了 NVIDIA GPU 互联与内存管理架构的完整演进路线：NVLink 从软件训练走向固件自治，NVSwitch 从多端口低带宽走向少端口高带宽，MMU 从 49-bit/5 级扩展到 57-bit/6 级+256GB 巨型页，C2C 一致性从实验性功能走向生产就绪。驱动代码正在从"直接硬件操控"向"固件协调层"转变，开源可见度下降但系统可靠性提升。</p>
+  </div>
+
+</div>
+
+<script>
+function toggleSection(header) {
+  header.classList.toggle('active');
+  const content = header.nextElementSibling;
+  content.classList.toggle('open');
+}
+
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', function(e) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+window.addEventListener('scroll', function() {
+  const sections = document.querySelectorAll('.section[id]');
+  const scrollPos = window.scrollY + 100;
+  sections.forEach(section => {
+    if (section.offsetTop <= scrollPos && section.offsetTop + section.offsetHeight > scrollPos) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      const activeTab = document.querySelector(`.nav-tab[href="#${section.id}"]`);
+      if (activeTab) activeTab.classList.add('active');
+    }
+  });
+});
+</script>
+</body>
+</html>

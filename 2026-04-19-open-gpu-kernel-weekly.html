@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NVIDIA Open GPU Kernel 周度追踪报告 2026-04-19</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: linear-gradient(180deg, #0d1117 0%, #161b22 30%, #1a2332 60%, #21283b 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #e6edf3;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(8px);
+    border-radius: 24px;
+    padding: 32px 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .header h1 {
+    font-size: 32px;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg, #76b900, #00a3e0, #76b900);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header .subtitle {
+    font-size: 15px;
+    opacity: 0.7;
+  }
+
+  .header .date-range {
+    display: inline-block;
+    background: rgba(118,185,0,0.15);
+    color: #76b900;
+    padding: 6px 20px;
+    border-radius: 12px;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  .nav-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    position: sticky;
+    top: 12px;
+    z-index: 100;
+    background: rgba(13,17,23,0.92);
+    backdrop-filter: blur(10px);
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .nav-tab {
+    display: inline-block;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    color: #8b949e;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .nav-tab:hover {
+    background: rgba(255,255,255,0.12);
+    color: #e6edf3;
+    transform: translateY(-1px);
+  }
+
+  .nav-tab.active {
+    background: linear-gradient(135deg, rgba(118,185,0,0.3), rgba(0,163,224,0.3));
+    color: #e6edf3;
+    border-color: rgba(118,185,0,0.5);
+  }
+
+  .nav-tab .badge {
+    display: inline-block;
+    background: #da3633;
+    color: #fff;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .nav-tab .badge-ok {
+    background: rgba(118,185,0,0.4);
+    color: #76b900;
+  }
+
+  .section {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(6px);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    cursor: pointer;
+    border-radius: 14px;
+    transition: background 0.2s;
+    margin-bottom: 14px;
+  }
+
+  .section-header:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .section-header h2 {
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-header .toggle-icon {
+    font-size: 18px;
+    transition: transform 0.3s;
+    color: #8b949e;
+  }
+
+  .section-header.active .toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  .section-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+  }
+
+  .section-content.open {
+    max-height: 12000px;
+  }
+
+  .update-item {
+    background: rgba(255,255,255,0.04);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    border-left: 4px solid #76b900;
+  }
+
+  .update-item.critical {
+    border-left-color: #da3633;
+    background: rgba(218,54,51,0.06);
+  }
+
+  .update-item.warning {
+    border-left-color: #d29922;
+    background: rgba(210,153,34,0.06);
+  }
+
+  .update-item.info {
+    border-left-color: #00a3e0;
+    background: rgba(0,163,224,0.06);
+  }
+
+  .update-item h3 {
+    font-size: 17px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .update-item p {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+  }
+
+  .update-item code {
+    background: rgba(255,255,255,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", "Fira Code", monospace;
+  }
+
+  .ref-link {
+    display: inline-block;
+    color: #00a3e0;
+    text-decoration: none;
+    font-size: 12px;
+    padding: 3px 10px;
+    background: rgba(0,163,224,0.12);
+    border-radius: 8px;
+    transition: all 0.2s;
+    margin: 2px 4px 2px 0;
+    border: 1px solid rgba(0,163,224,0.2);
+  }
+
+  .ref-link:hover {
+    background: rgba(0,163,224,0.25);
+    color: #fff;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .tag-bug { background: rgba(218,54,51,0.2); color: #f85149; }
+  .tag-fix { background: rgba(118,185,0,0.2); color: #76b900; }
+  .tag-community { background: rgba(0,163,224,0.2); color: #00a3e0; }
+  .tag-info { background: rgba(139,148,158,0.2); color: #8b949e; }
+  .tag-new { background: rgba(188,140,255,0.2); color: #bc8cff; }
+
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 6px;
+    margin-top: 16px;
+    font-size: 14px;
+  }
+
+  .compare-table th {
+    background: rgba(255,255,255,0.1);
+    padding: 12px 12px;
+    text-align: left;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  .compare-table td {
+    background: rgba(255,255,255,0.04);
+    padding: 12px 12px;
+  }
+
+  .compare-table tr td:first-child {
+    border-radius: 8px 0 0 8px;
+    font-weight: 600;
+    color: #76b900;
+  }
+
+  .compare-table tr td:last-child {
+    border-radius: 0 8px 8px 0;
+  }
+
+  .trend-item {
+    background: linear-gradient(135deg, rgba(118,185,0,0.08), rgba(0,163,224,0.08));
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 14px;
+    border: 1px solid rgba(118,185,0,0.15);
+  }
+
+  .trend-item h3 {
+    font-size: 17px;
+    margin-bottom: 8px;
+    color: #76b900;
+  }
+
+  .trend-item p {
+    font-size: 14px;
+    opacity: 0.85;
+  }
+
+  .no-update {
+    text-align: center;
+    padding: 28px;
+    opacity: 0.5;
+    font-size: 15px;
+  }
+
+  .summary {
+    text-align: center;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(118,185,0,0.12), rgba(0,163,224,0.12));
+    border-radius: 20px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(118,185,0,0.25);
+  }
+
+  .summary h2 {
+    font-size: 24px;
+    margin-bottom: 14px;
+    color: #76b900;
+  }
+
+  .summary p {
+    font-size: 15px;
+    max-width: 800px;
+    margin: 0 auto 8px;
+    opacity: 0.85;
+  }
+
+  @media (max-width: 599px) {
+    body { padding: 12px; }
+    .header h1 { font-size: 24px; }
+    .nav-tabs { gap: 6px; padding: 10px; }
+    .nav-tab { padding: 8px 14px; font-size: 13px; }
+    .section { padding: 16px; }
+    .section-header h2 { font-size: 18px; }
+    .compare-table { font-size: 12px; }
+    .compare-table th, .compare-table td { padding: 8px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>NVIDIA Open GPU Kernel 周度追踪</h1>
+    <p class="subtitle">NVLink NVSwitch NVLink-C2C MMU 动态</p>
+    <span class="date-range">2026年4月12日 — 4月19日</span>
+  </div>
+
+  <div class="nav-tabs">
+    <a href="#nvlink" class="nav-tab active">NVLINK <span class="badge badge-ok">无更新</span></a>
+    <a href="#nvswitch" class="nav-tab">NVSWITCH <span class="badge badge-ok">无更新</span></a>
+    <a href="#nvlc2c" class="nav-tab">NVLINK C2C <span class="badge badge-ok">无更新</span></a>
+    <a href="#mmu" class="nav-tab">MMU <span class="badge">4 项</span></a>
+    <a href="#community" class="nav-tab">社区反馈 <span class="badge">8 项</span></a>
+    <a href="#compare" class="nav-tab">技术对比</a>
+    <a href="#trend" class="nav-tab">趋势展望</a>
+  </div>
+
+  <!-- NVLINK -->
+  <div class="section" id="nvlink">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>NVLINK</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+      <div class="no-update">
+        本周无重大更新
+      </div>
+      <p style="text-align:center; opacity:0.5; font-size:13px; margin-top:8px;">
+        仓库中 NVLink 驱动代码完整存在（<code>src/common/nvlink/</code>、<code>kernel-open/nvidia/nvlink_*.c</code>），但本周无相关提交、Issue 或 PR。
+      </p>
+      <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/tree/main/src/common/nvlink" target="_blank">源码目录参考</a>
+    </div>
+  </div>
+
+  <!-- NVSWITCH -->
+  <div class="section" id="nvswitch">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>NVSWITCH</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+      <div class="no-update">
+        本周无重大更新
+      </div>
+      <p style="text-align:center; opacity:0.5; font-size:13px; margin-top:8px;">
+        NVSwitch 驱动代码完整存在（<code>kernel-open/nvidia/linux_nvswitch.c</code>、<code>src/common/nvswitch/</code>），但本周无相关提交或讨论。
+      </p>
+      <a class="ref-link" href="https://github.com/nvidia/open-gpu-kernel-modules/tree/main/src/common/nvswitch" target="_blank">源码目录参考</a>
+    </div>
+  </div>
+
+  <!-- NVLINK C2C -->
+  <div class="section" id="nvlc2c">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>NVLINK C2C</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+      <div class="no-update">
+        仓库内本周无重大更新
+      </div>
+
+      <div class="update-item info">
+        <h3>NVbandwidth 工具博客发布 <span class="tag tag-info">官方博客</span></h3>
+        <p>NVIDIA 开发者博客于 4月14日 发布 <strong>"NVIDIA NVbandwidth: Your Essential Tool for Measuring GPU Interconnect and Memory Performance"</strong>，介绍使用 NVbandwidth 测量 NVLink/NVSwitch 互联带宽的方法，并附 GTC 2026 On-Demand 会话 S81666。</p>
+        <a class="ref-link" href="https://developer.nvidia.com/blog/nvidia-nvbandwidth-your-essential-tool-for-measuring-gpu-interconnect-and-memory-performance/" target="_blank">官方博客</a>
+        <a class="ref-link" href="https://www.nvidia.com/en-us/on-demand/session/gtc26-s81666/" target="_blank">GTC 2026 Session</a>
+        <a class="ref-link" href="https://forums.developer.nvidia.com/t/nvidia-nvbandwidth-your-essential-tool-for-measuring-gpu-interconnect-and-memory-performance/366603" target="_blank">论坛讨论</a>
+      </div>
+
+      <div class="update-item info">
+        <h3>NVLink 产品页更新（非本周变动） <span class="tag tag-info">参考</span></h3>
+        <p>NVLink 产品页当前显示：第六代互联技术提供 Rubin 平台每 GPU 3.6 TB/s、Vera Rubin NVL72 总带宽 260 TB/s、NVLink Fusion 支持混合架构。无本周新增内容。</p>
+        <a class="ref-link" href="https://www.nvidia.com/en-us/data-center/nvlink/" target="_blank">NVLink 产品页</a>
+        <a class="ref-link" href="https://www.nvidia.com/en-us/data-center/nvlink-c2c/" target="_blank">NVLink-C2C 产品页</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MMU -->
+  <div class="section" id="mmu">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>MMU / UVM</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="update-item critical">
+        <h3>Issue #1108: nvidia_uvm 重 I/O 下内核崩溃 <span class="tag tag-bug">严重Bug</span></h3>
+        <p>用户在 RTX 4050 Laptop GPU + Arch Linux + 内核 6.18.22-1-lts + 驱动 595.58.03 环境下，报告 <code>nvidia_uvm</code> 模块在持续顺序I/O（tar压缩约30GB）或并行C++编译时一致性地触发内核恐慌。</p>
+        <p><strong>临时方案：</strong>在操作前卸载 <code>nvidia_uvm</code> 模块可完全避免崩溃。</p>
+        <p><strong>涉及代码路径：</strong><code>kernel-open/nvidia-uvm/</code> 核心UVM模块。</p>
+        <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1108" target="_blank">GitHub Issue #1108</a>
+      </div>
+
+      <div class="update-item critical">
+        <h3>Issue #1107: nvidia_vma_access 空指针崩溃 <span class="tag tag-bug">严重Bug</span></h3>
+        <p>在驱动 595.58.03 + 内核 6.18.21（Debian 13）+ RTX A6000（8台受影响）上，<code>mmap_context</code> 被初始化为 NULL 后立即解引用，导致空指针崩溃。触发条件为打开 <code>/proc/PID/mem</code> 并读取 GPU 内存映射地址偏移。</p>
+        <p><strong>涉及代码路径：</strong><code>kernel-open/nvidia/nv.c</code> 中 <code>nvidia_vma_access()</code> 函数。</p>
+        <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1107" target="_blank">GitHub Issue #1107</a>
+      </div>
+
+      <div class="update-item critical">
+        <h3>Issue #1111: Blackwell GSP 固件停止响应 <span class="tag tag-bug">严重Bug</span></h3>
+        <p>RTX Pro 6000（Blackwell, sm_120）在持续零间隙 llama.cpp 推理时，GSP 固件完全挂起，无任何恢复机制。这是 Blackwell 架构特有的稳定性问题。</p>
+        <p><strong>涉及代码路径：</strong><code>src/nvidia/src/kernel/gpu/mmu/</code> 中的 GSP RPC 与 MMU fault 处理。</p>
+        <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1111" target="_blank">GitHub Issue #1111</a>
+      </div>
+
+      <div class="update-item warning">
+        <h3>Issue #1106: Arch Linux 主机完全冻结 <span class="tag tag-bug">Bug</span></h3>
+        <p>Arch Linux + <code>nvidia-open-dkms</code> 595.58.03 在 Plex Docker GPU 工作负载下发生完全系统冻结。可能与 UVM 模块的内存映射处理有关。</p>
+        <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1106" target="_blank">GitHub Issue #1106</a>
+      </div>
+
+      <div class="update-item warning">
+        <h3>Issue #1033: 关机时内核恐慌（持续活跃） <span class="tag tag-bug">Bug</span></h3>
+        <p>驱动 590.48.01 在关机时因 <code>nvkms-kapi.h:struct</code> 的不安全使用触发内核恐慌。社区成员提出禁用内核地址随机化作为临时修复。</p>
+        <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1033" target="_blank">GitHub Issue #1033</a>
+      </div>
+
+      <div class="update-item info">
+        <h3>VRAM 耗尽时无系统 RAM 回退 <span class="tag tag-community">社区反馈</span></h3>
+        <p>当显存耗尽时，Linux 驱动不会像 Windows 那样回退到系统 RAM（缺少 GTT 功能），导致应用直接崩溃。影响 RTX 4060 Laptop、GTX 1050 Ti、GeForce 750 Ti、RTX 30 系列。官方尚无修复计划。</p>
+        <a class="ref-link" href="https://forums.developer.nvidia.com/t/nvidia-driver-fails-to-use-system-ram-when-vram-is-full-leading-to-crashes/357407" target="_blank">NVIDIA Forums</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 社区反馈 -->
+  <div class="section" id="community">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>社区反馈热点</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="update-item info">
+        <h3>Arch Linux 默认切换到 open kernel modules <span class="tag tag-new">生态变化</span></h3>
+        <p>Arch Linux 已将主 NVIDIA 驱动包默认切换为 open kernel modules。从 GTX 16xx 系列开始，开源内核模块已成为主要支持路径。</p>
+        <a class="ref-link" href="https://www.phoronix.com/news/Arch-LInux-NVIDIA-Open-Default" target="_blank">Phoronix 报道</a>
+      </div>
+
+      <div class="update-item info">
+        <h3>NVIDIA 595.58.03 稳定版发布 <span class="tag tag-info">驱动版本</span></h3>
+        <p>595.58.03 是 R595 系列的 Linux 稳定版构建。本周多个 Bug（#1106, #1107, #1108, #1111）均在此版本上复现。</p>
+        <a class="ref-link" href="https://www.phoronix.com/news/NVIDIA-595.58.03-Linux" target="_blank">Phoronix 报道</a>
+        <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/595.58.03" target="_blank">GitHub Release</a>
+      </div>
+
+      <div class="update-item warning">
+        <h3>内核 6.18/6.19 构建失败潮 <span class="tag tag-community">构建问题</span></h3>
+        <p>多平台报告 590.48.01 在 Linux 内核 6.18/6.19 上 DKMS 编译失败：</p>
+        <ul style="margin: 10px 0 10px 20px; font-size:14px; opacity:0.85;">
+          <li><strong>Debian 6.18.5:</strong> 链接段错误 <code>turing_shaders.xz.o Segmentation fault</code>，根因为 Debian Sid 工具链不稳定</li>
+          <li><strong>Ubuntu 6.19.0-3:</strong> 编译器报错 <code>call without frame pointer save/setup</code>，包管理器中断导致系统包损坏</li>
+          <li><strong>Fedora 43 + 6.18.6:</strong> akmod 编译失败</li>
+        </ul>
+        <p>NVIDIA 官方回应：590.xx 系列不再有新版本计划，用户应迁移至 595 分支。</p>
+        <a class="ref-link" href="https://forums.developer.nvidia.com/t/nvidia-open-kernel-module-590-48-01-fails-to-build-on-debian-6-18-5-deb14-amd64/358333" target="_blank">NVIDIA Forums</a>
+        <a class="ref-link" href="https://discourse.ubuntu.com/t/new-6-19-kernel-fails-to-configure-with-nvidia-driver-590-open/76659" target="_blank">Ubuntu Discourse</a>
+        <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1021" target="_blank">GitHub Issue #1021</a>
+        <a class="ref-link" href="https://www.reddit.com/r/Fedora/comments/1qm3mpy/fedora_43_kde_latest_kernel_6186_nvidia_akmod/" target="_blank">Reddit r/Fedora</a>
+      </div>
+
+      <div class="update-item info">
+        <h3>Hacker News: "NVIDIA 驱动进展巨大" <span class="tag tag-community">讨论</span></h3>
+        <p>HN 讨论帖认为 "Nvidia drivers on Linux 2026 is hands down just fine"，社区情绪整体改善。但反方指出用户态库仍闭源，open kernel modules 本质是与板载 RISC-V 固件通信的 shim。</p>
+        <a class="ref-link" href="https://news.ycombinator.com/item?id=47610110" target="_blank">Hacker News</a>
+        <a class="ref-link" href="https://news.ycombinator.com/item?id=47612578" target="_blank">讨论线程</a>
+      </div>
+
+      <div class="update-item info">
+        <h3>Canonical 计划集成 NVIDIA DOCA-OFED <span class="tag tag-new">生态变化</span></h3>
+        <p>NVIDIA DOCA-OFED 软件包将测试并集成到 Ubuntu 中，影响数据中心 GPU 部署的 open kernel module 生态。</p>
+        <a class="ref-link" href="https://www.phoronix.com/news/Ubuntu-Integrate-DOCA-OFED" target="_blank">Phoronix 报道</a>
+      </div>
+
+      <div class="update-item info">
+        <h3>Blackwell 必须使用 open kernel modules <span class="tag tag-info">重要提示</span></h3>
+        <p>RTX 5000 系列（Blackwell）GPU <strong>必须</strong>使用 open kernel modules，闭源模块不支持 Blackwell。社区维护了详细的安装指南。</p>
+        <a class="ref-link" href="https://gist.github.com/jatinkrmalik/86afb07cbe6abf5baa2d29d3842aa328" target="_blank">GitHub Gist 指南</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 技术对比 -->
+  <div class="section" id="compare">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>驱动版本 & 兼容性对比</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <h3 style="margin-bottom: 14px; font-size: 18px;">当前驱动版本状态</h3>
+      <table class="compare-table">
+        <tr>
+          <th>版本</th>
+          <th>类型</th>
+          <th>发布日期</th>
+          <th>内核兼容</th>
+          <th>已知问题</th>
+        </tr>
+        <tr>
+          <td>595.58.03</td>
+          <td>稳定版 (R595)</td>
+          <td>2026-03-24</td>
+          <td>6.14 ~ 6.18</td>
+          <td>UVM崩溃、GSP固件挂起(#1108,#1111)</td>
+        </tr>
+        <tr>
+          <td>595.44.05</td>
+          <td>预发布 (Vulkan Beta)</td>
+          <td>2026-04-03</td>
+          <td>6.14 ~ 6.18</td>
+          <td>Beta 测试阶段</td>
+        </tr>
+        <tr>
+          <td>590.48.01</td>
+          <td>旧稳定版</td>
+          <td>2025年底</td>
+          <td>~ 6.17</td>
+          <td>6.18/6.19构建失败，已EOL</td>
+        </tr>
+        <tr>
+          <td>580.126.20</td>
+          <td>数据中心</td>
+          <td>2026-02-23</td>
+          <td>5.15 ~ 6.17</td>
+          <td>较旧，不支持最新内核</td>
+        </tr>
+      </table>
+
+      <h3 style="margin: 24px 0 14px; font-size: 18px;">本周 Bug 严重度汇总</h3>
+      <table class="compare-table">
+        <tr>
+          <th>Issue</th>
+          <th>模块</th>
+          <th>严重度</th>
+          <th>影响范围</th>
+          <th>状态</th>
+        </tr>
+        <tr>
+          <td>#1111</td>
+          <td>GSP/MMU</td>
+          <td>严重</td>
+          <td>Blackwell sm_120</td>
+          <td>Open</td>
+        </tr>
+        <tr>
+          <td>#1108</td>
+          <td>UVM</td>
+          <td>严重</td>
+          <td>RTX 4050 + 内核6.18</td>
+          <td>Open</td>
+        </tr>
+        <tr>
+          <td>#1107</td>
+          <td>VMA/MMU</td>
+          <td>严重</td>
+          <td>RTX A6000 (8台)</td>
+          <td>Open</td>
+        </tr>
+        <tr>
+          <td>#1106</td>
+          <td>UVM</td>
+          <td>中等</td>
+          <td>Arch Linux + Docker</td>
+          <td>Open</td>
+        </tr>
+        <tr>
+          <td>#1033</td>
+          <td>KMS</td>
+          <td>中等</td>
+          <td>关机流程</td>
+          <td>社区Patch</td>
+        </tr>
+      </table>
+
+    </div>
+  </div>
+
+  <!-- 趋势展望 -->
+  <div class="section" id="trend">
+    <div class="section-header active" onclick="toggleSection(this)">
+      <h2>趋势展望</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content open">
+
+      <div class="trend-item">
+        <h3>Blackwell 稳定性是最大痛点</h3>
+        <p>RTX Pro 6000 (sm_120) 在持续 AI 推理负载下 GSP 固件完全挂起，且 Blackwell GPU 必须依赖 open kernel modules（闭源不支持）。这意味着 NVIDIA 在 Blackwell 的开源驱动成熟度上仍有明显差距，尤其是 MMU fault 处理和 GSP RPC 资源管理方面。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>内核 6.19 兼容性是关键风险</h3>
+        <p>590 分支已宣布 EOL，但 595 分支在 6.19 内核上仍有构建问题。Ubuntu、Fedora、Debian 三大主流发行版均受影响，可能延迟用户升级最新内核的进度。NVIDIA 需要尽快发布 595 热修复版本。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>Open Kernel 正在成为事实标准</h3>
+        <p>Arch Linux 已默认切换到 open kernel modules，Blackwell 强制要求开源驱动，Canonical 计划集成 DOCA-OFED。开源驱动正在从"备选"变为"默认"，这对 NVIDIA 的代码质量和社区响应速度提出了更高要求。</p>
+      </div>
+
+      <div class="trend-item">
+        <h3>NVLink/NVSwitch 代码沉寂需关注</h3>
+        <p>作为数据中心 GPU 互联的核心模块，NVLink 和 NVSwitch 本周在开源仓库中零活动。考虑到 GTC 2026 已展示 Vera Rubin NVL72 和 NVLink Fusion，开源代码可能滞后于硬件发布，需关注后续是否会推送大规模驱动更新。</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 本周观察 -->
+  <div class="summary">
+    <h2>本周观察</h2>
+    <p><strong>MMU/UVM 稳定性危机叠加 Blackwell 固件问题</strong>，使 open-gpu-kernel-modules 在 AI 推理场景下的可靠性面临严峻考验。与此同时，NVLink/NVSwitch 开源代码的沉默与 GTC 2026 展示的 Rubin NVL72 形成鲜明对比——硬件已发布但驱动未同步，暗示下一波大规模开源更新可能即将到来。</p>
+  </div>
+
+</div>
+
+<script>
+function toggleSection(header) {
+  header.classList.toggle('active');
+  const content = header.nextElementSibling;
+  content.classList.toggle('open');
+}
+
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', function(e) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+window.addEventListener('scroll', function() {
+  const sections = document.querySelectorAll('.section[id]');
+  const scrollPos = window.scrollY + 100;
+
+  sections.forEach(section => {
+    if (section.offsetTop <= scrollPos && section.offsetTop + section.offsetHeight > scrollPos) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      const activeTab = document.querySelector(`.nav-tab[href="#${section.id}"]`);
+      if (activeTab) activeTab.classList.add('active');
+    }
+  });
+});
+</script>
+</body>
+</html>

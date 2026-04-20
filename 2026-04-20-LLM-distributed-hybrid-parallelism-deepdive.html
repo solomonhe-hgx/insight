@@ -4,928 +4,1090 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLM 分布式混合并行 - 论文深度解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-            min-height: 100vh;
-            color: #e0e0e0;
-            line-height: 1.8;
-            padding: 40px 20px;
-        }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header {
-            text-align: center;
-            margin-bottom: 50px;
-            padding: 40px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-        }
-        .header h1 {
-            font-size: 2.5em;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 20px;
-        }
-        .header .paper-info {
-            font-size: 0.95em;
-            color: #a0a0c0;
-            margin: 10px 0;
-        }
-        .header .tags { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
-        .tag {
-            padding: 6px 16px;
-            background: rgba(102,126,234,0.2);
-            border: 1px solid rgba(102,126,234,0.4);
-            border-radius: 20px;
-            font-size: 0.85em;
-            color: #667eea;
-        }
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .nav-tab {
-            padding: 10px 20px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            color: #b0b0d0;
-            font-size: 0.95em;
-        }
-        .nav-tab:hover, .nav-tab.active {
-            background: rgba(102,126,234,0.2);
-            border-color: rgba(102,126,234,0.5);
-            color: #667eea;
-        }
-        .section {
-            background: rgba(255,255,255,0.03);
-            border-radius: 20px;
-            padding: 40px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255,255,255,0.08);
-            backdrop-filter: blur(10px);
-        }
-        .section h2 {
-            font-size: 1.8em;
-            color: #667eea;
-            margin-bottom: 25px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid rgba(102,126,234,0.3);
-        }
-        .section h3 {
-            font-size: 1.4em;
-            color: #a78bfa;
-            margin: 30px 0 15px 0;
-        }
-        .section h4 {
-            font-size: 1.15em;
-            color: #f0abfc;
-            margin: 25px 0 12px 0;
-        }
-        .highlight-box {
-            background: rgba(102,126,234,0.1);
-            border-left: 4px solid #667eea;
-            padding: 20px 25px;
-            margin: 20px 0;
-            border-radius: 0 12px 12px 0;
-        }
-        .formula-box {
-            background: rgba(0,0,0,0.3);
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 0;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            overflow-x: auto;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .comparison-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 0.9em;
-        }
-        .comparison-table th, .comparison-table td {
-            padding: 12px 15px;
-            text-align: left;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .comparison-table th {
-            background: rgba(102,126,234,0.2);
-            color: #667eea;
-            font-weight: 600;
-        }
-        .comparison-table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
-        .comparison-table tr:hover { background: rgba(102,126,234,0.1); }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 25px 0; }
-        .card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 25px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(102,126,234,0.2);
-        }
-        .card h4 { color: #667eea; margin-bottom: 12px; font-size: 1.1em; }
-        .card .pros { color: #4ade80; }
-        .card .cons { color: #f87171; }
-        .insight-list { list-style: none; padding: 0; }
-        .insight-list li {
-            padding: 12px 20px;
-            margin: 10px 0;
-            background: rgba(255,255,255,0.03);
-            border-radius: 10px;
-            border-left: 3px solid #a78bfa;
-        }
-        .metric-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            background: rgba(74,222,128,0.2);
-            border: 1px solid rgba(74,222,128,0.4);
-            border-radius: 15px;
-            color: #4ade80;
-            font-size: 0.85em;
-            font-weight: 600;
-        }
-        .metric-badge.warn {
-            background: rgba(248,113,113,0.2);
-            border-color: rgba(248,113,113,0.4);
-            color: #f87171;
-        }
-        .architecture-diagram {
-            background: rgba(0,0,0,0.3);
-            border-radius: 15px;
-            padding: 30px;
-            margin: 25px 0;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .architecture-diagram .layer {
-            display: inline-block;
-            padding: 12px 25px;
-            margin: 8px;
-            border-radius: 10px;
-            font-weight: 600;
-            font-size: 0.9em;
-        }
-        .layer.gpu { background: rgba(102,126,234,0.3); border: 1px solid #667eea; }
-        .layer.dp { background: rgba(74,222,128,0.3); border: 1px solid #4ade80; }
-        .layer.tp { background: rgba(248,113,113,0.3); border: 1px solid #f87171; }
-        .layer.pp { background: rgba(250,204,21,0.3); border: 1px solid #facc15; }
-        .layer.cp { background: rgba(167,139,250,0.3); border: 1px solid #a78bfa; }
-        .flow-arrow { color: #667eea; font-size: 1.5em; margin: 0 10px; }
-        .details-expand {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px;
-            margin: 15px 0;
-            overflow: hidden;
-        }
-        .details-expand summary {
-            padding: 15px 20px;
-            cursor: pointer;
-            color: #667eea;
-            font-weight: 600;
-            transition: background 0.3s;
-        }
-        .details-expand summary:hover { background: rgba(102,126,234,0.1); }
-        .details-expand .content { padding: 20px; }
-        .footer {
-            text-align: center;
-            margin-top: 50px;
-            padding: 30px;
-            color: #8080a0;
-            font-size: 0.9em;
-        }
-        .footer a { color: #667eea; text-decoration: none; }
-        .footer a:hover { text-decoration: underline; }
-        ul, ol { padding-left: 25px; margin: 15px 0; }
-        li { margin: 8px 0; }
-        p { margin: 12px 0; }
-        code {
-            background: rgba(0,0,0,0.3);
-            padding: 2px 8px;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-        }
-        .ref-link {
-            color: #667eea;
-            text-decoration: none;
-            border-bottom: 1px dashed rgba(102,126,234,0.5);
-        }
-        .ref-link:hover { border-bottom-style: solid; }
-        .emoji-icon { font-size: 1.2em; margin-right: 8px; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .metric-card { background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); }
+        .update-card { transition: all 0.3s ease; }
+        .update-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .table-row-hover:hover { background: rgba(99, 102, 241, 0.1); }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        .detail-section { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .ref-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; background: rgba(99, 102, 241, 0.15); color: #818cf8; border-radius: 4px; text-decoration: none; margin-left: 6px; white-space: nowrap; transition: all 0.15s; }
+        .ref-link:hover { background: rgba(99, 102, 241, 0.3); }
+        .ref-link.green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .ref-link.green:hover { background: rgba(16, 185, 129, 0.3); }
+        .ref-link.orange { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .ref-link.orange:hover { background: rgba(245, 158, 11, 0.3); }
+        .ref-link.purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .ref-link.purple:hover { background: rgba(139, 92, 246, 0.3); }
+        .ref-link.cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; }
+        .ref-link.cyan:hover { background: rgba(6, 182, 212, 0.3); }
+        .formula-box { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.15); font-family: 'Courier New', monospace; }
+        .layer-gpu { background: rgba(99, 102, 241, 0.3); border: 1px solid #6366f1; }
+        .layer-dp { background: rgba(16, 185, 129, 0.3); border: 1px solid #10b981; }
+        .layer-tp { background: rgba(239, 68, 68, 0.3); border: 1px solid #ef4444; }
+        .layer-pp { background: rgba(250, 204, 21, 0.3); border: 1px solid #facc15; }
+        .layer-cp { background: rgba(167, 139, 250, 0.3); border: 1px solid #a78bfa; }
+        .badge-best { background: rgba(16, 185, 129, 0.1); }
+        .badge-worst { background: rgba(239, 68, 68, 0.1); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>LLM 分布式混合并行</h1>
-            <div class="paper-info"><strong>论文标题:</strong> Distributed Hybrid Parallelism for Large Language Models: Comparative Study and System Design Guide</div>
-            <div class="paper-info"><strong>作者:</strong> Hossam Amer, Mahmoud Gharib, Atef Ibrahim, Qiang Weng, Zheng Wang, Ali Ghodsi (华为加拿大研究所)</div>
-            <div class="paper-info"><strong>arXiv:</strong> <a href="https://arxiv.org/abs/2602.09109" class="ref-link" target="_blank">arXiv:2602.09109</a> | <strong>年份:</strong> 2026</div>
-            <div class="paper-info"><strong>页数:</strong> 60页 | <strong>核心主题:</strong> 分布式训练与推理的并行化策略系统性指南</div>
-            <div class="tags">
-                <span class="tag">Data Parallelism</span>
-                <span class="tag">Tensor Parallelism</span>
-                <span class="tag">Pipeline Parallelism</span>
-                <span class="tag">Context Parallelism</span>
-                <span class="tag">Expert Parallelism</span>
-                <span class="tag">Hybrid 3D/4D</span>
-                <span class="tag">MFU Optimization</span>
-                <span class="tag">Auto-Parallelism</span>
-                <span class="tag">Mamba SSM</span>
-                <span class="tag">Ascend NPU</span>
+<body class="text-slate-200">
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-diagram-project text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">LLM 分布式混合并行</h1>
+                        <p class="text-xs text-slate-400">Distributed Hybrid Parallelism for Large Language Models: Comparative Study and System Design Guide</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-slate-300">论文信息</div>
+                        <div class="text-xs text-slate-400">arXiv:2602.09109 | 2026 | 60页</div>
+                    </div>
+                    <a href="https://arxiv.org/abs/2602.09109" target="_blank" class="metric-card px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-500/20 transition-colors">
+                        <i class="fas fa-external-link-alt text-indigo-400 text-sm"></i>
+                        <div>
+                            <div class="text-xs text-indigo-400 font-medium">arXiv</div>
+                            <div class="text-xs text-slate-400">阅读原文</div>
+                        </div>
+                    </a>
+                </div>
             </div>
         </div>
+    </header>
 
-        <div class="nav-tabs">
-            <div class="nav-tab active" onclick="showSection('overview')">论文概览</div>
-            <div class="nav-tab" onclick="showSection('collective')">集合通信</div>
-            <div class="nav-tab" onclick="showSection('parallelism')">并行策略</div>
-            <div class="nav-tab" onclick="showSection('memory')">内存优化</div>
-            <div class="nav-tab" onclick="showSection('overlap')">通信重叠</div>
-            <div class="nav-tab" onclick="showSection('hybrid')">混合系统</div>
-            <div class="nav-tab" onclick="showSection('frameworks')">框架对比</div>
-            <div class="nav-tab" onclick="showSection('theory')">理论分析</div>
-            <div class="nav-tab" onclick="showSection('casestudy')">案例研究</div>
-            <div class="nav-tab" onclick="showSection('auto')">自动并行</div>
-            <div class="nav-tab" onclick="showSection('challenges')">挑战与未来</div>
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('overview')" id="tab-overview" class="tab-active px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-chart-line"></i> 论文概览
+            </button>
+            <button onclick="showTab('collective')" id="tab-collective" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-network-wired"></i> 集合通信
+            </button>
+            <button onclick="showTab('parallelism')" id="tab-parallelism" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-cubes"></i> 并行策略
+            </button>
+            <button onclick="showTab('memory')" id="tab-memory" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-memory"></i> 内存优化
+            </button>
+            <button onclick="showTab('overlap')" id="tab-overlap" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-layer-group"></i> 通信重叠
+            </button>
+            <button onclick="showTab('hybrid')" id="tab-hybrid" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-puzzle-piece"></i> 混合系统
+            </button>
+            <button onclick="showTab('frameworks')" id="tab-frameworks" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-toolbox"></i> 框架对比
+            </button>
+            <button onclick="showTab('theory')" id="tab-theory" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-square-root-variable"></i> 理论分析
+            </button>
+            <button onclick="showTab('casestudy')" id="tab-casestudy" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-flask"></i> 案例研究
+            </button>
+            <button onclick="showTab('auto')" id="tab-auto" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-robot"></i> 自动并行
+            </button>
+            <button onclick="showTab('challenges')" id="tab-challenges" class="tab-inactive px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm">
+                <i class="fas fa-telescope"></i> 挑战与未来
+            </button>
         </div>
+    </nav>
 
-        <!-- Section 1: Overview -->
-        <div id="overview" class="section">
-            <h2><span class="emoji-icon">&#128202;</span>1. 论文概览与核心动机</h2>
-            
-            <div class="highlight-box">
-                <strong>核心问题:</strong> 随着 LLM 规模指数增长（从 BERT 110M 到 GPT-3 175B 再到万亿参数），单设备已无法承载模型训练与推理。如何组合多种并行策略（DP/TP/PP/CP/EP）在有限硬件资源下最大化 Model FLOPs Utilization (MFU)、最小化通信开销、满足内存约束，成为分布式 AI 系统的核心挑战。
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <!-- ==================== Overview Tab ==================== -->
+        <section id="content-overview" class="space-y-6">
+            <div class="glass-card rounded-xl p-6 border-l-4 border-indigo-500">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-bullseye text-indigo-400"></i> 核心问题</h2>
+                <p class="text-sm text-slate-300 leading-relaxed">
+                    随着 LLM 规模指数增长（从 BERT 110M 到 GPT-3 175B 再到万亿参数），单设备已无法承载模型训练与推理。如何组合多种并行策略（DP/TP/PP/CP/EP）在有限硬件资源下最大化 Model FLOPs Utilization (MFU)、最小化通信开销、满足内存约束，成为分布式 AI 系统的核心挑战。
+                </p>
             </div>
 
-            <h3>1.1 论文贡献</h3>
-            <ul class="insight-list">
-                <li><strong>系统性综述:</strong> 全面回顾分布式混合并行策略，涵盖数据并行、模型并行、激活并行的所有变体及其组合方式</li>
-                <li><strong>理论分析:</strong> 对 GQA（Grouped Query Attention）、MLP（SwiGLU）、Mamba-2（SSD）三种核心模块进行 FLOPs、内存、通信的统一数学建模</li>
-                <li><strong>实验验证:</strong> 在 Ascend 910B NPU 集群上对 LLaMA 1B/7B 和 Mamba 1B/7B 进行 16+ 种并行配置的系统性评测</li>
-                <li><strong>设计指南:</strong> 提供从问题公式化、策略选择、SLO 权衡到框架实现的完整系统设计流程</li>
-                <li><strong>开源洞察:</strong> 对比 Megatron-LM、NeMo、DeepSpeed、MindSpeed-LLM 等主流框架的实现差异</li>
-            </ul>
-
-            <h3>1.2 核心评估指标</h3>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>MFU (Model FLOPs Utilization)</h4>
-                    <p>模型实际达到的 FLOPs 与硬件峰值 FLOPs 的比值。衡量计算资源利用效率的核心指标，越高越好。</p>
-                    <span class="metric-badge">核心优化目标</span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-file-alt text-indigo-400"></i></div>
+                        <div class="text-sm text-slate-400">论文信息</div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div><span class="text-slate-500">作者:</span> <span class="text-slate-300">Hossam Amer, Mahmoud Gharib, Atef Ibrahim, Qiang Weng, Zheng Wang, Ali Ghodsi</span></div>
+                        <div><span class="text-slate-500">机构:</span> <span class="text-slate-300">华为加拿大研究所</span></div>
+                        <div><span class="text-slate-500">arXiv:</span> <a href="https://arxiv.org/abs/2602.09109" class="ref-link" target="_blank"><i class="fas fa-external-link-alt"></i>arXiv:2602.09109</a></div>
+                        <div><span class="text-slate-500">年份:</span> <span class="text-slate-300">2026</span></div>
+                    </div>
                 </div>
-                <div class="card">
-                    <h4>TTFT (Time To First Token)</h4>
-                    <p>推理场景下从输入到生成第一个 token 的延迟。影响用户体验的关键指标，越低越好。</p>
-                    <span class="metric-badge">推理关键指标</span>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-tags text-purple-400"></i></div>
+                        <div class="text-sm text-slate-400">核心主题</div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="text-xs px-2 py-1 rounded bg-indigo-500/20 text-indigo-300">Data Parallelism</span>
+                        <span class="text-xs px-2 py-1 rounded bg-indigo-500/20 text-indigo-300">Tensor Parallelism</span>
+                        <span class="text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-300">Pipeline Parallelism</span>
+                        <span class="text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-300">Context Parallelism</span>
+                        <span class="text-xs px-2 py-1 rounded bg-cyan-500/20 text-cyan-300">Expert Parallelism</span>
+                        <span class="text-xs px-2 py-1 rounded bg-cyan-500/20 text-cyan-300">Hybrid 3D/4D</span>
+                        <span class="text-xs px-2 py-1 rounded bg-green-500/20 text-green-300">MFU Optimization</span>
+                        <span class="text-xs px-2 py-1 rounded bg-green-500/20 text-green-300">Auto-Parallelism</span>
+                        <span class="text-xs px-2 py-1 rounded bg-amber-500/20 text-amber-300">Mamba SSM</span>
+                        <span class="text-xs px-2 py-1 rounded bg-amber-500/20 text-amber-300">Ascend NPU</span>
+                    </div>
                 </div>
-                <div class="card">
-                    <h4>TPOT (Time Per Output Token)</h4>
-                    <p>推理场景下每个生成 token 的平均时间。反映解码阶段效率。</p>
-                    <span class="metric-badge">推理关键指标</span>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-star text-yellow-400"></i> 论文贡献</h2>
+                <ul class="space-y-3 text-sm text-slate-300">
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong>系统性综述:</strong> 全面回顾分布式混合并行策略，涵盖数据并行、模型并行、激活并行的所有变体及其组合方式</span></li>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong>理论分析:</strong> 对 GQA（Grouped Query Attention）、MLP（SwiGLU）、Mamba-2（SSD）三种核心模块进行 FLOPs、内存、通信的统一数学建模</span></li>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong>实验验证:</strong> 在 Ascend 910B NPU 集群上对 LLaMA 1B/7B 和 Mamba 1B/7B 进行 16+ 种并行配置的系统性评测</span></li>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong>设计指南:</strong> 提供从问题公式化、策略选择、SLO 权衡到框架实现的完整系统设计流程</span></li>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong>开源洞察:</strong> 对比 Megatron-LM、NeMo、DeepSpeed、MindSpeed-LLM 等主流框架的实现差异</span></li>
+                </ul>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-gauge-high text-green-400"></i> 核心评估指标</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="metric-card rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2"><i class="fas fa-gauge text-indigo-400"></i><span class="text-sm font-medium text-indigo-300">MFU</span></div>
+                        <p class="text-xs text-slate-400 leading-relaxed">模型实际达到的 FLOPs 与硬件峰值 FLOPs 的比值。衡量计算资源利用效率的核心指标，越高越好。</p>
+                        <span class="text-xs mt-2 inline-block px-2 py-0.5 rounded bg-green-500/20 text-green-400">核心优化目标</span>
+                    </div>
+                    <div class="metric-card rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2"><i class="fas fa-clock text-cyan-400"></i><span class="text-sm font-medium text-cyan-300">TTFT</span></div>
+                        <p class="text-xs text-slate-400 leading-relaxed">推理场景下从输入到生成第一个 token 的延迟。影响用户体验的关键指标，越低越好。</p>
+                        <span class="text-xs mt-2 inline-block px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400">推理关键指标</span>
+                    </div>
+                    <div class="metric-card rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2"><i class="fas fa-hourglass-half text-purple-400"></i><span class="text-sm font-medium text-purple-300">TPOT</span></div>
+                        <p class="text-xs text-slate-400 leading-relaxed">推理场景下每个生成 token 的平均时间。反映解码阶段效率。</p>
+                        <span class="text-xs mt-2 inline-block px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400">推理关键指标</span>
+                    </div>
+                    <div class="metric-card rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2"><i class="fas fa-chart-line text-green-400"></i><span class="text-sm font-medium text-green-300">Throughput</span></div>
+                        <p class="text-xs text-slate-400 leading-relaxed">训练吞吐量（每秒处理 token 数）和推理吞吐量（每秒服务请求数）。直接影响训练成本和推理服务能力。</p>
+                        <span class="text-xs mt-2 inline-block px-2 py-0.5 rounded bg-green-500/20 text-green-400">核心性能指标</span>
+                    </div>
                 </div>
-                <div class="card">
-                    <h4>Throughput (tokens/sec)</h4>
-                    <p>训练吞吐量（每秒处理 token 数）和推理吞吐量（每秒服务请求数）。直接影响训练成本和推理服务能力。</p>
-                    <span class="metric-badge">核心性能指标</span>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-square-root-variable text-purple-400"></i> 问题公式化</h2>
+                <p class="text-sm text-slate-300 mb-3">给定模型架构 <code class="px-1.5 py-0.5 rounded bg-slate-700 text-indigo-300 text-xs">M</code>、硬件集群 <code class="px-1.5 py-0.5 rounded bg-slate-700 text-indigo-300 text-xs">H</code>、全局 batch size <code class="px-1.5 py-0.5 rounded bg-slate-700 text-indigo-300 text-xs">B</code>、序列长度 <code class="px-1.5 py-0.5 rounded bg-slate-700 text-indigo-300 text-xs">S</code>，寻找最优并行配置 <code class="px-1.5 py-0.5 rounded bg-slate-700 text-indigo-300 text-xs">P = (DP, PP, TP, CP, EP)</code> 使得:</p>
+                <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                    <div>maximize: MFU(P, M, H, B, S)</div>
+                    <div>subject to: memory_per_device(P, M, B, S) &lt;= device_memory_capacity</div>
+                    <div>subject to: latency(P, M, B, S) &lt;= SLO_target (for inference)</div>
+                    <div>subject to: DP * PP * TP * CP * EP = world_size (total devices)</div>
+                </div>
+                <p class="text-sm text-slate-400 mt-3">这是一个组合优化问题，搜索空间随模型层数和并行维度指数增长。例如 80 层 Transformer 可产生约 10^125 种配置组合。</p>
+            </div>
+        </section>
+
+        <!-- ==================== Collective Tab ==================== -->
+        <section id="content-collective" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-network-wired text-indigo-400"></i> 分布式集合通信操作</h2>
+                <p class="text-sm text-slate-300 mb-6">分布式并行策略的效率直接依赖于底层集合通信操作的性能。论文系统性地分析了六种核心集合操作的数据移动模式和通信量。</p>
+
+                <div class="space-y-4">
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-indigo-500">
+                        <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('reduce')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-reduce"></i><h3 class="font-semibold text-white">Reduce (归约)</h3></div>
+                            <span class="text-xs bg-slate-700 px-2 py-1 rounded font-mono">O((N-1)*n)</span>
+                        </div>
+                        <div id="reduce-summary" class="mt-2"><p class="text-sm text-slate-300">将多个设备上的数据按元素进行归约操作（求和、最大值、最小值等）。根设备接收最终结果。</p></div>
+                        <div id="reduce-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono">
+                                数据量: (N-1) * n * element_size<br>
+                                N = 设备数, n = 每设备元素数
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500">
+                        <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('gather')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-gather"></i><h3 class="font-semibold text-white">Gather (收集)</h3></div>
+                            <span class="text-xs bg-slate-700 px-2 py-1 rounded font-mono">O((N-1)*n)</span>
+                        </div>
+                        <div id="gather-summary" class="mt-2"><p class="text-sm text-slate-300">根设备从所有设备收集各自的数据分片，组合成完整数据。每个设备 i 贡献数据分片 i。</p></div>
+                        <div id="gather-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono">数据量: (N-1) * n * element_size</div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500">
+                        <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('allgather')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-allgather"></i><h3 class="font-semibold text-white">AllGather (全收集)</h3></div>
+                            <span class="text-xs bg-slate-700 px-2 py-1 rounded font-mono">每设备 O((N-1)*n)</span>
+                        </div>
+                        <div id="allgather-summary" class="mt-2"><p class="text-sm text-slate-300">所有设备同时执行 Gather 操作，每个设备最终都拥有完整数据。比单纯 Gather 更常用。</p></div>
+                        <div id="allgather-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                数据量: (N-1) * n * element_size per device<br>
+                                优化: 环形 AllGather 可将单次通信量降至 n * element_size，共 N-1 步
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500">
+                        <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('reducescatter')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-reducescatter"></i><h3 class="font-semibold text-white">ReduceScatter (归约分散)</h3></div>
+                            <span class="text-xs bg-slate-700 px-2 py-1 rounded font-mono">O((N-1)*n)</span>
+                        </div>
+                        <div id="reducescatter-summary" class="mt-2"><p class="text-sm text-slate-300">结合 Reduce 和 Scatter：先按元素归约，再将结果分散到各设备。每个设备获得归约后数据的一个分片。</p></div>
+                        <div id="reducescatter-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                数据量: (N-1) * n * element_size<br>
+                                关键应用: AllReduce 的两阶段实现（ReduceScatter + AllGather）
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500">
+                        <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('allreduce')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-allreduce"></i><h3 class="font-semibold text-white">AllReduce (全归约)</h3></div>
+                            <span class="text-xs bg-slate-700 px-2 py-1 rounded font-mono">2*(N-1)*n</span>
+                        </div>
+                        <div id="allreduce-summary" class="mt-2"><p class="text-sm text-slate-300">所有设备上的数据按元素归约（通常是求和），每个设备都获得完整的归约结果。分布式训练中最关键的集合操作，用于梯度同步。</p></div>
+                        <div id="allreduce-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                两阶段实现:<br>
+                                1. ReduceScatter: 每个设备获得 1/N 的归约结果<br>
+                                2. AllGather: 每个设备获取完整结果<br>
+                                总通信量: 2 * (N-1) * n * element_size per device<br>
+                                最优实现: 环形或树形拓扑
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-red-500">
+                        <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('alltoall')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-alltoall"></i><h3 class="font-semibold text-white">All-to-All (全对全)</h3></div>
+                            <span class="text-xs bg-slate-700 px-2 py-1 rounded font-mono">O(N*(N-1)*n)</span>
+                        </div>
+                        <div id="alltoall-summary" class="mt-2"><p class="text-sm text-slate-300">每个设备向所有其他设备发送不同的数据分片。通信模式最复杂，常见于 Expert Parallelism 中的 token 路由。</p></div>
+                        <div id="alltoall-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                数据量: (N-1) * n * element_size per device<br>
+                                总网络流量: N * (N-1) * n * element_size
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-lg p-5 mt-6 bg-indigo-500/10 border border-indigo-500/30">
+                    <h3 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>通信优化关键洞察</h3>
+                    <p class="text-sm text-slate-300">Ring AllReduce 将每设备通信量从 O(N*n) 降至 O(2*(N-1)*n/N)，在大规模场景下差异巨大。现代框架（NCCL、DeepEP）利用硬件拓扑感知（NVLink、InfiniBand）进一步优化带宽利用率。</p>
                 </div>
             </div>
+        </section>
 
-            <h3>1.3 问题公式化</h3>
-            <p>给定模型架构 <code>M</code>、硬件集群 <code>H</code>、全局 batch size <code>B</code>、序列长度 <code>S</code>，寻找最优并行配置 <code>P = (DP, PP, TP, CP, EP)</code> 使得:</p>
-            <div class="formula-box">
-                maximize: MFU(P, M, H, B, S)<br>
-                subject to: memory_per_device(P, M, B, S) &lt;= device_memory_capacity<br>
-                subject to: latency(P, M, B, S) &lt;= SLO_target (for inference)<br>
-                subject to: DP * PP * TP * CP * EP = world_size (total devices)
-            </div>
-            <p>这是一个组合优化问题，搜索空间随模型层数和并行维度指数增长。例如 80 层 Transformer 可产生约 10^125 种配置组合。</p>
-        </div>
+        <!-- ==================== Parallelism Tab ==================== -->
+        <section id="content-parallelism" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2"><i class="fas fa-cubes text-indigo-400"></i> 并行策略全景</h2>
 
-        <!-- Section 2: Collective Operations -->
-        <div id="collective" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#128260;</span>2. 分布式集合通信操作</h2>
-            
-            <p>分布式并行策略的效率直接依赖于底层集合通信操作的性能。论文系统性地分析了六种核心集合操作的数据移动模式和通信量。</p>
-
-            <h3>2.1 Reduce (归约)</h3>
-            <p>将多个设备上的数据按元素进行归约操作（求和、最大值、最小值等）。根设备接收最终结果。</p>
-            <div class="formula-box">
-                数据量: (N-1) * n * element_size<br>
-                N = 设备数, n = 每设备元素数
-            </div>
-
-            <h3>2.2 Gather (收集)</h3>
-            <p>根设备从所有设备收集各自的数据分片，组合成完整数据。每个设备 i 贡献数据分片 i。</p>
-            <div class="formula-box">
-                数据量: (N-1) * n * element_size
-            </div>
-
-            <h3>2.3 AllGather (全收集)</h3>
-            <p>所有设备同时执行 Gather 操作，每个设备最终都拥有完整数据。比单纯 Gather 更常用。</p>
-            <div class="formula-box">
-                数据量: (N-1) * n * element_size per device<br>
-                优化: 环形 AllGather 可将单次通信量降至 n * element_size，共 N-1 步
-            </div>
-
-            <h3>2.4 ReduceScatter (归约分散)</h3>
-            <p>结合 Reduce 和 Scatter：先按元素归约，再将结果分散到各设备。每个设备获得归约后数据的一个分片。</p>
-            <div class="formula-box">
-                数据量: (N-1) * n * element_size<br>
-                关键应用: AllReduce 的两阶段实现（ReduceScatter + AllGather）
-            </div>
-
-            <h3>2.5 AllReduce (全归约)</h3>
-            <p>所有设备上的数据按元素归约（通常是求和），每个设备都获得完整的归约结果。分布式训练中最关键的集合操作，用于梯度同步。</p>
-            <div class="formula-box">
-                两阶段实现:<br>
-                1. ReduceScatter: 每个设备获得 1/N 的归约结果<br>
-                2. AllGather: 每个设备获取完整结果<br>
-                总通信量: 2 * (N-1) * n * element_size per device<br>
-                最优实现: 环形或树形拓扑
-            </div>
-
-            <h3>2.6 All-to-All (全对全)</h3>
-            <p>每个设备向所有其他设备发送不同的数据分片。通信模式最复杂，常见于 Expert Parallelism 中的 token 路由。</p>
-            <div class="formula-box">
-                数据量: (N-1) * n * element_size per device<br>
-                总网络流量: N * (N-1) * n * element_size
-            </div>
-
-            <div class="highlight-box">
-                <strong>通信优化关键洞察:</strong> Ring AllReduce 将每设备通信量从 O(N*n) 降至 O(2*(N-1)*n/N)，在大规模场景下差异巨大。现代框架（NCCL、DeepEP）利用硬件拓扑感知（NVLink、InfiniBand）进一步优化带宽利用率。
-            </div>
-        </div>
-
-        <!-- Section 3: Parallelism Strategies -->
-        <div id="parallelism" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#9881;&#65039;</span>3. 并行策略全景</h2>
-
-            <div class="architecture-diagram">
-                <div class="layer dp">Data Parallelism (DP)</div>
-                <span class="flow-arrow">+</span>
-                <div class="layer pp">Pipeline Parallelism (PP)</div>
-                <span class="flow-arrow">+</span>
-                <div class="layer tp">Tensor Parallelism (TP)</div>
-                <span class="flow-arrow">+</span>
-                <div class="layer cp">Context Parallelism (CP)</div>
-                <span class="flow-arrow">+</span>
-                <div class="layer gpu">Expert Parallelism (EP)</div>
-                <p style="margin-top:20px; color:#a0a0c0;">= 3D/4D/5D 混合并行</p>
-            </div>
-
-            <h3>3.1 数据并行 (Data Parallelism, DP)</h3>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>工作原理</h4>
-                    <p>每个设备持有完整模型副本，处理不同的数据 batch。每步结束后通过 AllReduce 同步梯度。</p>
+                <div class="formula-box rounded-xl p-6 text-center mb-8">
+                    <div class="flex flex-wrap items-center justify-center gap-3 mb-4">
+                        <span class="layer-dp px-4 py-2 rounded-lg font-semibold text-sm">Data Parallelism (DP)</span>
+                        <span class="text-indigo-400 text-xl">+</span>
+                        <span class="layer-pp px-4 py-2 rounded-lg font-semibold text-sm">Pipeline Parallelism (PP)</span>
+                        <span class="text-indigo-400 text-xl">+</span>
+                        <span class="layer-tp px-4 py-2 rounded-lg font-semibold text-sm">Tensor Parallelism (TP)</span>
+                        <span class="text-indigo-400 text-xl">+</span>
+                        <span class="layer-cp px-4 py-2 rounded-lg font-semibold text-sm">Context Parallelism (CP)</span>
+                        <span class="text-indigo-400 text-xl">+</span>
+                        <span class="layer-gpu px-4 py-2 rounded-lg font-semibold text-sm">Expert Parallelism (EP)</span>
+                    </div>
+                    <p class="text-slate-400">= 3D/4D/5D 混合并行</p>
                 </div>
-                <div class="card">
-                    <h4>优点 <span class="pros">&#10004;</span></h4>
-                    <ul>
-                        <li>实现简单，通信开销最小</li>
-                        <li>通过分布式数据提高吞吐量</li>
-                        <li>前向/后向传播中通信极少</li>
+
+                <div class="space-y-4">
+                    <!-- DP -->
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('dp')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-dp"></i><h3 class="font-semibold text-white">3.1 数据并行 (Data Parallelism, DP)</h3></div>
+                        </div>
+                        <div id="dp-summary" class="mt-2"><p class="text-sm text-slate-300">每个设备持有完整模型副本，处理不同的数据 batch。每步结束后通过 AllReduce 同步梯度。</p></div>
+                        <div id="dp-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-green-500/10 rounded-lg p-4 border border-green-500/20">
+                                    <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-thumbs-up mr-2"></i>优点</h4>
+                                    <ul class="space-y-1 text-sm text-slate-400">
+                                        <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 text-xs"></i><span>实现简单，通信开销最小</span></li>
+                                        <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 text-xs"></i><span>通过分布式数据提高吞吐量</span></li>
+                                        <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 text-xs"></i><span>前向/后向传播中通信极少</span></li>
+                                    </ul>
+                                </div>
+                                <div class="bg-red-500/10 rounded-lg p-4 border border-red-500/20">
+                                    <h4 class="text-sm font-medium text-red-300 mb-2"><i class="fas fa-thumbs-down mr-2"></i>缺点</h4>
+                                    <ul class="space-y-1 text-sm text-slate-400">
+                                        <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1 text-xs"></i><span>每设备需完整模型副本</span></li>
+                                        <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1 text-xs"></i><span>梯度同步开销大（尤其大模型）</span></li>
+                                        <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1 text-xs"></i><span>对超大模型内存效率低</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PP -->
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-yellow-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('pp')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-pp"></i><h3 class="font-semibold text-white">3.2 流水线并行 (Pipeline Parallelism, PP)</h3></div>
+                        </div>
+                        <div id="pp-summary" class="mt-2"><p class="text-sm text-slate-300">将模型按层划分到不同设备，数据以 micro-batch 形式在设备间流水线式传递。设备 i 处理层 [L_i, L_{i+1})。</p></div>
+                        <div id="pp-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">
+                                <h4 class="text-sm font-medium text-yellow-300 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>流水线气泡 (Pipeline Bubble)</h4>
+                                <p class="text-sm text-slate-300">当最后一个 micro-batch 离开设备前，部分设备处于空闲状态。气泡大小取决于 stage 数量和 micro-batch 数量。GPipe、PipeDream、Interleaved 1F1B 等调度策略致力于最小化气泡。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TP -->
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-red-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('tp')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-tp"></i><h3 class="font-semibold text-white">3.3 张量并行 (Tensor Parallelism, TP)</h3></div>
+                        </div>
+                        <div id="tp-summary" class="mt-2"><p class="text-sm text-slate-300">将单层内的矩阵乘法切分到多个设备。例如将 GEMM Y = XA 按列切分 A 为 [A1, A2]，两设备分别计算 Y1=XA1, Y2=XA2，最后通过 AllReduce 合并结果。</p></div>
+                        <div id="tp-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                典型切分方式:<br>
+                                - Column Parallel: Y = X[A1; A2] = [XA1, XA2] (按列切分权重)<br>
+                                - Row Parallel: Y = X1A1 + X2A2 (按行切分，需 AllReduce)<br>
+                                - Megatron-LM 模式: Attention 和 MLP 分别采用不同切分策略
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CP -->
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('cp')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-cp"></i><h3 class="font-semibold text-white">3.4 上下文并行 / 序列并行 (Context/Sequence Parallelism, CP/SP)</h3></div>
+                        </div>
+                        <div id="cp-summary" class="mt-2"><p class="text-sm text-slate-300">将序列长度维度切分到多个设备。设备 i 处理序列分片 S[i:i+s/CP]。对于超长序列（128K+ tokens）尤为关键。</p></div>
+                        <div id="cp-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="bg-purple-500/10 rounded-lg p-4 border border-purple-500/20">
+                                <h4 class="text-sm font-medium text-purple-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>LASP (Layer-Alternating SP)</h4>
+                                <p class="text-sm text-slate-300">Megatron-LM 提出的改进策略，某些层采用序列并行（切分序列），某些层采用张量并行（切分权重），通过 LayerNorm 的巧妙实现减少通信。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- EP -->
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('ep')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-ep"></i><h3 class="font-semibold text-white">3.5 Expert 并行 (Expert Parallelism, EP)</h3></div>
+                        </div>
+                        <div id="ep-summary" class="mt-2"><p class="text-sm text-slate-300">针对 Mixture-of-Experts (MoE) 架构的专用并行策略。每个设备持有不同的 Expert 子集，token 通过路由机制分配到对应设备。</p></div>
+                        <div id="ep-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                EP 核心挑战:<br>
+                                1. 动态路由: 每个 token 由 gating network 决定发送到哪个 expert<br>
+                                2. 负载均衡: expert 间 token 分布不均导致计算热点<br>
+                                3. 通信开销: token 跨设备路由需要 All-to-All 通信<br>
+                                4. 容量约束: 每设备 expert 有处理上限，超出 token 被丢弃
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparison Table -->
+                <div class="mt-8">
+                    <h3 class="text-base font-semibold mb-4 flex items-center gap-2"><i class="fas fa-table text-indigo-400"></i> 3.6 策略对比总结</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead><tr class="border-b border-slate-600"><th class="text-left py-3 px-4 text-slate-300 font-semibold">策略</th><th class="text-left py-3 px-4 text-indigo-400 font-semibold">核心优势</th><th class="text-left py-3 px-4 text-red-400 font-semibold">核心劣势</th><th class="text-left py-3 px-4 text-slate-300 font-semibold">适用场景</th></tr></thead>
+                            <tbody>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-green-400">DP</td><td class="py-3 px-4">实现简单，吞吐高</td><td class="py-3 px-4">需完整模型副本</td><td class="py-3 px-4">模型可放入单设备</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-yellow-400">PP</td><td class="py-3 px-4">减少每设备内存</td><td class="py-3 px-4">流水线气泡降低效率</td><td class="py-3 px-4">深层网络，内存受限</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-red-400">TP</td><td class="py-3 px-4">切分权重与激活内存</td><td class="py-3 px-4">层间通信开销大</td><td class="py-3 px-4">需要高带宽互联</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-purple-400">CP</td><td class="py-3 px-4">支持超长序列</td><td class="py-3 px-4">负载均衡困难</td><td class="py-3 px-4">注意力密集型模型</td></tr>
+                                <tr class="table-row-hover"><td class="py-3 px-4 font-medium text-cyan-400">EP</td><td class="py-3 px-4">高效扩展 MoE</td><td class="py-3 px-4">路由与负载平衡复杂</td><td class="py-3 px-4">Mixture-of-Experts</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Memory Tab ==================== -->
+        <section id="content-memory" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2"><i class="fas fa-memory text-indigo-400"></i> 内存优化技术</h2>
+
+                <div class="space-y-4">
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-indigo-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('act-ckpt')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-act-ckpt"></i><h3 class="font-semibold text-white">4.1 激活检查点 (Activation Checkpointing)</h3></div>
+                        </div>
+                        <div id="act-ckpt-summary" class="mt-2"><p class="text-sm text-slate-300">不在前向传播中保存所有激活值，仅保存部分检查点。反向传播时重新计算未保存的激活值。以计算换内存。</p></div>
+                        <div id="act-ckpt-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                无检查点: 内存 = O(L * batch * seq_len * hidden)<br>
+                                有检查点: 内存 = O(sqrt(L) * batch * seq_len * hidden) + O(L) 重计算代价<br>
+                                L = 层数
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('sel-release')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-sel-release"></i><h3 class="font-semibold text-white">4.2 选择性激活释放 (Selective Activation Release)</h3></div>
+                        </div>
+                        <div id="sel-release-summary" class="mt-2"><p class="text-sm text-slate-300">在前向传播完成后立即释放不再需要的激活值，而非等到整个 batch 完成。反向传播前保留必要的激活值。</p></div>
+                        <div id="sel-release-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="bg-green-500/10 rounded-lg p-4 border border-green-500/20">
+                                <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-chart-line mr-2"></i>优化效果</h4>
+                                <p class="text-sm text-slate-300">相比朴素检查点可额外节省 20-30% 激活内存，尤其对深层 Transformer 网络显著。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('grad-offload')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-grad-offload"></i><h3 class="font-semibold text-white">4.3 梯度卸载 (Gradient Offloading)</h3></div>
+                        </div>
+                        <div id="grad-offload-summary" class="mt-2"><p class="text-sm text-slate-300">将梯度从 GPU 内存转移到 CPU 内存，在优化器步骤时再搬回。适用于大 batch size 训练。</p></div>
+                        <div id="grad-offload-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700"></div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('zero')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-zero"></i><h3 class="font-semibold text-white">4.4 ZeRO (Zero Redundancy Optimizer)</h3></div>
+                        </div>
+                        <div id="zero-summary" class="mt-2"><p class="text-sm text-slate-300">DeepSpeed 提出的三阶段优化策略，消除数据并行中的冗余状态。</p></div>
+                        <div id="zero-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="metric-card rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-layer-group mr-1"></i>ZeRO-1: 优化器状态切分</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">将优化器状态（如 Adam 的动量和方差）切分到不同设备，每设备只持有 1/N 的优化器状态。通信开销增加有限。</p>
+                                </div>
+                                <div class="metric-card rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-layer-group mr-1"></i>ZeRO-2: 梯度切分</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">在 ZeRO-1 基础上进一步切分梯度，每设备只接收和处理其负责的梯度分片。进一步减少冗余。</p>
+                                </div>
+                                <div class="metric-card rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-layer-group mr-1"></i>ZeRO-3: 参数切分</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">将模型参数也切分到不同设备。前向/后向传播时通过 AllGather 临时获取所需参数。内存最优但通信开销最大。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 glass-card rounded-lg p-5">
+                    <h3 class="text-base font-semibold mb-4 flex items-center gap-2"><i class="fas fa-balance-scale text-indigo-400"></i> 4.5 内存对比分析</h3>
+                    <ul class="space-y-3 text-sm text-slate-300">
+                        <li class="flex items-start gap-2"><i class="fas fa-weight-hanging text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">权重内存:</strong> TP &lt; CP &asymp; DP。TP 将权重切分到 N 个设备，CP 和 DP 每设备持有完整权重</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-weight-hanging text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">激活内存:</strong> CP &asymp; DP &lt; TP（某些情况下）。CP 切分序列维度，DP 切分 batch 维度，TP 在某些层需要保存额外中间结果</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-weight-hanging text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">优化器状态:</strong> ZeRO 系列可将其从 O(N_params) 降至 O(N_params / DP_degree)</span></li>
                     </ul>
                 </div>
-                <div class="card">
-                    <h4>缺点 <span class="cons">&#10008;</span></h4>
-                    <ul>
-                        <li>每设备需完整模型副本</li>
-                        <li>梯度同步开销大（尤其大模型）</li>
-                        <li>对超大模型内存效率低</li>
+            </div>
+        </section>
+
+        <!-- ==================== Overlap Tab ==================== -->
+        <section id="content-overlap" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-layer-group text-indigo-400"></i> 通信-计算重叠技术</h2>
+                <p class="text-sm text-slate-300 mb-6">通信-计算重叠是提升 MFU 的核心技术之一。基本思想是将通信操作与计算操作在时间上交错执行，利用不同的硬件资源（网络 vs 计算单元）实现并发。</p>
+
+                <div class="space-y-4">
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-indigo-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('data-decomp')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-data-decomp"></i><h3 class="font-semibold text-white">5.1 数据分解重叠 (Data Decomposition Overlap)</h3></div>
+                        </div>
+                        <div id="data-decomp-summary" class="mt-2"><p class="text-sm text-slate-300">将大的计算任务（如大矩阵乘法）分解为多个小 chunk，每个 chunk 计算后立即触发对应通信，而非等待全部计算完成再统一通信。</p></div>
+                        <div id="data-decomp-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                朴素模式: [全部计算] ----&gt; [全部通信]<br>
+                                重叠模式: [计算chunk1]-&gt;[通信chunk1]-&gt;[计算chunk2]-&gt;[通信chunk2]...<br>
+                                关键: 计算和通信在不同硬件上并行执行
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('algo-decomp')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-algo-decomp"></i><h3 class="font-semibold text-white">5.2 算法分解重叠 (Algorithm Decom Overlap)</h3></div>
+                        </div>
+                        <div id="algo-decomp-summary" class="mt-2"><p class="text-sm text-slate-300">将算法拆分为独立的部分，某些部分需要通信，某些部分不需要。例如 LayerNorm 不需要跨设备同步，可放在通信间隙执行。</p></div>
+                        <div id="algo-decomp-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700"></div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('kernel-fusion')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-kernel-fusion"></i><h3 class="font-semibold text-white">5.3 内核融合重叠 (Kernel Fusion Overlap)</h3></div>
+                        </div>
+                        <div id="kernel-fusion-summary" class="mt-2"><p class="text-sm text-slate-300">通过 CUDA Graph 和融合内核将多个小操作合并为大操作，减少内核启动开销，同时为通信重叠创造更大的计算窗口。</p></div>
+                        <div id="kernel-fusion-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700"></div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('autotune')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-autotune"></i><h3 class="font-semibold text-white">5.4 自动调优 (Auto-tuning)</h3></div>
+                        </div>
+                        <div id="autotune-summary" class="mt-2"><p class="text-sm text-slate-300">不同 chunk 大小、通信启动时机、重叠策略对性能影响显著。自动调优系统通过搜索找到最优配置。</p></div>
+                        <div id="autotune-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="bg-green-500/10 rounded-lg p-4 border border-green-500/20">
+                                <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>关键洞察</h4>
+                                <p class="text-sm text-slate-300">最优 chunk 大小取决于网络带宽、计算强度、硬件拓扑。经验法则: chunk 大小应使计算时间 &gt;= 通信时间，但 chunk 过大则失去重叠灵活性。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Hybrid Tab ==================== -->
+        <section id="content-hybrid" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2"><i class="fas fa-puzzle-piece text-indigo-400"></i> 混合并行系统设计</h2>
+
+                <div class="space-y-4">
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-indigo-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('3d')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-3d"></i><h3 class="font-semibold text-white">6.1 3D 混合并行</h3></div>
+                        </div>
+                        <div id="3d-summary" class="mt-2"><p class="text-sm text-slate-300">组合三种基本并行策略: DP &times; PP &times; TP = world_size。这是当前大规模训练的主流方案。</p></div>
+                        <div id="3d-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                配置表示: (DP=m, PP=n, TP=p)，满足 m * n * p = world_size<br>
+                                例如 8 卡: (4, 2, 1), (2, 2, 2), (1, 8, 1), (8, 1, 1) 等
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('4d')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-4d"></i><h3 class="font-semibold text-white">6.2 4D 混合并行</h3></div>
+                        </div>
+                        <div id="4d-summary" class="mt-2"><p class="text-sm text-slate-300">在 3D 基础上加入序列/上下文并行 (CP): DP &times; PP &times; TP &times; CP = world_size。适用于超长序列训练场景。</p></div>
+                        <div id="4d-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700"></div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500">
+                        <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('dp-group')">
+                            <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-dp-group"></i><h3 class="font-semibold text-white">6.3 DP 组内并行设计</h3></div>
+                        </div>
+                        <div id="dp-group-summary" class="mt-2"><p class="text-sm text-slate-300">在每个 DP 组内部，进一步组合 PP/TP/CP:</p></div>
+                        <div id="dp-group-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="metric-card rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-indigo-300 mb-2">DP 组 = {PP, TP}</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">经典 3D 并行。PP 切分层，TP 切分层内矩阵。适用于中等长度序列的标准 Transformer 训练。</p>
+                                </div>
+                                <div class="metric-card rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-indigo-300 mb-2">DP 组 = {PP, CP}</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">避免 TP 的 AllReduce 开销，用 CP 替代。适用于序列极长但模型宽度不大的场景。</p>
+                                </div>
+                                <div class="metric-card rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-indigo-300 mb-2">DP 组 = {PP, TP, CP}</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">最灵活但也最复杂。需要仔细调优以避免通信成为瓶颈。适用于极端规模模型。</p>
+                                </div>
+                                <div class="metric-card rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-indigo-300 mb-2">DP 组 = {TP, CP}</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">无 PP 的配置，避免流水线气泡。适用于层数不多但每层计算密集的场景。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500">
+                        <div class="cursor-pointer" onclick="toggleDetail('comm-group')">
+                            <div class="flex items-center gap-2 mb-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-comm-group"></i><h3 class="font-semibold text-white">6.4 通信组设计</h3></div>
+                        </div>
+                        <div id="comm-group-summary" class="mt-2"><p class="text-sm text-slate-300">混合并行需要管理多个通信组:</p></div>
+                        <div id="comm-group-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                            <ul class="space-y-2 text-sm text-slate-300">
+                                <li class="flex items-start gap-2"><span class="text-red-400 font-mono text-xs px-2 py-0.5 rounded bg-red-500/10 flex-shrink-0 mt-0.5">TP 组</span><span>同一张量并行组内的设备，每层执行 AllReduce</span></li>
+                                <li class="flex items-start gap-2"><span class="text-yellow-400 font-mono text-xs px-2 py-0.5 rounded bg-yellow-500/10 flex-shrink-0 mt-0.5">PP 组</span><span>同一流水线组内的设备，传递 micro-batch 激活值</span></li>
+                                <li class="flex items-start gap-2"><span class="text-purple-400 font-mono text-xs px-2 py-0.5 rounded bg-purple-500/10 flex-shrink-0 mt-0.5">CP 组</span><span>同一上下文并行组内的设备，传递序列分片的 KV cache</span></li>
+                                <li class="flex items-start gap-2"><span class="text-green-400 font-mono text-xs px-2 py-0.5 rounded bg-green-500/10 flex-shrink-0 mt-0.5">DP 组</span><span>同一数据并行组内的设备，执行梯度 AllReduce</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Frameworks Tab ==================== -->
+        <section id="content-frameworks" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-toolbox text-indigo-400"></i> 主流框架对比</h2>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead><tr class="border-b border-slate-600"><th class="text-left py-3 px-4 text-slate-300 font-semibold">框架</th><th class="text-left py-3 px-4 text-indigo-400 font-semibold">核心并行支持</th><th class="text-left py-3 px-4 text-slate-300 font-semibold">特色功能</th><th class="text-left py-3 px-4 text-slate-300 font-semibold">通信库</th></tr></thead>
+                        <tbody>
+                            <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-green-400">Megatron-LM</td><td class="py-3 px-4">TP, PP, DP, CP, EP</td><td class="py-3 px-4">Tensor Parallelism 开创者；LASP；GQA 优化；MoE 支持</td><td class="py-3 px-4 font-mono text-xs">NCCL</td></tr>
+                            <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-green-400">NeMo (NVIDIA)</td><td class="py-3 px-4">TP, PP, DP, CP, EP</td><td class="py-3 px-4">Megatron-LM 基础上增加分布式检查点、PEFT 支持、数据管道优化</td><td class="py-3 px-4 font-mono text-xs">NCCL</td></tr>
+                            <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-blue-400">DeepSpeed (Microsoft)</td><td class="py-3 px-4">ZeRO-DP, PP, TP, EP</td><td class="py-3 px-4">ZeRO 系列优化器；Inference 引擎；激活检查点；CPU Offloading</td><td class="py-3 px-4 font-mono text-xs">NCCL / DeepSpeed Comms</td></tr>
+                            <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium text-red-400">MindSpeed-LLM (华为)</td><td class="py-3 px-4">TP, PP, DP, CP, EP</td><td class="py-3 px-4">Ascend NPU 原生支持；HCCL 通信库；MoE 优化；半精度训练</td><td class="py-3 px-4 font-mono text-xs">HCCL</td></tr>
+                            <tr class="table-row-hover"><td class="py-3 px-4 font-medium text-amber-400">SageMaker (AWS)</td><td class="py-3 px-4">DP, PP, TP</td><td class="py-3 px-4">云原生；自动缩放；多实例训练；与 AWS 生态集成</td><td class="py-3 px-4 font-mono text-xs">NCCL / EFA</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="glass-card rounded-lg p-5 mt-6 bg-indigo-500/10 border border-indigo-500/30">
+                    <h3 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>框架选择建议</h3>
+                    <p class="text-sm text-slate-300">NVIDIA GPU 生态首选 Megatron-LM/NeMo；需要 ZeRO 内存优化选 DeepSpeed；Ascend NPU 选 MindSpeed-LLM；云部署考虑 SageMaker。实际项目中经常组合使用（如 DeepSpeed + Megatron-LM）。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Theory Tab ==================== -->
+        <section id="content-theory" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-square-root-variable text-indigo-400"></i> 理论分析: FLOPs、内存与通信建模</h2>
+                <p class="text-sm text-slate-300 mb-6">论文第 5 节对 GQA、MLP 和 Mamba 三种核心模块在不同并行策略下的 FLOPs、激活内存、权重内存和通信开销进行了统一数学建模。以下为核心结论。</p>
+
+                <!-- GQA -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-indigo-500 mb-4">
+                    <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('gqa')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-gqa"></i><h3 class="font-semibold text-white">8.1 GQA (Grouped Query Attention) 分析</h3></div>
+                    </div>
+                    <div id="gqa-summary" class="mt-2">
+                        <p class="text-sm text-slate-300"><strong class="text-indigo-400">FLOPs 不变性:</strong> 总计算量在 TP/CP/DP 三种策略下完全不变，只是分配到不同设备。</p>
+                    </div>
+                    <div id="gqa-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700 space-y-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-indigo-300 mb-2"><i class="fas fa-calculator mr-2"></i>FLOPs 公式</h4>
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                GQA 总 FLOPs = 4*b*s*d^2 + 4*b*s*k*dh*d + 4*b*s^2*d + 5*b*s^2*a<br>
+                                <br>
+                                关键发现: FLOPs(TP) = FLOPs(CP) = FLOPs(DP)
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-purple-300 mb-2"><i class="fas fa-memory mr-2"></i>激活内存对比</h4>
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                GQA 总激活内存 = (3*b*s*d + 2*b*s*d*k/a) * a_byte<br>
+                                <br>
+                                每设备激活内存:<br>
+                                - TP: (b*s*d + 2*b*s*d/TP + 2*b*s*d/TP*k/a) * a_byte<br>
+                                - CP: (b*d*s/CP + 2*b*d*s/CP + 2*b*d*s/CP*k/a) * a_byte<br>
+                                - DP: (s*d*b/DP + 2*s*d*b/DP + 2*s*d*b/DP*k/a) * a_byte<br>
+                                <br>
+                                结论: memory_act(TP) &gt; memory_act(CP) &asymp; memory_act(DP)
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-weight-hanging mr-2"></i>权重内存对比</h4>
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                GQA 总权重内存 = 2*d^2*(1 + k/a) * w_byte<br>
+                                <br>
+                                每设备权重内存:<br>
+                                - TP: 2*(d/TP)^2*(1 + k/a) * w_byte (权重被切分)<br>
+                                - CP: 2*d^2*(1 + k/a) * w_byte (完整权重)<br>
+                                - DP: 2*d^2*(1 + k/a) * w_byte (完整权重)<br>
+                                <br>
+                                结论: memory_wt(TP) &lt; memory_wt(CP) &asymp; memory_wt(DP)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MLP -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('mlp')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-mlp"></i><h3 class="font-semibold text-white">8.2 MLP (SwiGLU) 分析</h3></div>
+                    </div>
+                    <div id="mlp-summary" class="mt-2">
+                        <p class="text-sm text-slate-300">FLOPs 不变性同样成立。激活内存和权重内存的结论与 GQA 一致。</p>
+                    </div>
+                    <div id="mlp-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                            MLP 总 FLOPs = b*s*(6*d*I + 5*I)，其中 I 是 FFN 中间维度<br>
+                            <br>
+                            FLOPs 不变性同样成立: FLOPs(TP) = FLOPs(CP) = FLOPs(DP)<br>
+                            <br>
+                            激活内存: memory_act(TP) &gt; memory_act(CP) &asymp; memory_act(DP)<br>
+                            权重内存: memory_wt(TP) &lt; memory_wt(CP) &asymp; memory_wt(DP)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mamba -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('mamba')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-mamba"></i><h3 class="font-semibold text-white">8.3 Mamba-2 (SSD) 分析</h3></div>
+                    </div>
+                    <div id="mamba-summary" class="mt-2">
+                        <p class="text-sm text-slate-300">Mamba-2 的核心是 State Space Duality (SSD)，将 SSM 递归转换为分块矩阵乘法，利用并行扫描 (parallel scan) 实现线性复杂度。</p>
+                    </div>
+                    <div id="mamba-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700 space-y-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-amber-300 mb-2"><i class="fas fa-calculator mr-2"></i>FLOPs 公式</h4>
+                            <div class="formula-box rounded-lg p-4 text-sm text-slate-300 font-mono space-y-1">
+                                Mamba 总 FLOPs (parallel scan):<br>
+                                = 2*b*[ (s/l)*h*l^2*n + (s/l)*h*l^2*p + (s/l)*h*l*p*n + h*(s/l)*p*n + (s/l)*h*p*n*l ]<br>
+                                  + 2*b*s*d*d_in_proj + 2*b*s*d_inner*d<br>
+                                <br>
+                                其中: s=序列长度, l=chunk大小, h=head数, n=state维度, p=head维度<br>
+                                <br>
+                                关键: 使用 parallel scan 后 inter-chunk 计算从 O((s/l)^2) 降至 O(s/l)
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-amber-300 mb-2"><i class="fas fa-network-wired mr-2"></i>Mamba 通信对比</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead><tr class="border-b border-slate-600"><th class="text-left py-2 px-3 text-slate-300">策略</th><th class="text-left py-2 px-3 text-slate-300">通信量</th><th class="text-left py-2 px-3 text-slate-300">集合操作</th></tr></thead>
+                                    <tbody>
+                                        <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">TPSP</td><td class="py-2 px-3 font-mono text-xs">O(d * d_state * seqlen)</td><td class="py-2 px-3 text-indigo-400">AllReduce</td></tr>
+                                        <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">CP</td><td class="py-2 px-3 font-mono text-xs">O(d * d_state * CP)</td><td class="py-2 px-3 text-cyan-400">All-Gather</td></tr>
+                                        <tr class="table-row-hover"><td class="py-2 px-3 font-mono text-xs">DP</td><td class="py-2 px-3 font-mono text-xs">0</td><td class="py-2 px-3 text-slate-500">-</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="text-sm text-slate-400 mt-2">由于通常 CP &lt;&lt; seqlen，CP 的通信开销远小于 TPSP。这是 Mamba 架构下 CP 优于 TP 的重要原因。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Theory Conclusions -->
+                <div class="glass-card rounded-lg p-5 bg-indigo-500/10 border border-indigo-500/30">
+                    <h3 class="text-sm font-semibold text-indigo-300 mb-3"><i class="fas fa-list-check mr-2"></i>8.4 理论分析核心结论</h3>
+                    <ul class="space-y-2 text-sm text-slate-300">
+                        <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">FLOPs 不变性:</strong> 无论选择 TP/CP/DP，总计算量不变，只是分配到不同设备</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">通信成本是关键:</strong> 通信量和可用带宽共同决定最优配置</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">TP 权重内存最优:</strong> TP 将权重切分到 N 设备，内存减少 N 倍</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">CP/DP 激活内存最优:</strong> 当序列或 batch 是内存瓶颈时优先</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-check-circle text-indigo-400 mt-1 flex-shrink-0"></i><span><strong class="text-indigo-300">Mamba 特殊考虑:</strong> CP 通信量 &lt; TPSP 通信量（因为 CP &lt;&lt; seqlen）</span></li>
                     </ul>
                 </div>
             </div>
+        </section>
 
-            <h3>3.2 流水线并行 (Pipeline Parallelism, PP)</h3>
-            <p>将模型按层划分到不同设备，数据以 micro-batch 形式在设备间流水线式传递。设备 i 处理层 [L_i, L_{i+1})。</p>
-            <div class="highlight-box">
-                <strong>流水线气泡 (Pipeline Bubble):</strong> 当最后一个 micro-batch 离开设备前，部分设备处于空闲状态。气泡大小取决于 stage 数量和 micro-batch 数量。GPipe、PipeDream、Interleaved 1F1B 等调度策略致力于最小化气泡。
-            </div>
+        <!-- ==================== Case Study Tab ==================== -->
+        <section id="content-casestudy" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-flask text-indigo-400"></i> 案例研究: Ascend 910B 上的实验结果</h2>
 
-            <h3>3.3 张量并行 (Tensor Parallelism, TP)</h3>
-            <p>将单层内的矩阵乘法切分到多个设备。例如将 GEMM Y = XA 按列切分 A 为 [A1, A2]，两设备分别计算 Y1=XA1, Y2=XA2，最后通过 AllReduce 合并结果。</p>
-            <div class="formula-box">
-                典型切分方式:<br>
-                - Column Parallel: Y = X[A1; A2] = [XA1, XA2] (按列切分权重)<br>
-                - Row Parallel: Y = X1A1 + X2A2 (按行切分，需 AllReduce)<br>
-                - Megatron-LM 模式: Attention 和 MLP 分别采用不同切分策略
-            </div>
-
-            <h3>3.4 上下文并行 / 序列并行 (Context/Sequence Parallelism, CP/SP)</h3>
-            <p>将序列长度维度切分到多个设备。设备 i 处理序列分片 S[i:i+s/CP]。对于超长序列（128K+ tokens）尤为关键。</p>
-            <div class="highlight-box">
-                <strong>LASP (Layer-Alternating SP):</strong> Megatron-LM 提出的改进策略，某些层采用序列并行（切分序列），某些层采用张量并行（切分权重），通过 LayerNorm 的巧妙实现减少通信。
-            </div>
-
-            <h3>3.5 Expert 并行 (Expert Parallelism, EP)</h3>
-            <p>针对 Mixture-of-Experts (MoE) 架构的专用并行策略。每个设备持有不同的 Expert 子集，token 通过路由机制分配到对应设备。</p>
-            <div class="formula-box">
-                EP 核心挑战:<br>
-                1. 动态路由: 每个 token 由 gating network 决定发送到哪个 expert<br>
-                2. 负载均衡: expert 间 token 分布不均导致计算热点<br>
-                3. 通信开销: token 跨设备路由需要 All-to-All 通信<br>
-                4. 容量约束: 每设备 expert 有处理上限，超出 token 被丢弃
-            </div>
-
-            <h3>3.6 策略对比总结</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>策略</th><th>核心优势</th><th>核心劣势</th><th>适用场景</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td><strong>DP</strong></td><td>实现简单，吞吐高</td><td>需完整模型副本</td><td>模型可放入单设备</td></tr>
-                    <tr><td><strong>PP</strong></td><td>减少每设备内存</td><td>流水线气泡降低效率</td><td>深层网络，内存受限</td></tr>
-                    <tr><td><strong>TP</strong></td><td>切分权重与激活内存</td><td>层间通信开销大</td><td>需要高带宽互联</td></tr>
-                    <tr><td><strong>CP</strong></td><td>支持超长序列</td><td>负载均衡困难</td><td>注意力密集型模型</td></tr>
-                    <tr><td><strong>EP</strong></td><td>高效扩展 MoE</td><td>路由与负载平衡复杂</td><td>Mixture-of-Experts</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Section 4: Memory Optimization -->
-        <div id="memory" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#128190;</span>4. 内存优化技术</h2>
-
-            <h3>4.1 激活检查点 (Activation Checkpointing)</h3>
-            <p>不在前向传播中保存所有激活值，仅保存部分检查点。反向传播时重新计算未保存的激活值。以计算换内存。</p>
-            <div class="formula-box">
-                无检查点: 内存 = O(L * batch * seq_len * hidden)<br>
-                有检查点: 内存 = O(sqrt(L) * batch * seq_len * hidden) + O(L) 重计算代价<br>
-                L = 层数
-            </div>
-
-            <h3>4.2 选择性激活释放 (Selective Activation Release)</h3>
-            <p>在前向传播完成后立即释放不再需要的激活值，而非等到整个 batch 完成。反向传播前保留必要的激活值。</p>
-            <div class="highlight-box">
-                <strong>优化效果:</strong> 相比朴素检查点可额外节省 20-30% 激活内存，尤其对深层 Transformer 网络显著。
-            </div>
-
-            <h3>4.3 梯度卸载 (Gradient Offloading)</h3>
-            <p>将梯度从 GPU 内存转移到 CPU 内存，在优化器步骤时再搬回。适用于大 batch size 训练。</p>
-
-            <h3>4.4 ZeRO (Zero Redundancy Optimizer)</h3>
-            <p>DeepSpeed 提出的三阶段优化策略，消除数据并行中的冗余状态:</p>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>ZeRO-1: 优化器状态切分</h4>
-                    <p>将优化器状态（如 Adam 的动量和方差）切分到不同设备，每设备只持有 1/N 的优化器状态。通信开销增加有限。</p>
+                <div class="glass-card rounded-lg p-4 bg-indigo-500/10 border border-indigo-500/30 mb-6">
+                    <h3 class="text-sm font-semibold text-indigo-300 mb-1"><i class="fas fa-server mr-2"></i>实验平台</h3>
+                    <p class="text-sm text-slate-300">单台 8 卡 Ascend 910B NPU，每卡 60GB HBM，378.88 TFLOPS GEMM 算力。全局 batch size = 1024，序列长度 = 4096，micro-batch size = 1，步 token 数 = 4M。</p>
                 </div>
-                <div class="card">
-                    <h4>ZeRO-2: 梯度切分</h4>
-                    <p>在 ZeRO-1 基础上进一步切分梯度，每设备只接收和处理其负责的梯度分片。进一步减少冗余。</p>
+
+                <!-- LLaMA 7B -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-indigo-500 mb-4">
+                    <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('llama7b')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-llama7b"></i><h3 class="font-semibold text-white">9.1 LLaMA 7B 实验结果</h3></div>
+                    </div>
+                    <div id="llama7b-summary" class="mt-2">
+                        <p class="text-sm text-slate-300">最佳配置 <span class="text-green-400 font-mono">(4,2,1,1)</span> MFU=63.7%，最差配置 <span class="text-red-400 font-mono">(1,1,4,2)</span> MFU=14.8%。</p>
+                    </div>
+                    <div id="llama7b-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead><tr class="border-b border-slate-600"><th class="text-left py-2 px-3 text-slate-300">配置 (DP,PP,TP,CP)</th><th class="text-left py-2 px-3 text-slate-300">步时间 (s)</th><th class="text-left py-2 px-3 text-slate-300">吞吐 (K tok/s)</th><th class="text-left py-2 px-3 text-slate-300">内存 (GB)</th><th class="text-left py-2 px-3 text-slate-300">MFU (%)</th></tr></thead>
+                                <tbody>
+                                    <tr class="badge-best border-b border-slate-800"><td class="py-2 px-3 font-mono text-green-400 font-semibold">(4,2,1,1) &#11088;</td><td class="py-2 px-3">101.8</td><td class="py-2 px-3">41.2</td><td class="py-2 px-3">45.9</td><td class="py-2 px-3 text-green-400 font-bold">63.7</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(2,4,1,1)</td><td class="py-2 px-3">108.5</td><td class="py-2 px-3">38.6</td><td class="py-2 px-3">33.7</td><td class="py-2 px-3">59.7</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(1,8,1,1)</td><td class="py-2 px-3">125.5</td><td class="py-2 px-3">33.4</td><td class="py-2 px-3">27.2</td><td class="py-2 px-3">51.7</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(4,1,2,1)</td><td class="py-2 px-3">157.3</td><td class="py-2 px-3">26.7</td><td class="py-2 px-3">41.2</td><td class="py-2 px-3">41.2</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(4,1,1,2)</td><td class="py-2 px-3">145.7</td><td class="py-2 px-3">28.8</td><td class="py-2 px-3">60.0</td><td class="py-2 px-3">44.5</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(2,2,1,2)</td><td class="py-2 px-3">149.2</td><td class="py-2 px-3">28.1</td><td class="py-2 px-3">38.9</td><td class="py-2 px-3">43.5</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(2,2,2,1)</td><td class="py-2 px-3">162.2</td><td class="py-2 px-3">25.9</td><td class="py-2 px-3">29.2</td><td class="py-2 px-3">40.0</td></tr>
+                                    <tr class="badge-worst"><td class="py-2 px-3 font-mono text-red-400 font-semibold">(1,1,4,2) &#128683;</td><td class="py-2 px-3">437.1</td><td class="py-2 px-3">9.6</td><td class="py-2 px-3">24.0</td><td class="py-2 px-3 text-red-400 font-bold">14.8</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4 space-y-2 text-sm text-slate-300">
+                            <p><strong class="text-green-400">最佳配置 (4,2,1,1):</strong> DP=4 保证足够全局 batch size，PP=2 将模型切分到 2 卡减少每卡内存（45.9GB &lt; 60GB），TP=1 和 CP=1 避免不必要的通信开销。Cube (GEMM) 操作占总运行时间 77.2%。</p>
+                            <p><strong class="text-red-400">最差配置 (1,1,4,2):</strong> TP=4 将 GEMM 切分成 4 份降低矩阵尺寸和 tile 重用，CP=2 进一步切分序列。TP 通信占 22.4%，CP 通信占 12.1%，Cube 操作仅占 46.5%。设备大量时间等待通信而非计算。</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="card">
-                    <h4>ZeRO-3: 参数切分</h4>
-                    <p>将模型参数也切分到不同设备。前向/后向传播时通过 AllGather 临时获取所需参数。内存最优但通信开销最大。</p>
+
+                <!-- LLaMA 1B -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('llama1b')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-llama1b"></i><h3 class="font-semibold text-white">9.2 LLaMA 1B 实验结果</h3></div>
+                    </div>
+                    <div id="llama1b-summary" class="mt-2">
+                        <p class="text-sm text-slate-300">最佳配置 <span class="text-green-400 font-mono">(8,1,1,1)</span> 纯 DP，MFU=43.3%。</p>
+                    </div>
+                    <div id="llama1b-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead><tr class="border-b border-slate-600"><th class="text-left py-2 px-3 text-slate-300">配置 (DP,PP,TP,CP)</th><th class="text-left py-2 px-3 text-slate-300">步时间 (s)</th><th class="text-left py-2 px-3 text-slate-300">吞吐 (K tok/s)</th><th class="text-left py-2 px-3 text-slate-300">内存 (GB)</th><th class="text-left py-2 px-3 text-slate-300">MFU (%)</th></tr></thead>
+                                <tbody>
+                                    <tr class="badge-best border-b border-slate-800"><td class="py-2 px-3 font-mono text-green-400 font-semibold">(8,1,1,1) &#11088;</td><td class="py-2 px-3">28.3</td><td class="py-2 px-3">148.4</td><td class="py-2 px-3">17.3</td><td class="py-2 px-3 text-green-400 font-bold">43.3</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(4,2,1,1)</td><td class="py-2 px-3">32.1</td><td class="py-2 px-3">130.6</td><td class="py-2 px-3">12.1</td><td class="py-2 px-3">38.3</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(2,4,1,1)</td><td class="py-2 px-3">33.9</td><td class="py-2 px-3">123.9</td><td class="py-2 px-3">9.4</td><td class="py-2 px-3">36.1</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(4,1,2,1)</td><td class="py-2 px-3">61.7</td><td class="py-2 px-3">68.0</td><td class="py-2 px-3">11.0</td><td class="py-2 px-3">19.8</td></tr>
+                                    <tr class="badge-worst"><td class="py-2 px-3 font-mono text-red-400 font-semibold">(1,1,4,2) &#128683;</td><td class="py-2 px-3">197.0</td><td class="py-2 px-3">21.3</td><td class="py-2 px-3">6.5</td><td class="py-2 px-3 text-red-400 font-bold">6.2</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-sm text-slate-300 mt-3"><strong class="text-green-400">关键发现:</strong> 1B 模型足够小（17.3GB &lt; 60GB），纯 DP 是最佳选择。模型和激活都放入单设备内存，无需任何模型并行，通信开销最小。Cube 操作占 64.0%。</p>
+                    </div>
                 </div>
-            </div>
 
-            <h3>4.5 内存对比分析</h3>
-            <p>论文理论分析表明:</p>
-            <ul>
-                <li><strong>权重内存:</strong> TP < CP &approx; DP。TP 将权重切分到 N 个设备，CP 和 DP 每设备持有完整权重</li>
-                <li><strong>激活内存:</strong> CP &approx; DP < TP（某些情况下）。CP 切分序列维度，DP 切分 batch 维度，TP 在某些层需要保存额外中间结果</li>
-                <li><strong>优化器状态:</strong> ZeRO 系列可将其从 O(N_params) 降至 O(N_params / DP_degree)</li>
-            </ul>
-        </div>
-
-        <!-- Section 5: Communication Overlap -->
-        <div id="overlap" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#128260;</span>5. 通信-计算重叠技术</h2>
-
-            <p>通信-计算重叠是提升 MFU 的核心技术之一。基本思想是将通信操作与计算操作在时间上交错执行，利用不同的硬件资源（网络 vs 计算单元）实现并发。</p>
-
-            <h3>5.1 数据分解重叠 (Data Decomposition Overlap)</h3>
-            <p>将大的计算任务（如大矩阵乘法）分解为多个小 chunk，每个 chunk 计算后立即触发对应通信，而非等待全部计算完成再统一通信。</p>
-            <div class="formula-box">
-                朴素模式: [全部计算] ----> [全部通信]<br>
-                重叠模式: [计算chunk1]->[通信chunk1]->[计算chunk2]->[通信chunk2]...<br>
-                关键: 计算和通信在不同硬件上并行执行
-            </div>
-
-            <h3>5.2 算法分解重叠 (Algorithm Decomposition Overlap)</h3>
-            <p>将算法拆分为独立的部分，某些部分需要通信，某些部分不需要。例如 LayerNorm 不需要跨设备同步，可放在通信间隙执行。</p>
-
-            <h3>5.3 内核融合重叠 (Kernel Fusion Overlap)</h3>
-            <p>通过 CUDA Graph 和融合内核将多个小操作合并为大操作，减少内核启动开销，同时为通信重叠创造更大的计算窗口。</p>
-
-            <h3>5.4 自动调优 (Auto-tuning)</h3>
-            <p>不同 chunk 大小、通信启动时机、重叠策略对性能影响显著。自动调优系统通过搜索找到最优配置。</p>
-            <div class="highlight-box">
-                <strong>关键洞察:</strong> 最优 chunk 大小取决于网络带宽、计算强度、硬件拓扑。经验法则: chunk 大小应使计算时间 >= 通信时间，但 chunk 过大则失去重叠灵活性。
-            </div>
-        </div>
-
-        <!-- Section 6: Hybrid Systems -->
-        <div id="hybrid" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#127912;</span>6. 混合并行系统设计</h2>
-
-            <h3>6.1 3D 混合并行</h3>
-            <p>组合三种基本并行策略: DP &times; PP &times; TP = world_size。这是当前大规模训练的主流方案。</p>
-            <div class="formula-box">
-                配置表示: (DP=m, PP=n, TP=p)，满足 m * n * p = world_size<br>
-                例如 8 卡: (4, 2, 1), (2, 2, 2), (1, 8, 1), (8, 1, 1) 等
-            </div>
-
-            <h3>6.2 4D 混合并行</h3>
-            <p>在 3D 基础上加入序列/上下文并行 (CP): DP &times; PP &times; TP &times; CP = world_size。适用于超长序列训练场景。</p>
-
-            <h3>6.3 DP 组内并行设计</h3>
-            <p>在每个 DP 组内部，进一步组合 PP/TP/CP:</p>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>DP 组 = {PP, TP}</h4>
-                    <p>经典 3D 并行。PP 切分层，TP 切分层内矩阵。适用于中等长度序列的标准 Transformer 训练。</p>
+                <!-- Mamba 7B -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('mamba7b')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-mamba7b"></i><h3 class="font-semibold text-white">9.3 Mamba 7B 实验结果</h3></div>
+                    </div>
+                    <div id="mamba7b-summary" class="mt-2">
+                        <p class="text-sm text-slate-300">最佳配置 <span class="text-green-400 font-mono">(4,1,2,1)</span> MFU=20.2%，整体 MFU 低于 LLaMA。</p>
+                    </div>
+                    <div id="mamba7b-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead><tr class="border-b border-slate-600"><th class="text-left py-2 px-3 text-slate-300">配置 (DP,PP,TP,CP)</th><th class="text-left py-2 px-3 text-slate-300">步时间 (s)</th><th class="text-left py-2 px-3 text-slate-300">吞吐 (K tok/s)</th><th class="text-left py-2 px-3 text-slate-300">内存 (GB)</th><th class="text-left py-2 px-3 text-slate-300">MFU (%)</th></tr></thead>
+                                <tbody>
+                                    <tr class="badge-best border-b border-slate-800"><td class="py-2 px-3 font-mono text-green-400 font-semibold">(4,1,2,1) &#11088;</td><td class="py-2 px-3">191.6</td><td class="py-2 px-3">21.9</td><td class="py-2 px-3">56.0</td><td class="py-2 px-3 text-green-400 font-bold">20.2</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(2,1,4,1)</td><td class="py-2 px-3">220.8</td><td class="py-2 px-3">19.0</td><td class="py-2 px-3">38.3</td><td class="py-2 px-3">16.4</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(2,2,2,1)</td><td class="py-2 px-3">248.7</td><td class="py-2 px-3">16.9</td><td class="py-2 px-3">40.8</td><td class="py-2 px-3">13.8</td></tr>
+                                    <tr class="badge-worst"><td class="py-2 px-3 font-mono text-red-400 font-semibold">(1,1,1,8) &#128683;</td><td class="py-2 px-3">461.1</td><td class="py-2 px-3">9.1</td><td class="py-2 px-3">33.4</td><td class="py-2 px-3 text-red-400 font-bold">8.4</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4 space-y-2 text-sm text-slate-300">
+                            <p><strong class="text-amber-400">Mamba 特殊性:</strong> Mamba-7B 无法用 DP=8 单卡放下（模型太大）。DP=4+CP=2 也不行（CP 只切分激活，不切分权重）。PP=2 因大 SSD 线性层也无法放在 2 卡。最优是 TP=2 切分大线性层和卷积分量。</p>
+                            <p>Mamba 整体 MFU 低于 LLaMA（20.2% vs 63.7%），因为 Mamba 强调序列状态更新而非密集矩阵乘法，Cube 利用率天然较低。</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="card">
-                    <h4>DP 组 = {PP, CP}</h4>
-                    <p>避免 TP 的 AllReduce 开销，用 CP 替代。适用于序列极长但模型宽度不大的场景。</p>
+
+                <!-- Mamba 1B -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-3 cursor-pointer" onclick="toggleDetail('mamba1b')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-mamba1b"></i><h3 class="font-semibold text-white">9.4 Mamba 1B 实验结果</h3></div>
+                    </div>
+                    <div id="mamba1b-summary" class="mt-2">
+                        <p class="text-sm text-slate-300">最佳配置 <span class="text-green-400 font-mono">(8,1,1,1)</span> 纯 DP，MFU=20.4%。</p>
+                    </div>
+                    <div id="mamba1b-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead><tr class="border-b border-slate-600"><th class="text-left py-2 px-3 text-slate-300">配置 (DP,PP,TP,CP)</th><th class="text-left py-2 px-3 text-slate-300">步时间 (s)</th><th class="text-left py-2 px-3 text-slate-300">吞吐 (K tok/s)</th><th class="text-left py-2 px-3 text-slate-300">内存 (GB)</th><th class="text-left py-2 px-3 text-slate-300">MFU (%)</th></tr></thead>
+                                <tbody>
+                                    <tr class="badge-best border-b border-slate-800"><td class="py-2 px-3 font-mono text-green-400 font-semibold">(8,1,1,1) &#11088;</td><td class="py-2 px-3">29.1</td><td class="py-2 px-3">144.3</td><td class="py-2 px-3">24.8</td><td class="py-2 px-3 text-green-400 font-bold">20.4</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(4,2,1,1)</td><td class="py-2 px-3">48.2</td><td class="py-2 px-3">87.0</td><td class="py-2 px-3">16.8</td><td class="py-2 px-3">12.3</td></tr>
+                                    <tr class="border-b border-slate-800 table-row-hover"><td class="py-2 px-3 font-mono text-xs">(4,1,2,1)</td><td class="py-2 px-3">47.7</td><td class="py-2 px-3">88.0</td><td class="py-2 px-3">14.7</td><td class="py-2 px-3">12.4</td></tr>
+                                    <tr class="badge-worst"><td class="py-2 px-3 font-mono text-red-400 font-semibold">(1,1,1,8) &#128683;</td><td class="py-2 px-3">191.1</td><td class="py-2 px-3">22.0</td><td class="py-2 px-3">14.2</td><td class="py-2 px-3 text-red-400 font-bold">3.1</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-sm text-slate-300 mt-3"><strong class="text-purple-400">Mamba vs LLaMA 1B 差异:</strong> Mamba-1B 纯 DP 时 Cube 占 42.8%，Vector 占 57.1%。LLaMA-1B 纯 DP 时 Cube 占 64.0%，Vector 占 24.2%。Mamba 的向量操作占比更高是 MFU 较低的根本原因。</p>
+                    </div>
                 </div>
-                <div class="card">
-                    <h4>DP 组 = {PP, TP, CP}</h4>
-                    <p>最灵活但也最复杂。需要仔细调优以避免通信成为瓶颈。适用于极端规模模型。</p>
+
+                <!-- Figures -->
+                <div class="glass-card rounded-lg p-5 mb-4">
+                    <h3 class="text-base font-semibold mb-4 flex items-center gap-2"><i class="fas fa-image text-indigo-400"></i> 9.5 MFU vs 内存消耗对比图</h3>
+                    <div class="space-y-6">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <img src="llm-parallel-mfU-memory.png" alt="Figure 8: MFU versus memory consumption for LLaMA models" class="max-w-full h-auto rounded-lg mb-3">
+                            <p class="text-xs text-slate-400">图 8: LLaMA 模型 MFU vs 内存消耗 -- 从最高 MFU 点开始，保持设备总数固定，分别变化 PP/TP/CP。DP 产生最高效率，TP 最小化内存使用，PP 提供最佳中间权衡</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <img src="mamba-mfU-memory.png" alt="Figure 11: MFU versus memory consumption for Mamba models" class="max-w-full h-auto rounded-lg mb-3">
+                            <p class="text-xs text-slate-400">图 9: Mamba 模型 MFU vs 内存消耗 -- TP 提供最高效的内存扩展，CP 产生最低 MFU 和最高内存使用。三元组格式 (a,b,c,d) 表示 (DP=a, PP=b, TP=c, CP=d)</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="card">
-                    <h4>DP 组 = {TP, CP}</h4>
-                    <p>无 PP 的配置，避免流水线气泡。适用于层数不多但每层计算密集的场景。</p>
-                </div>
-            </div>
 
-            <h3>6.4 通信组设计</h3>
-            <p>混合并行需要管理多个通信组:</p>
-            <ul>
-                <li><strong>TP 组:</strong> 同一张量并行组内的设备，每层执行 AllReduce</li>
-                <li><strong>PP 组:</strong> 同一流水线组内的设备，传递 micro-batch 激活值</li>
-                <li><strong>CP 组:</strong> 同一上下文并行组内的设备，传递序列分片的 KV cache</li>
-                <li><strong>DP 组:</strong> 同一数据并行组内的设备，执行梯度 AllReduce</li>
-            </ul>
-        </div>
+                <!-- Summary Table -->
+                <div class="glass-card rounded-lg p-5">
+                    <h3 class="text-base font-semibold mb-4 flex items-center gap-2"><i class="fas fa-trophy text-yellow-400"></i> 9.6 实验总结与最佳实践</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead><tr class="border-b border-slate-600"><th class="text-left py-3 px-4 text-slate-300">模型</th><th class="text-left py-3 px-4 text-green-400">最佳配置</th><th class="text-left py-3 px-4 text-green-400">MFU</th><th class="text-left py-3 px-4 text-red-400">最差配置</th><th class="text-left py-3 px-4 text-red-400">MFU</th></tr></thead>
+                            <tbody>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">LLaMA 1B</td><td class="py-3 px-4 font-mono text-xs">(8,1,1,1) 纯 DP</td><td class="py-3 px-4 text-green-400 font-bold">43.3%</td><td class="py-3 px-4 font-mono text-xs">(1,1,4,2)</td><td class="py-3 px-4 text-red-400 font-bold">6.2%</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">LLaMA 7B</td><td class="py-3 px-4 font-mono text-xs">(4,2,1,1) DP+PP</td><td class="py-3 px-4 text-green-400 font-bold">63.7%</td><td class="py-3 px-4 font-mono text-xs">(1,1,4,2)</td><td class="py-3 px-4 text-red-400 font-bold">14.8%</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">Mamba 1B</td><td class="py-3 px-4 font-mono text-xs">(8,1,1,1) 纯 DP</td><td class="py-3 px-4 text-green-400 font-bold">20.4%</td><td class="py-3 px-4 font-mono text-xs">(1,1,1,8)</td><td class="py-3 px-4 text-red-400 font-bold">3.1%</td></tr>
+                                <tr class="table-row-hover"><td class="py-3 px-4 font-medium">Mamba 7B</td><td class="py-3 px-4 font-mono text-xs">(4,1,2,1) DP+TP</td><td class="py-3 px-4 text-green-400 font-bold">20.2%</td><td class="py-3 px-4 font-mono text-xs">(1,1,1,8)</td><td class="py-3 px-4 text-red-400 font-bold">8.4%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-        <!-- Section 7: Frameworks -->
-        <div id="frameworks" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#128736;&#65039;</span>7. 主流框架对比</h2>
-
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>框架</th><th>核心并行支持</th><th>特色功能</th><th>通信库</th></tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Megatron-LM</strong></td>
-                        <td>TP, PP, DP, CP, EP</td>
-                        <td>Tensor Parallelism 开创者；LASP；GQA 优化；MoE 支持</td>
-                        <td>NCCL</td>
-                    </tr>
-                    <tr>
-                        <td><strong>NeMo (NVIDIA)</strong></td>
-                        <td>TP, PP, DP, CP, EP</td>
-                        <td>Megatron-LM 基础上增加分布式检查点、PEFT 支持、数据管道优化</td>
-                        <td>NCCL</td>
-                    </tr>
-                    <tr>
-                        <td><strong>DeepSpeed (Microsoft)</strong></td>
-                        <td>ZeRO-DP, PP, TP, EP</td>
-                        <td>ZeRO 系列优化器；Inference 引擎；激活检查点；CPU Offloading</td>
-                        <td>NCCL / DeepSpeed Comms</td>
-                    </tr>
-                    <tr>
-                        <td><strong>MindSpeed-LLM (华为)</strong></td>
-                        <td>TP, PP, DP, CP, EP</td>
-                        <td>Ascend NPU 原生支持；HCCL 通信库；MoE 优化；半精度训练</td>
-                        <td>HCCL</td>
-                    </tr>
-                    <tr>
-                        <td><strong>SageMaker (AWS)</strong></td>
-                        <td>DP, PP, TP</td>
-                        <td>云原生；自动缩放；多实例训练；与 AWS 生态集成</td>
-                        <td>NCCL / EFA</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="highlight-box">
-                <strong>框架选择建议:</strong> NVIDIA GPU 生态首选 Megatron-LM/NeMo；需要 ZeRO 内存优化选 DeepSpeed；Ascend NPU 选 MindSpeed-LLM；云部署考虑 SageMaker。实际项目中经常组合使用（如 DeepSpeed + Megatron-LM）。
-            </div>
-        </div>
-
-        <!-- Section 8: Theoretical Analysis -->
-        <div id="theory" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#128200;</span>8. 理论分析: FLOPs、内存与通信建模</h2>
-
-            <p>论文第 5 节对 GQA、MLP 和 Mamba 三种核心模块在不同并行策略下的 FLOPs、激活内存、权重内存和通信开销进行了统一数学建模。以下为核心结论。</p>
-
-            <h3>8.1 GQA (Grouped Query Attention) 分析</h3>
-            
-            <h4>FLOPs 不变性</h4>
-            <div class="formula-box">
-                GQA 总 FLOPs = 4*b*s*d^2 + 4*b*s*k*dh*d + 4*b*s^2*d + 5*b*s^2*a<br>
-                <br>
-                关键发现: FLOPs(TP) = FLOPs(CP) = FLOPs(DP)<br>
-                总计算量在三种策略下完全不变，只是分配到不同设备
-            </div>
-
-            <h4>激活内存对比</h4>
-            <div class="formula-box">
-                GQA 总激活内存 = (3*b*s*d + 2*b*s*d*k/a) * a_byte<br>
-                <br>
-                每设备激活内存:<br>
-                - TP: (b*s*d + 2*b*s*d/TP + 2*b*s*d/TP*k/a) * a_byte<br>
-                - CP: (b*d*s/CP + 2*b*d*s/CP + 2*b*d*s/CP*k/a) * a_byte<br>
-                - DP: (s*d*b/DP + 2*s*d*b/DP + 2*s*d*b/DP*k/a) * a_byte<br>
-                <br>
-                结论: memory_act(TP) > memory_act(CP) &approx; memory_act(DP)<br>
-                CP 和 DP 的每设备激活内存相同，TP 更高
-            </div>
-
-            <h4>权重内存对比</h4>
-            <div class="formula-box">
-                GQA 总权重内存 = 2*d^2*(1 + k/a) * w_byte<br>
-                <br>
-                每设备权重内存:<br>
-                - TP: 2*(d/TP)^2*(1 + k/a) * w_byte (权重被切分)<br>
-                - CP: 2*d^2*(1 + k/a) * w_byte (完整权重)<br>
-                - DP: 2*d^2*(1 + k/a) * w_byte (完整权重)<br>
-                <br>
-                结论: memory_wt(TP) < memory_wt(CP) &approx; memory_wt(DP)<br>
-                TP 在权重内存上优势明显
-            </div>
-
-            <h3>8.2 MLP (SwiGLU) 分析</h3>
-            <div class="formula-box">
-                MLP 总 FLOPs = b*s*(6*d*I + 5*I)，其中 I 是 FFN 中间维度<br>
-                <br>
-                FLOPs 不变性同样成立: FLOPs(TP) = FLOPs(CP) = FLOPs(DP)<br>
-                <br>
-                激活内存: memory_act(TP) > memory_act(CP) &approx; memory_act(DP)<br>
-                权重内存: memory_wt(TP) < memory_wt(CP) &approx; memory_wt(DP)<br>
-                <br>
-                与 GQA 结论一致
-            </div>
-
-            <h3>8.3 Mamba-2 (SSD) 分析</h3>
-            <p>Mamba-2 的核心是 State Space Duality (SSD)，将 SSM 递归转换为分块矩阵乘法，利用并行扫描 (parallel scan) 实现线性复杂度。</p>
-            <div class="formula-box">
-                Mamba 总 FLOPs (parallel scan):<br>
-                = 2*b*[ (s/l)*h*l^2*n + (s/l)*h*l^2*p + (s/l)*h*l*p*n + h*(s/l)*p*n + (s/l)*h*p*n*l ]<br>
-                  + 2*b*s*d*d_in_proj + 2*b*s*d_inner*d<br>
-                <br>
-                其中: s=序列长度, l=chunk大小, h=head数, n=state维度, p=head维度<br>
-                <br>
-                关键: 使用 parallel scan 后 inter-chunk 计算从 O((s/l)^2) 降至 O(s/l)
-            </div>
-
-            <h4>Mamba 通信对比</h4>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>策略</th><th>通信量</th><th>集合操作</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>TPSP</td><td>O(d * d_state * seqlen)</td><td>AllReduce</td></tr>
-                    <tr><td>CP</td><td>O(d * d_state * CP)</td><td>All-Gather</td></tr>
-                    <tr><td>DP</td><td>0</td><td>-</td></tr>
-                </tbody>
-            </table>
-            <p>由于通常 CP &lt;&lt; seqlen，CP 的通信开销远小于 TPSP。这是 Mamba 架构下 CP 优于 TP 的重要原因。</p>
-
-            <h3>8.4 理论分析核心结论</h3>
-            <ul class="insight-list">
-                <li><strong>FLOPs 不变性:</strong> 无论选择 TP/CP/DP，总计算量不变，只是分配到不同设备</li>
-                <li><strong>通信成本是关键:</strong> 通信量和可用带宽共同决定最优配置</li>
-                <li><strong>TP 权重内存最优:</strong> TP 将权重切分到 N 设备，内存减少 N 倍</li>
-                <li><strong>CP/DP 激活内存最优:</strong> 当序列或 batch 是内存瓶颈时优先</li>
-                <li><strong>Mamba 特殊考虑:</strong> CP 通信量 &lt; TPSP 通信量（因为 CP &lt;&lt; seqlen）</li>
-            </ul>
-        </div>
-
-        <!-- Section 9: Case Study -->
-        <div id="casestudy" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#128300;</span>9. 案例研究: Ascend 910B 上的实验结果</h2>
-
-            <div class="highlight-box">
-                <strong>实验平台:</strong> 单台 8 卡 Ascend 910B NPU，每卡 60GB HBM，378.88 TFLOPS GEMM 算力。全局 batch size = 1024，序列长度 = 4096，micro-batch size = 1，步 token 数 = 4M。
-            </div>
-
-            <h3>9.1 LLaMA 7B 实验结果</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>配置 (DP,PP,TP,CP)</th><th>步时间 (s)</th><th>吞吐 (K tokens/s)</th><th>内存 (GB)</th><th>MFU (%)</th></tr>
-                </thead>
-                <tbody>
-                    <tr style="background: rgba(74,222,128,0.1);"><td><strong>(4,2,1,1) &#11088;</strong></td><td>101.8</td><td>41.2</td><td>45.9</td><td><strong>63.7</strong></td></tr>
-                    <tr><td>(2,4,1,1)</td><td>108.5</td><td>38.6</td><td>33.7</td><td>59.7</td></tr>
-                    <tr><td>(1,8,1,1)</td><td>125.5</td><td>33.4</td><td>27.2</td><td>51.7</td></tr>
-                    <tr><td>(4,1,2,1)</td><td>157.3</td><td>26.7</td><td>41.2</td><td>41.2</td></tr>
-                    <tr><td>(4,1,1,2)</td><td>145.7</td><td>28.8</td><td>60.0</td><td>44.5</td></tr>
-                    <tr><td>(2,2,1,2)</td><td>149.2</td><td>28.1</td><td>38.9</td><td>43.5</td></tr>
-                    <tr><td>(2,2,2,1)</td><td>162.2</td><td>25.9</td><td>29.2</td><td>40.0</td></tr>
-                    <tr style="background: rgba(248,113,113,0.1);"><td><strong>(1,1,4,2) &#128683;</strong></td><td>437.1</td><td>9.6</td><td>24.0</td><td><strong>14.8</strong></td></tr>
-                </tbody>
-            </table>
-            <p><strong>最佳配置 (4,2,1,1):</strong> DP=4 保证足够全局 batch size，PP=2 将模型切分到 2 卡减少每卡内存（45.9GB &lt; 60GB），TP=1 和 CP=1 避免不必要的通信开销。Cube (GEMM) 操作占总运行时间 77.2%。</p>
-            <p><strong>最差配置 (1,1,4,2):</strong> TP=4 将 GEMM 切分成 4 份降低矩阵尺寸和 tile 重用，CP=2 进一步切分序列。TP 通信占 22.4%，CP 通信占 12.1%，Cube 操作仅占 46.5%。设备大量时间等待通信而非计算。</p>
-
-            <h3>9.2 LLaMA 1B 实验结果</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>配置 (DP,PP,TP,CP)</th><th>步时间 (s)</th><th>吞吐 (K tokens/s)</th><th>内存 (GB)</th><th>MFU (%)</th></tr>
-                </thead>
-                <tbody>
-                    <tr style="background: rgba(74,222,128,0.1);"><td><strong>(8,1,1,1) &#11088;</strong></td><td>28.3</td><td>148.4</td><td>17.3</td><td><strong>43.3</strong></td></tr>
-                    <tr><td>(4,2,1,1)</td><td>32.1</td><td>130.6</td><td>12.1</td><td>38.3</td></tr>
-                    <tr><td>(2,4,1,1)</td><td>33.9</td><td>123.9</td><td>9.4</td><td>36.1</td></tr>
-                    <tr><td>(4,1,2,1)</td><td>61.7</td><td>68.0</td><td>11.0</td><td>19.8</td></tr>
-                    <tr style="background: rgba(248,113,113,0.1);"><td><strong>(1,1,4,2) &#128683;</strong></td><td>197.0</td><td>21.3</td><td>6.5</td><td><strong>6.2</strong></td></tr>
-                </tbody>
-            </table>
-            <p><strong>关键发现:</strong> 1B 模型足够小（17.3GB &lt; 60GB），纯 DP 是最佳选择。模型和激活都放入单设备内存，无需任何模型并行，通信开销最小。Cube 操作占 64.0%。</p>
-
-            <h3>9.3 Mamba 7B 实验结果</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>配置 (DP,PP,TP,CP)</th><th>步时间 (s)</th><th>吞吐 (K tokens/s)</th><th>内存 (GB)</th><th>MFU (%)</th></tr>
-                </thead>
-                <tbody>
-                    <tr style="background: rgba(74,222,128,0.1);"><td><strong>(4,1,2,1) &#11088;</strong></td><td>191.6</td><td>21.9</td><td>56.0</td><td><strong>20.2</strong></td></tr>
-                    <tr><td>(2,1,4,1)</td><td>220.8</td><td>19.0</td><td>38.3</td><td>16.4</td></tr>
-                    <tr><td>(2,2,2,1)</td><td>248.7</td><td>16.9</td><td>40.8</td><td>13.8</td></tr>
-                    <tr style="background: rgba(248,113,113,0.1);"><td><strong>(1,1,1,8) &#128683;</strong></td><td>461.1</td><td>9.1</td><td>33.4</td><td><strong>8.4</strong></td></tr>
-                </tbody>
-            </table>
-            <p><strong>Mamba 特殊性:</strong> Mamba-7B 无法用 DP=8 单卡放下（模型太大）。DP=4+CP=2 也不行（CP 只切分激活，不切分权重）。PP=2 因大 SSD 线性层也无法放在 2 卡。最优是 TP=2 切分大线性层和卷积分量。</p>
-            <p>Mamba 整体 MFU 低于 LLaMA（20.2% vs 63.7%），因为 Mamba 强调序列状态更新而非密集矩阵乘法，Cube 利用率天然较低。</p>
-
-            <h3>9.4 Mamba 1B 实验结果</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>配置 (DP,PP,TP,CP)</th><th>步时间 (s)</th><th>吞吐 (K tokens/s)</th><th>内存 (GB)</th><th>MFU (%)</th></tr>
-                </thead>
-                <tbody>
-                    <tr style="background: rgba(74,222,128,0.1);"><td><strong>(8,1,1,1) &#11088;</strong></td><td>29.1</td><td>144.3</td><td>24.8</td><td><strong>20.4</strong></td></tr>
-                    <tr><td>(4,2,1,1)</td><td>48.2</td><td>87.0</td><td>16.8</td><td>12.3</td></tr>
-                    <tr><td>(4,1,2,1)</td><td>47.7</td><td>88.0</td><td>14.7</td><td>12.4</td></tr>
-                    <tr style="background: rgba(248,113,113,0.1);"><td><strong>(1,1,1,8) &#128683;</strong></td><td>191.1</td><td>22.0</td><td>14.2</td><td><strong>3.1</strong></td></tr>
-                </tbody>
-            </table>
-            <p><strong>Mamba vs LLaMA 1B 差异:</strong> Mamba-1B 纯 DP 时 Cube 占 42.8%，Vector 占 57.1%。LLaMA-1B 纯 DP 时 Cube 占 64.0%，Vector 占 24.2%。Mamba 的向量操作占比更高是 MFU 较低的根本原因。</p>
-
-            <h3>9.5 MFU vs 内存消耗对比图</h3>
-            
-            <div class="original-fig">
-                <img src="llm-parallel-mfU-memory.png" alt="Figure 8: MFU versus memory consumption for LLaMA models" style="max-width: 100%; height: auto;">
-                <div class="caption">图 8: LLaMA 模型 MFU vs 内存消耗 — 从最高 MFU 点开始，保持设备总数固定，分别变化 PP/TP/CP。DP 产生最高效率，TP 最小化内存使用，PP 提供最佳中间权衡</div>
-            </div>
-
-            <div class="original-fig">
-                <img src="mamba-mfU-memory.png" alt="Figure 11: MFU versus memory consumption for Mamba models" style="max-width: 100%; height: auto;">
-                <div class="caption">图 9: Mamba 模型 MFU vs 内存消耗 — TP 提供最高效的内存扩展，CP 产生最低 MFU 和最高内存使用。三元组格式 (a,b,c,d) 表示 (DP=a, PP=b, TP=c, CP=d)</div>
-            </div>
-
-            <h3>9.6 实验总结与最佳实践</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>模型</th><th>最佳配置</th><th>MFU</th><th>最差配置</th><th>MFU</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>LLaMA 1B</td><td>(8,1,1,1) 纯 DP</td><td>43.3%</td><td>(1,1,4,2)</td><td>6.2%</td></tr>
-                    <tr><td>LLaMA 7B</td><td>(4,2,1,1) DP+PP</td><td>63.7%</td><td>(1,1,4,2)</td><td>14.8%</td></tr>
-                    <tr><td>Mamba 1B</td><td>(8,1,1,1) 纯 DP</td><td>20.4%</td><td>(1,1,1,8)</td><td>3.1%</td></tr>
-                    <tr><td>Mamba 7B</td><td>(4,1,2,1) DP+TP</td><td>20.2%</td><td>(1,1,1,8)</td><td>8.4%</td></tr>
-                </tbody>
-            </table>
-
-            <div class="highlight-box">
-                <strong>设计实践核心洞察:</strong><br>
-                1. 小模型 (&le;1B): 优先纯 DP，模型和激活都能放入单设备内存<br>
-                2. 中等模型 (~7B): 引入有限模型并行。LLaMA 偏好 PP，Mamba 偏好 TP<br>
-                3. 超大模型: 需要更高程度的 PP/TP<br>
-                4. 超长序列: CP 变得必要，但需权衡通信开销<br>
-                5. 过度切分 (TP&ge;4 或 CP&ge;4) 通常降低 MFU，通信开销超过计算收益
-            </div>
-        </div>
-
-        <!-- Section 10: Auto-Parallelism -->
-        <div id="auto" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#129302;</span>10. 自动并行化技术</h2>
-
-            <p>手动搜索最优并行配置在大规模场景下不可行（80 层 Transformer 约 10^125 种配置）。自动并行化系统通过构建代价模型和搜索算法来自动选择最优策略。</p>
-
-            <h3>10.1 自动并行化演进</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>系统</th><th>年份</th><th>并行类型</th><th>搜索/优化方法</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>Piper</td><td>2021</td><td>PP, TP</td><td>动态规划</td></tr>
-                    <tr><td>Alpa</td><td>2022</td><td>DP, PP, TP</td><td>整数线性规划 + 动态规划</td></tr>
-                    <tr><td>Galvatron</td><td>2022</td><td>DP, PP, TP</td><td>决策树剪枝 + 动态规划</td></tr>
-                    <tr><td>AMP</td><td>2022</td><td>PP, TP</td><td>符号代价模型 + 动态规划</td></tr>
-                    <tr><td>Colossal-AI</td><td>2023</td><td>DP, PP, TP, SP</td><td>贪心搜索</td></tr>
-                    <tr><td>Merak</td><td>2023</td><td>DP, PP, TP</td><td>图分片启发式</td></tr>
-                    <tr><td>Metis</td><td>2024</td><td>DP, PP, TP</td><td>剪枝搜索算法</td></tr>
-                    <tr><td>Mist</td><td>2025</td><td>DP, PP, TP</td><td>混合整数线性规划</td></tr>
-                </tbody>
-            </table>
-
-            <h3>10.2 关键技术进展</h3>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>Alpa (2022)</h4>
-                    <p>将并行空间分为 inter-operator（PP/DP）和 intra-operator（TP）两层，分别用 ILP 和 DP 求解。开创了分层搜索范式，但未充分解决负载不均衡。</p>
-                </div>
-                <div class="card">
-                    <h4>Colossal-AI (2023)</h4>
-                    <p>扩展至 4D 并行，支持 2D/2.5D/3D 张量切分。贪心分片转换和激活检查点集成。降低了拓扑约束。</p>
-                </div>
-                <div class="card">
-                    <h4>Mist (2025)</h4>
-                    <p>联合优化内存缩减和并行策略选择。不平衡感知分层调优，通过 Pareto 前沿采样连接 inter-stage 和 intra-stage 优化。解决搜索空间爆炸和流水线不平衡问题。</p>
+                    <div class="glass-card rounded-lg p-5 mt-6 bg-green-500/10 border border-green-500/30">
+                        <h3 class="text-sm font-semibold text-green-300 mb-3"><i class="fas fa-lightbulb mr-2"></i>设计实践核心洞察</h3>
+                        <ol class="space-y-2 text-sm text-slate-300 list-none">
+                            <li class="flex items-start gap-2"><span class="text-green-400 font-bold flex-shrink-0">1.</span><span>小模型 (&le;1B): 优先纯 DP，模型和激活都能放入单设备内存</span></li>
+                            <li class="flex items-start gap-2"><span class="text-green-400 font-bold flex-shrink-0">2.</span><span>中等模型 (~7B): 引入有限模型并行。LLaMA 偏好 PP，Mamba 偏好 TP</span></li>
+                            <li class="flex items-start gap-2"><span class="text-green-400 font-bold flex-shrink-0">3.</span><span>超大模型: 需要更高程度的 PP/TP</span></li>
+                            <li class="flex items-start gap-2"><span class="text-green-400 font-bold flex-shrink-0">4.</span><span>超长序列: CP 变得必要，但需权衡通信开销</span></li>
+                            <li class="flex items-start gap-2"><span class="text-green-400 font-bold flex-shrink-0">5.</span><span>过度切分 (TP&ge;4 或 CP&ge;4) 通常降低 MFU，通信开销超过计算收益</span></li>
+                        </ol>
+                    </div>
                 </div>
             </div>
+        </section>
 
-            <h3>10.3 自动并行化挑战</h3>
-            <ul>
-                <li><strong>组合爆炸:</strong> 搜索空间随模型层数和并行维度指数增长</li>
-                <li><strong>硬件异构性:</strong> 不同设备算力、内存、带宽不同，需异构感知</li>
-                <li><strong>代价模型精度:</strong> 理论 FLOPs 与实际执行时间偏差受内核融合、内存访问模式影响</li>
-                <li><strong>可用性:</strong> 自动化工具需要最小化代码修改，提供 PyTorch 原生体验</li>
-                <li><strong>设备内并行:</strong> 最新研究开始考虑 NPU 内部多核心的细粒度并行</li>
-            </ul>
-        </div>
+        <!-- ==================== Auto Tab ==================== -->
+        <section id="content-auto" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-robot text-indigo-400"></i> 自动并行化技术</h2>
+                <p class="text-sm text-slate-300 mb-6">手动搜索最优并行配置在大规模场景下不可行（80 层 Transformer 约 10^125 种配置）。自动并行化系统通过构建代价模型和搜索算法来自动选择最优策略。</p>
 
-        <!-- Section 11: Challenges -->
-        <div id="challenges" class="section" style="display:none;">
-            <h2><span class="emoji-icon">&#127758;</span>11. 开放挑战与未来方向</h2>
+                <!-- Evolution Table -->
+                <div class="mb-6">
+                    <h3 class="text-base font-semibold mb-4 flex items-center gap-2"><i class="fas fa-timeline text-indigo-400"></i> 10.1 自动并行化演进</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead><tr class="border-b border-slate-600"><th class="text-left py-3 px-4 text-slate-300">系统</th><th class="text-left py-3 px-4 text-slate-300">年份</th><th class="text-left py-3 px-4 text-indigo-400">并行类型</th><th class="text-left py-3 px-4 text-slate-300">搜索/优化方法</th></tr></thead>
+                            <tbody>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">Piper</td><td class="py-3 px-4">2021</td><td class="py-3 px-4 font-mono text-xs">PP, TP</td><td class="py-3 px-4">动态规划</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">Alpa</td><td class="py-3 px-4">2022</td><td class="py-3 px-4 font-mono text-xs">DP, PP, TP</td><td class="py-3 px-4">整数线性规划 + 动态规划</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">Galvatron</td><td class="py-3 px-4">2022</td><td class="py-3 px-4 font-mono text-xs">DP, PP, TP</td><td class="py-3 px-4">决策树剪枝 + 动态规划</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">AMP</td><td class="py-3 px-4">2022</td><td class="py-3 px-4 font-mono text-xs">PP, TP</td><td class="py-3 px-4">符号代价模型 + 动态规划</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">Colossal-AI</td><td class="py-3 px-4">2023</td><td class="py-3 px-4 font-mono text-xs">DP, PP, TP, SP</td><td class="py-3 px-4">贪心搜索</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">Merak</td><td class="py-3 px-4">2023</td><td class="py-3 px-4 font-mono text-xs">DP, PP, TP</td><td class="py-3 px-4">图分片启发式</td></tr>
+                                <tr class="border-b border-slate-800 table-row-hover"><td class="py-3 px-4 font-medium">Metis</td><td class="py-3 px-4">2024</td><td class="py-3 px-4 font-mono text-xs">DP, PP, TP</td><td class="py-3 px-4">剪枝搜索算法</td></tr>
+                                <tr class="table-row-hover"><td class="py-3 px-4 font-medium">Mist</td><td class="py-3 px-4">2025</td><td class="py-3 px-4 font-mono text-xs">DP, PP, TP</td><td class="py-3 px-4">混合整数线性规划</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-            <h3>11.1 资源利用率</h3>
-            <p>尽管分布式训练和推理系统持续进步，最优硬件利用率仍是重大挑战。开销来源包括:</p>
-            <ul>
-                <li>内存访问延迟（内存受限操作）</li>
-                <li>通信等待时间（带宽受限操作）</li>
-                <li>小操作的内核启动开销</li>
-                <li>张量形状不利于最优 tile 到并行核心</li>
-            </ul>
-            <p>Mamba 等新兴架构的 MFU 显著低于 Transformer 架构，凸显了对模型架构设计和系统级优化的进一步研究需求。</p>
+                <!-- Key Advances -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="metric-card rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-layer-group mr-1"></i>Alpa (2022)</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed">将并行空间分为 inter-operator（PP/DP）和 intra-operator（TP）两层，分别用 ILP 和 DP 求解。开创了分层搜索范式，但未充分解决负载不均衡。</p>
+                    </div>
+                    <div class="metric-card rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-cubes mr-1"></i>Colossal-AI (2023)</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed">扩展至 4D 并行，支持 2D/2.5D/3D 张量切分。贪心分片转换和激活检查点集成。降低了拓扑约束。</p>
+                    </div>
+                    <div class="metric-card rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-indigo-300 mb-2"><i class="fas fa-brain mr-1"></i>Mist (2025)</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed">联合优化内存缩减和并行策略选择。不平衡感知分层调优，通过 Pareto 前沿采样连接 inter-stage 和 intra-stage 优化。解决搜索空间爆炸和流水线不平衡问题。</p>
+                    </div>
+                </div>
 
-            <h3>11.2 能源考量</h3>
-            <p>前沿模型接近万亿参数规模，能源约束变得与硬件可用性同等重要。OpenAI 已承诺千兆瓦级计算，Meta 投资大型核电。能源效率和可持续训练是未来关键方向。</p>
-
-            <h3>11.3 训练与推理协同设计</h3>
-            <p>训练阶段优化吞吐量，推理阶段优化延迟。如何在训练时就考虑推理部署需求（如量化、剪枝、知识蒸馏），实现训练-推理协同优化是重要趋势。</p>
-
-            <h3>11.4 异构硬件支持</h3>
-            <p>未来集群将混合使用 GPU、TPU、NPU 等不同加速器，甚至混合不同代际的芯片（如 H100 + B200）。自动并行化系统需要原生支持异构硬件。</p>
-
-            <h3>11.5 通信库进化</h3>
-            <p>NCCL、DeepEP、NVSHMEM 等通信库需要持续优化:</p>
-            <ul>
-                <li>拓扑感知路由（NVLink vs InfiniBand vs Ethernet）</li>
-                <li>更细粒度的重叠调度</li>
-                <li>MoE 场景下的高效 All-to-All</li>
-                <li>跨节点多轨通信优化</li>
-            </ul>
-
-            <h3>11.6 超长序列支持</h3>
-            <p>128K+ tokens 的序列长度对激活内存和通信提出极端挑战。需要更智能的 CP 策略、激活压缩、KV cache 优化等技术。</p>
-
-            <div class="highlight-box">
-                <strong>论文总结:</strong> 本文提供了 LLM 分布式混合并行的系统性指南，从理论分析到实验验证，从框架实现到未来挑战。核心经验法则是: <strong>在满足内存约束的前提下，最大化数据并行度；当模型超出单设备时，优先引入 PP（Transformer）或 TP（Mamba）；避免过度切分导致通信成为瓶颈。</strong>
+                <!-- Challenges -->
+                <div class="glass-card rounded-lg p-5">
+                    <h3 class="text-base font-semibold mb-4 flex items-center gap-2"><i class="fas fa-triangle-exclamation text-amber-400"></i> 10.3 自动并行化挑战</h3>
+                    <ul class="space-y-2 text-sm text-slate-300">
+                        <li class="flex items-start gap-2"><i class="fas fa-exclamation-circle text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-300">组合爆炸:</strong> 搜索空间随模型层数和并行维度指数增长</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-exclamation-circle text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-300">硬件异构性:</strong> 不同设备算力、内存、带宽不同，需异构感知</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-exclamation-circle text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-300">代价模型精度:</strong> 理论 FLOPs 与实际执行时间偏差受内核融合、内存访问模式影响</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-exclamation-circle text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-300">可用性:</strong> 自动化工具需要最小化代码修改，提供 PyTorch 原生体验</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-exclamation-circle text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-300">设备内并行:</strong> 最新研究开始考虑 NPU 内部多核心的细粒度并行</span></li>
+                    </ul>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <div class="footer">
-            <p>论文原文: <a href="https://arxiv.org/abs/2602.09109" target="_blank">arXiv:2602.09109</a></p>
-            <p>作者: Hossam Amer, Mahmoud Gharib, Atef Ibrahim, Qiang Weng, Zheng Wang, Ali Ghodsi (Huawei Canada)</p>
-            <p>本深度解析网页生成于 2026-04-20</p>
+        <!-- ==================== Challenges Tab ==================== -->
+        <section id="content-challenges" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2"><i class="fas fa-telescope text-indigo-400"></i> 开放挑战与未来方向</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="update-card glass-card rounded-lg p-5">
+                        <h3 class="text-sm font-semibold text-indigo-300 mb-3 flex items-center gap-2"><i class="fas fa-gauge-high"></i> 11.1 资源利用率</h3>
+                        <p class="text-sm text-slate-300 mb-3">尽管分布式训练和推理系统持续进步，最优硬件利用率仍是重大挑战。开销来源包括:</p>
+                        <ul class="space-y-1 text-sm text-slate-400">
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-indigo-400 mt-1 text-xs"></i><span>内存访问延迟（内存受限操作）</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-indigo-400 mt-1 text-xs"></i><span>通信等待时间（带宽受限操作）</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-indigo-400 mt-1 text-xs"></i><span>小操作的内核启动开销</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-indigo-400 mt-1 text-xs"></i><span>张量形状不利于最优 tile 到并行核心</span></li>
+                        </ul>
+                        <p class="text-sm text-slate-400 mt-3">Mamba 等新兴架构的 MFU 显著低于 Transformer 架构，凸显了对模型架构设计和系统级优化的进一步研究需求。</p>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5">
+                        <h3 class="text-sm font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-leaf"></i> 11.2 能源考量</h3>
+                        <p class="text-sm text-slate-300">前沿模型接近万亿参数规模，能源约束变得与硬件可用性同等重要。OpenAI 已承诺千兆瓦级计算，Meta 投资大型核电。能源效率和可持续训练是未来关键方向。</p>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5">
+                        <h3 class="text-sm font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-rotate"></i> 11.3 训练与推理协同设计</h3>
+                        <p class="text-sm text-slate-300">训练阶段优化吞吐量，推理阶段优化延迟。如何在训练时就考虑推理部署需求（如量化、剪枝、知识蒸馏），实现训练-推理协同优化是重要趋势。</p>
+                    </div>
+
+                    <div class="update-card glass-card rounded-lg p-5">
+                        <h3 class="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2"><i class="fas fa-microchip"></i> 11.4 异构硬件支持</h3>
+                        <p class="text-sm text-slate-300">未来集群将混合使用 GPU、TPU、NPU 等不同加速器，甚至混合不同代际的芯片（如 H100 + B200）。自动并行化系统需要原生支持异构硬件。</p>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 mb-6">
+                    <h3 class="text-sm font-semibold text-blue-300 mb-3 flex items-center gap-2"><i class="fas fa-network-wired"></i> 11.5 通信库进化</h3>
+                    <p class="text-sm text-slate-300 mb-3">NCCL、DeepEP、NVSHMEM 等通信库需要持续优化:</p>
+                    <ul class="space-y-1 text-sm text-slate-400">
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-blue-400 mt-1 text-xs"></i><span>拓扑感知路由（NVLink vs InfiniBand vs Ethernet）</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-blue-400 mt-1 text-xs"></i><span>更细粒度的重叠调度</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-blue-400 mt-1 text-xs"></i><span>MoE 场景下的高效 All-to-All</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-blue-400 mt-1 text-xs"></i><span>跨节点多轨通信优化</span></li>
+                    </ul>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 mb-6">
+                    <h3 class="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-expand"></i> 11.6 超长序列支持</h3>
+                    <p class="text-sm text-slate-300">128K+ tokens 的序列长度对激活内存和通信提出极端挑战。需要更智能的 CP 策略、激活压缩、KV cache 优化等技术。</p>
+                </div>
+
+                <div class="glass-card rounded-lg p-6 bg-indigo-500/10 border-2 border-indigo-500/30">
+                    <h3 class="text-base font-semibold text-indigo-300 mb-3 flex items-center gap-2"><i class="fas fa-star"></i> 论文总结</h3>
+                    <p class="text-sm text-slate-300 leading-relaxed">
+                        本文提供了 LLM 分布式混合并行的系统性指南，从理论分析到实验验证，从框架实现到未来挑战。核心经验法则是:
+                        <strong class="text-white">在满足内存约束的前提下，最大化数据并行度；当模型超出单设备时，优先引入 PP（Transformer）或 TP（Mamba）；避免过度切分导致通信成为瓶颈。</strong>
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>论文原文: <a href="https://arxiv.org/abs/2602.09109" class="ref-link" target="_blank"><i class="fas fa-external-link-alt"></i>arXiv:2602.09109</a></p>
+            <p class="mt-1">作者: Hossam Amer, Mahmoud Gharib, Atef Ibrahim, Qiang Weng, Zheng Wang, Ali Ghodsi (Huawei Canada)</p>
+            <p class="mt-1">本深度解析网页生成于 2026-04-20</p>
         </div>
-    </div>
+    </footer>
 
     <script>
-        function showSection(id) {
-            const sections = document.querySelectorAll('.section');
-            sections.forEach(s => s.style.display = 'none');
-            document.getElementById(id).style.display = 'block';
-            const tabs = document.querySelectorAll('.nav-tab');
-            tabs.forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
+        function showTab(tabName) {
+            const tabs = ['overview', 'collective', 'parallelism', 'memory', 'overlap', 'hybrid', 'frameworks', 'theory', 'casestudy', 'auto', 'challenges'];
+            tabs.forEach(tab => {
+                document.getElementById('content-' + tab).classList.add('hidden');
+                document.getElementById('tab-' + tab).classList.remove('tab-active');
+                document.getElementById('tab-' + tab).classList.add('tab-inactive');
+            });
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            document.getElementById('tab-' + tabName).classList.remove('tab-inactive');
+            document.getElementById('tab-' + tabName).classList.add('tab-active');
+        }
+        function toggleDetail(detailId) {
+            const detail = document.getElementById(detailId + '-detail');
+            const icon = document.getElementById('icon-' + detailId);
+            if (detail.classList.contains('hidden')) { detail.classList.remove('hidden'); icon.classList.add('expanded'); }
+            else { detail.classList.add('hidden'); icon.classList.remove('expanded'); }
         }
     </script>
 </body>

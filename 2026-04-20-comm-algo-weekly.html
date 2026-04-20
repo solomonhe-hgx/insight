@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>通信库竞品周报 - 2026-04-20</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232734;
+    --border: #2d3248;
+    --text: #e2e4ed;
+    --text-dim: #8b8fa3;
+    --accent: #6c5ce7;
+    --accent-light: #a29bfe;
+    --green: #00cec9;
+    --orange: #fdcb6e;
+    --red: #ff7675;
+    --blue: #74b9ff;
+    --nccl-color: #6c5ce7;
+    --deepep-color: #00cec9;
+    --nvshmem-color: #fdcb6e;
+    --other-color: #74b9ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1d27 0%, #2d1b69 100%);
+    padding: 40px 20px 30px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent-light), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .header .subtitle {
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  .header .date-range {
+    display: inline-block;
+    background: var(--surface2);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    color: var(--accent-light);
+    margin-top: 8px;
+  }
+  /* Navigation Tabs */
+  .nav-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex;
+    overflow-x: auto;
+    gap: 2px;
+  }
+  .nav-tab {
+    padding: 12px 18px;
+    font-size: 14px;
+    color: var(--text-dim);
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .nav-tab:hover {
+    color: var(--text);
+    background: var(--surface2);
+  }
+  .nav-tab.active {
+    color: var(--accent-light);
+    border-bottom-color: var(--accent-light);
+  }
+  .nav-tab .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .nav-tab .badge.green { background: var(--green); color: #000; }
+  .nav-tab .badge.orange { background: var(--orange); color: #000; }
+  /* Main Content */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 20px;
+  }
+  .section {
+    margin-bottom: 40px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .section-header .tag {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+  }
+  .tag.active { background: rgba(0, 206, 201, 0.15); color: var(--green); }
+  .tag.stable { background: rgba(116, 185, 255, 0.15); color: var(--blue); }
+  .tag.experimental { background: rgba(253, 203, 110, 0.15); color: var(--orange); }
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .card-header:hover { background: var(--surface2); }
+  .card-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-header .version {
+    font-size: 13px;
+    padding: 3px 10px;
+    background: var(--surface2);
+    border-radius: 8px;
+    color: var(--accent-light);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .card-header .date {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .card-header .arrow {
+    font-size: 18px;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+  }
+  .card-header.open .arrow { transform: rotate(180deg); }
+  .card-body {
+    display: none;
+    padding: 0 20px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .card-body.open { display: block; }
+  .card-body ul {
+    list-style: none;
+    padding: 0;
+  }
+  .card-body li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(45, 50, 72, 0.5);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .card-body li:last-child { border-bottom: none; }
+  .card-body li .bullet {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    margin-top: 8px;
+  }
+  .card-body li .bullet.green { background: var(--green); }
+  .card-body li .bullet.orange { background: var(--orange); }
+  .card-body li .bullet.blue { background: var(--blue); }
+  .ref-link {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 8px;
+    background: rgba(108, 92, 231, 0.15);
+    color: var(--accent-light);
+    border-radius: 4px;
+    text-decoration: none;
+    margin-left: 8px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .ref-link:hover {
+    background: rgba(108, 92, 231, 0.3);
+  }
+  .ref-link.green { background: rgba(0, 206, 201, 0.15); color: var(--green); }
+  .ref-link.green:hover { background: rgba(0, 206, 201, 0.3); }
+  .ref-link.orange { background: rgba(253, 203, 110, 0.15); color: var(--orange); }
+  .ref-link.orange:hover { background: rgba(253, 203, 110, 0.3); }
+  .ref-link.blue { background: rgba(116, 185, 255, 0.15); color: var(--blue); }
+  .ref-link.blue:hover { background: rgba(116, 185, 255, 0.3); }
+  /* Sub-sections */
+  .sub-section {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+  }
+  .sub-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  /* No update */
+  .no-update {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-dim);
+    font-size: 15px;
+  }
+  .no-update .icon { font-size: 32px; margin-bottom: 10px; }
+  /* Summary card */
+  .summary-card {
+    background: linear-gradient(135deg, #1a1d27 0%, #2d1b69 100%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .summary-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--accent-light);
+  }
+  .summary-card p {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.8;
+  }
+  /* Comparison Table */
+  .comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 16px;
+  }
+  .comparison-table th {
+    background: var(--surface2);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border);
+  }
+  .comparison-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .comparison-table tr:hover td {
+    background: var(--surface2);
+  }
+  .comparison-table .lib-name {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .comparison-table .lib-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  /* Trend section */
+  .trend-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+  }
+  .trend-item h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .trend-item p {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-dim);
+    font-size: 13px;
+    border-top: 1px solid var(--border);
+  }
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header h1 { font-size: 22px; }
+    .nav-tab { padding: 10px 14px; font-size: 13px; }
+    .comparison-table { font-size: 12px; }
+    .comparison-table th, .comparison-table td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>通信库竞品动态周报</h1>
+  <div class="subtitle">NCCL / DeepEP / NVSHMEM / 其他通信库 最新动态追踪</div>
+  <div class="date-range">2026-04-13 ~ 2026-04-20 · 第16周</div>
+</div>
+
+<div class="nav-tabs" id="navTabs">
+  <a class="nav-tab active" href="#nccl">NCCL <span class="badge green">3项更新</span></a>
+  <a class="nav-tab" href="#deepep">DeepEP <span class="badge">2项</span></a>
+  <a class="nav-tab" href="#nvshmem">NVSHMEM <span class="badge green">1项</span></a>
+  <a class="nav-tab" href="#others">其他通信库 <span class="badge orange">3项</span></a>
+  <a class="nav-tab" href="#comparison">技术对比</a>
+  <a class="nav-tab" href="#trends">趋势展望</a>
+</div>
+
+<div class="container">
+
+<!-- ==================== NCCL ==================== -->
+<div class="section" id="nccl">
+  <div class="section-header">
+    <div class="section-icon" style="background: var(--nccl-color);">N</div>
+    <h2>NVIDIA NCCL</h2>
+    <span class="tag active">活跃更新</span>
+  </div>
+
+  <!-- NCCL v2.30.3-1 Release -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--green);">●</span> NCCL v2.30.3-1 正式发布
+        <span class="version">v2.30.3-1</span>
+      </h3>
+      <div>
+        <span class="date">2026-04-15</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="sub-section">
+        <h4>新增功能</h4>
+        <ul>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>GIN 上下文隔离：</strong>GIN contexts 不再被同一 host communicator 背书的 device communicator 共享，新增 per-context resource modes
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Device API 增强：</strong>新增 TrafficClass 路由、超时处理、ncclDevComm 版本控制
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Elastic Buffers (LSA 支持)：</strong>对超大 tensor 进行分段窗口切分，活跃数据驻留 GPU，其余 offload 至 host 内存
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>GIN Nonblocking Get：</strong>实验性 gin.get 支持非阻塞刷新，无需 GPU stall（需 GDAKI）
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Symmetric Memory 增强：</strong>新增 AVG operator、动态 group-based offloading、signal operations 的 CUDA graph replay 支持
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>TMA (Tensor Memory Accelerator) 集成：</strong>在 symmetric kernels 中 offload 大批量数据传输
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Dynamic Direct Path：</strong>激活硬件级多路径路由；IB port recovery 管理瞬态网络故障
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Cross-Clique 支持：</strong>将分离的 NVLINK 组作为统一域处理
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Python Wrapper 更新：</strong>支持 freethreading，新增 C API 参数查询
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Blackwell / Hopper 优化：</strong>NVLSTree 针对 Blackwell 调优；Hopper GPU 激活 LL128 协议
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>Bug 修复</h4>
+        <ul>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 putSignal 和 collectives 中 pageable memory copy 导致的隐式 CUDA 同步问题
+              <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet orange"></span>
+            <span>消除 CE collectives 与 CUDA graphs 组合使用时的 hang 问题
+              <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 RMA 与 GIN 插件共存时 finalize 阶段的空指针解引用
+              <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 multi-CTA all2all 示例中的同步 race condition 和 Python wrapper 的 enum 兼容问题
+              <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 communicator 生命周期管理中的内存泄漏和 unaligned symmetric kernel 数据损坏
+              <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>变更与限制</h4>
+        <ul>
+          <li>
+            <span class="bullet"></span>
+            <span><strong>Breaking Change：</strong>使用 GIN API 的应用需用 2.30.3 重新编译才能与新 runtime 兼容
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet"></span>
+            <span>Nonblocking GPU get 功能暂不支持 directNIC 和 Ampere 架构
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">GitHub Release ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- NCCL Q2 2026 Roadmap -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--green);">●</span> NCCL Q2 2026 Roadmap 更新
+        <span class="version">Roadmap</span>
+      </h3>
+      <div>
+        <span class="date">2026-04 持续更新</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="sub-section">
+        <h4>Q2 规划概览 (2026年5月-7月)</h4>
+        <ul>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>CuTe DSL 集成：</strong>将 CuTe 抽象引入 NCCL device API，统一编程模型
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Elastic Buffer for GIN：</strong>扩展 Elastic Buffer 至 GIN device API
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Batched Get for GIN：</strong>批量异步获取操作
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Simultaneous GIN Proxy & GDAKI：</strong>同步部署 GIN proxy 和 GDAKI 传输层
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Lamport-style Synchronization：</strong>在 symmetric kernels 中部署 Lamport 式低延迟同步方案
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>NVLS + PAT 增强：</strong>优化中小消息规模的多 SM NVLS 集合通信
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>LL/LL128 Device API 暴露：</strong>通过 device API 暴露低延迟协议集合操作
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Zero-SM 路径扩展：</strong>将零 SM 占用的 collectives 扩展到 AllGather
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Symmetric A2A：</strong>对称 All-to-All 通信支持
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Cost Model 重构：</strong>完全重写算法选择成本模型
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>RAS API & Profiler 改进：</strong>可靠性、可用性和可维护性 API + 性能分析器增强
+              <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>评估中特性 (可能进入 Q2)</h4>
+        <ul>
+          <li>
+            <span class="bullet orange"></span>
+            <span>Custom Comms Ops Hook、SM-initiated CE Collectives、SET Signal Operation、CUDA Checkpoint、Determinism 改进、Device API JIT 支持
+              <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">Q2 Roadmap ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- NCCL EP Paper -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--green);">●</span> NCCL EP 论文发布 - MoE 通信统一 API
+        <span class="version">论文</span>
+      </h3>
+      <div>
+        <span class="date">2026-03 发布 / 本周持续讨论</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="sub-section">
+        <h4>核心内容</h4>
+        <ul>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>NCCL EP：</strong>基于 NCCL Device API 从头构建的 MoE 通信库，统一支持低延迟 (LL) 和高吞吐 (HT) 路径
+              <a class="ref-link" href="https://arxiv.org/html/2603.13606v3" target="_blank">arXiv 论文 ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>与 DeepEP 对比：</strong>统一 ncclEpDispatch / ncclEpCombine 原语，替代 DeepEP 的多接口分离设计；用 NCCL 原生拓扑检测替换 NVSHMEM 依赖
+              <a class="ref-link" href="https://arxiv.org/html/2603.13606v3" target="_blank">arXiv 论文 ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>性能表现：</strong>LL 设计实现较 DeepEP 架构一个数量级的显存占用降低；多节点 dispatch 吞吐匹配或超越 DeepEP；vLLM 端到端 serving 测试中，1-4 节点场景下性能为 DeepEP 的 90-93%
+              <a class="ref-link" href="https://arxiv.org/html/2603.13606v3" target="_blank">arXiv 论文 ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>生态意义：</strong>解决当前 MoE 通信生态碎片化问题（DeepEP、pplx-kernels 等各自为战），为 NVIDIA 平台提供官方支持的 Expert Parallelism 路径
+              <a class="ref-link" href="https://arxiv.org/html/2603.13606v3" target="_blank">arXiv 论文 ↗</a>
+              <a class="ref-link" href="https://www.itsolotime.com/archives/27456" target="_blank">中文解读 ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- NCCL Community / SGLang -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--blue);">●</span> 社区动态 - SGLang NCCL/NVSHMEM 集成讨论
+        <span class="version">社区</span>
+      </h3>
+      <div>
+        <span class="date">本周活跃</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li>
+          <span class="bullet blue"></span>
+          <span><strong>SGLang 与 NVIDIA 协作路线图 (2026 Q2)：</strong>计划 4 月添加 decode Context 功能；社区正在探索将 NVSHMEM symmetric memory 用于 all-to-all 专家路由
+            <a class="ref-link blue" href="https://github.com/sgl-project/sglang/issues/22960" target="_blank">SGLang Roadmap ↗</a>
+            <a class="ref-link blue" href="https://github.com/sgl-project/sglang/issues/22583" target="_blank">SGLang Issue ↗</a>
+          </span>
+        </li>
+        <li>
+          <span class="bullet blue"></span>
+          <span><strong>NVSHMEM all_to_all_vdev_2d 实测修正：</strong>早期声称恒定 ~45μs 延迟的测试被发现存在维度推断 bug；修正后 B200 上 32MB 传输需 145μs（较标准 collectives 慢 1.82×），多节点和大规模 EP 场景潜力待验证
+            <a class="ref-link blue" href="https://github.com/sgl-project/sglang/issues/22583" target="_blank">SGLang Issue ↗</a>
+          </span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DeepEP ==================== -->
+<div class="section" id="deepep">
+  <div class="section-header">
+    <div class="section-icon" style="background: var(--deepep-color);">D</div>
+    <h2>DeepSeek DeepEP</h2>
+    <span class="tag stable">稳定维护</span>
+  </div>
+
+  <!-- DeepEP 本周状态 -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--text-dim);">●</span> DeepEP 本周状态
+        <span class="version">v1.2.1</span>
+      </h3>
+      <div>
+        <span class="date">最后发布 2025-09-16</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="sub-section">
+        <h4>本周动态</h4>
+        <ul>
+          <li>
+            <span class="bullet orange"></span>
+            <span><strong>本周无新版本发布：</strong>最新稳定版仍为 v1.2.1（2025-09-16），支持 topk10 low-latency kernel。本周 GitHub 仓库无重大 commit 或 release 活动。
+              <a class="ref-link orange" href="https://github.com/deepseek-ai/DeepEP/releases" target="_blank">GitHub Releases ↗</a>
+              <a class="ref-link orange" href="https://github.com/deepseek-ai/DeepEP" target="_blank">GitHub Repo ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>社区/生态动态</h4>
+        <ul>
+          <li>
+            <span class="bullet blue"></span>
+            <span><strong>AMD ROCm 移植完成：</strong>AMD 官方已移植 DeepEP 至 ROCm 平台，支持 xGMI (节点内) + RDMA (跨节点) 路由，统一 Python API，当前支持 cx7、thor2、io 网卡适配器
+              <a class="ref-link blue" href="https://github.com/ROCm/DeepEP" target="_blank">ROCm/DeepEP ↗</a>
+              <a class="ref-link blue" href="https://www.linkedin.com/posts/semianalysis_amd-support-for-deepep-is-finally-here-activity-7376114606085214208-iHY-" target="_blank">SemiAnalysis 报道 ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet blue"></span>
+            <span><strong>Azure 性能优化实践：</strong>Microsoft 技术社区发布 DeepEP on Azure 优化指南，分享 expert parallelism 在 Azure 集群上的最佳实践
+              <a class="ref-link blue" href="https://techcommunity.microsoft.com/blog/azurehighperformancecomputingblog/achieving-optimal-performance-for-deepseek-expert-parallelism-deepep-on-azure/4414699" target="_blank">Azure 博客 ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet blue"></span>
+            <span><strong>Infrawaves 双端口 Multi-QP 扩展：</strong>第三方团队发布 DeepEP IBRC 双端口多 QP 实现，并首次披露 NCCL 版本与 DeepEP 的兼容性敏感性分析
+              <a class="ref-link blue" href="https://github.com/Infrawaves/DeepEP_ibrc_dual-ports_multiQP" target="_blank">Infrawaves/DeepEP ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet blue"></span>
+            <span><strong>NCCL EP 竞争压力：</strong>NVIDIA 发布的 NCCL EP 论文直接对标 DeepEP，提出统一 API 方案，社区开始讨论 DeepEP 与 NCCL 生态的融合路径
+              <a class="ref-link blue" href="https://arxiv.org/html/2603.13606v3" target="_blank">NCCL EP 论文 ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>项目概览</h4>
+        <ul>
+          <li>
+            <span class="bullet"></span>
+            <span><strong>Stars：</strong>9.1k · <strong>Commits：</strong>240 · <strong>Open Issues：</strong>172
+              <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank">GitHub ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet"></span>
+            <span><strong>核心特性：</strong>MoE expert parallelism 专用 all-to-all GPU kernels、FP8/BF16 支持、hook-based computation-computation overlap（零 SM 占用）、NVLink + RDMA 双通道路由
+              <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank">GitHub ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== NVSHMEM ==================== -->
+<div class="section" id="nvshmem">
+  <div class="section-header">
+    <div class="section-icon" style="background: var(--nvshmem-color);">V</div>
+    <h2>NVIDIA NVSHMEM</h2>
+    <span class="tag stable">稳定更新</span>
+  </div>
+
+  <!-- NVSHMEM 3.6.5 -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--green);">●</span> NVSHMEM 3.6.5 发布
+        <span class="version">v3.6.5</span>
+      </h3>
+      <div>
+        <span class="date">2026-03-20</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="sub-section">
+        <h4>新增功能</h4>
+        <ul>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>配置文件支持：</strong>新增配置文件管理，简化 NVSHMEM 环境变量管理
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>实验性 LTO-IR Build：</strong>支持 NVSHMEM LTO-IR 构建选项，优化编译时优化
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>增强用户 Buffer 注册：</strong>改进对称内存用户 buffer 注册机制
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>Tile API 错误码返回：</strong>tile API 调用现在返回错误码，提升可调试性
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>libfabric Multi-NIC：</strong>libfabric 传输层新增多网卡支持
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet green"></span>
+            <span><strong>NVSHMEM4Py 0.3.0：</strong>新增 CuTe DSL 支持、peer/multicast tensor 的 device-side 构建
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>Bug 修复</h4>
+        <ul>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 IBGDA 在支持架构上未激活 CST 优化的问题
+              <a class="ref-link orange" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 LLVM Dead Store Elimination 误删 WQE stores 的问题
+              <a class="ref-link orange" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 NVSHMEM_TEAM_SHARED 初始化错误、libfabric 传输兼容性问题、PMIx bootstrap 处理
+              <a class="ref-link orange" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet orange"></span>
+            <span>修复 host RMA off-stream transport capability 检查和 NVSHMEM4Py peer/multimem buffer tracking
+              <a class="ref-link orange" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>变更</h4>
+        <ul>
+          <li>
+            <span class="bullet"></span>
+            <span><strong>弃用 C++11：</strong>为 C++17 迁移做准备，C++11 支持将被弃用
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+          <li>
+            <span class="bullet"></span>
+            <span><strong>Numba-CUDA 最低版本升级：</strong>Python binding 最低版本提升至 0.25
+              <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">Release Notes ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Other Libraries ==================== -->
+<div class="section" id="others">
+  <div class="section-header">
+    <div class="section-icon" style="background: var(--other-color);">+</div>
+    <h2>其他通信库</h2>
+    <span class="tag stable">持续维护</span>
+  </div>
+
+  <!-- UCX -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--green);">●</span> UCX v1.20.1-rc2 发布
+        <span class="version">v1.20.1-rc2</span>
+      </h3>
+      <div>
+        <span class="date">2026-04-06</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li>
+          <span class="bullet green"></span>
+          <span><strong>v1.20.1-rc2 (2026-04-06)：</strong>修复 IB 配置 const 正确性以兼容 GCC 15.2.1 编译
+            <a class="ref-link" href="https://github.com/openucx/ucx/releases" target="_blank">UCX Releases ↗</a>
+          </span>
+        </li>
+        <li>
+          <span class="bullet green"></span>
+          <span><strong>v1.20.0 (2026-02-05)：</strong>新增 GPU device API 实现直接 GPU-to-GPU 通信；ConnectX-9 设备支持；CUDA 13 构建能力；Direct NIC 数据路径；GDAKI 传输层
+            <a class="ref-link" href="https://github.com/openucx/ucx/releases" target="_blank">UCX Releases ↗</a>
+          </span>
+        </li>
+        <li>
+          <span class="bullet green"></span>
+          <span><strong>UCC (Unified Collective Communication)：</strong>作为 UCX 上层集体通信库持续协同开发，为 NCCL/RCCL 提供底层 collective 抽象
+            <a class="ref-link" href="https://github.com/openucx/ucc" target="_blank">UCC GitHub ↗</a>
+          </span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- torchcomms -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--green);">●</span> torchcomms - PyTorch 全新通信 API
+        <span class="version">Experimental</span>
+      </h3>
+      <div>
+        <span class="date">近期发布</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li>
+          <span class="bullet green"></span>
+          <span><strong>torchcomms：</strong>PyTorch 官方发布的实验性轻量级通信 API，旨在简化分布式编程，降低 torch.distributed 使用门槛
+            <a class="ref-link" href="https://pytorch.org/blog/torchcomms/" target="_blank">PyTorch Blog ↗</a>
+            <a class="ref-link" href="https://github.com/meta-pytorch/torchcomms" target="_blank">GitHub ↗</a>
+          </span>
+        </li>
+        <li>
+          <span class="bullet green"></span>
+          <span><strong>设计目标：</strong>提供更简洁的 API 抽象层，使开发者更容易利用 NCCL/Gloo 等后端进行分布式训练和推理
+            <a class="ref-link" href="https://pytorch.org/blog/torchcomms/" target="_blank">PyTorch Blog ↗</a>
+          </span>
+        </li>
+        <li>
+          <span class="bullet blue"></span>
+          <span><strong>社区反应：</strong>LinkedIn 和 daily.dev 等平台已有多篇讨论帖，社区关注度上升
+            <a class="ref-link blue" href="https://www.linkedin.com/posts/subodhiyengar_excited-to-announce-this-new-library-for-activity-7386864161638703104-gQDL" target="_blank">LinkedIn ↗</a>
+            <a class="ref-link blue" href="https://app.daily.dev/posts/torchcomms-a-modern-pytorch-communications-api-pytorch-ge8j0flky" target="_blank">daily.dev ↗</a>
+          </span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- RCCL / Gloo / OneCCL -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>
+        <span style="color: var(--text-dim);">●</span> RCCL / Gloo / OneCCL 本周动态
+        <span class="version">多项</span>
+      </h3>
+      <div>
+        <span class="date">本周</span>
+        <span class="arrow">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="sub-section">
+        <h4>RCCL (AMD ROCm)</h4>
+        <ul>
+          <li>
+            <span class="bullet orange"></span>
+            <span><strong>本周无新版本发布：</strong>RCCL 已迁移至 ROCm/rocm-systems 仓库，当前稳定版为 2.26.6（ROCm 7.x）。AMD 持续维护 DeepEP ROCm 移植版，间接推动 RCCL 生态扩展
+              <a class="ref-link orange" href="https://github.com/ROCm/rccl" target="_blank">RCCL GitHub ↗</a>
+              <a class="ref-link orange" href="https://rocm.docs.amd.com/projects/rccl/en/docs-7.0.2/" target="_blank">RCCL Docs ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>Gloo (PyTorch)</h4>
+        <ul>
+          <li>
+            <span class="bullet orange"></span>
+            <span><strong>本周无更新：</strong>Gloo 作为 PyTorch CPU 通信后端持续维护，无新版本发布。torchcomms 的发布可能为 Gloo 生态带来新的上层抽象
+              <a class="ref-link orange" href="https://github.com/pytorch/gloo" target="_blank">Gloo GitHub ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="sub-section">
+        <h4>OneCCL (Intel)</h4>
+        <ul>
+          <li>
+            <span class="bullet orange"></span>
+            <span><strong>本周无更新：</strong>最新稳定版 2021.17.2 (oneCCL 2025.3 套件)。已迁移至 UXL Foundation 管辖
+              <a class="ref-link orange" href="https://github.com/uxlfoundation/oneCCL" target="_blank">oneCCL GitHub ↗</a>
+              <a class="ref-link orange" href="https://www.intel.com/content/www/us/en/developer/articles/release-notes/oneapi-collective-communication-library-ccl-release-notes.html" target="_blank">Intel Release Notes ↗</a>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Comparison ==================== -->
+<div class="section" id="comparison">
+  <div class="section-header">
+    <div class="section-icon" style="background: linear-gradient(135deg, var(--nccl-color), var(--deepep-color));">⚡</div>
+    <h2>技术对比</h2>
+  </div>
+
+  <div class="card" style="overflow-x: auto;">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>特性</th>
+          <th>NCCL</th>
+          <th>DeepEP</th>
+          <th>NVSHMEM</th>
+          <th>UCX</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>维护方</strong></td>
+          <td>NVIDIA</td>
+          <td>DeepSeek</td>
+          <td>NVIDIA</td>
+          <td>Open-UCX (Mellanox/NVIDIA)</td>
+        </tr>
+        <tr>
+          <td><strong>最新版本</strong></td>
+          <td>v2.30.3-1 <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">↗</a></td>
+          <td>v1.2.1 <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/releases" target="_blank">↗</a></td>
+          <td>v3.6.5 <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">↗</a></td>
+          <td>v1.20.1-rc2 <a class="ref-link" href="https://github.com/openucx/ucx/releases" target="_blank">↗</a></td>
+        </tr>
+        <tr>
+          <td><strong>主要定位</strong></td>
+          <td>通用 GPU 集合通信</td>
+          <td>MoE Expert Parallel</td>
+          <td>全局地址空间并行编程</td>
+          <td>统一通信框架</td>
+        </tr>
+        <tr>
+          <td><strong>Device API</strong></td>
+          <td>✅ 成熟 (GIN/EP) <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">↗</a></td>
+          <td>✅ 原生 all-to-all <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank">↗</a></td>
+          <td>✅ 完整 device API <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">↗</a></td>
+          <td>✅ v1.20 新增 GPU device API <a class="ref-link" href="https://github.com/openucx/ucx/releases" target="_blank">↗</a></td>
+        </tr>
+        <tr>
+          <td><strong>零 SM 占用</strong></td>
+          <td>✅ CE Collectives / Zero-SM <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">↗</a></td>
+          <td>✅ Hook-based overlap <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank">↗</a></td>
+          <td>❌ 需 SM 参与</td>
+          <td>❌ 需 SM 参与</td>
+        </tr>
+        <tr>
+          <td><strong>MoE EP 专用优化</strong></td>
+          <td>🔬 NCCL EP 实验性 <a class="ref-link" href="https://arxiv.org/html/2603.13606v3" target="_blank">↗</a></td>
+          <td>✅ 原生支持 <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank">↗</a></td>
+          <td>🔬 可构建 DeepEP-like buffer <a class="ref-link" href="https://github.com/KuangjuX/NVSHMEM-Tutorial" target="_blank">↗</a></td>
+          <td>❌ 通用框架</td>
+        </tr>
+        <tr>
+          <td><strong>跨平台</strong></td>
+          <td>NVIDIA GPU only</td>
+          <td>NVIDIA + AMD (ROCm) <a class="ref-link" href="https://github.com/ROCm/DeepEP" target="_blank">↗</a></td>
+          <td>NVIDIA GPU only</td>
+          <td>NVIDIA + AMD + Intel (UCX)</td>
+        </tr>
+        <tr>
+          <td><strong>Python 绑定</strong></td>
+          <td>✅ (freethreading) <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">↗</a></td>
+          <td>✅</td>
+          <td>✅ NVSHMEM4Py 0.3.0 <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">↗</a></td>
+          <td>✅ (Java preview)</td>
+        </tr>
+        <tr>
+          <td><strong>Blackwell 支持</strong></td>
+          <td>✅ NVLSTree 调优 <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">↗</a></td>
+          <td>❓ 未明确</td>
+          <td>✅ GA (B200/GB200) <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">↗</a></td>
+          <td>❓</td>
+        </tr>
+        <tr>
+          <td><strong>本周动态</strong></td>
+          <td style="color: var(--green);">● 重大更新</td>
+          <td style="color: var(--text-dim);">● 生态扩展</td>
+          <td style="color: var(--green);">● 持续更新</td>
+          <td style="color: var(--green);">● RC 发布</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ==================== Trends ==================== -->
+<div class="section" id="trends">
+  <div class="section-header">
+    <div class="section-icon" style="background: linear-gradient(135deg, var(--green), var(--blue));">→</div>
+    <h2>趋势展望</h2>
+  </div>
+
+  <div class="trend-item">
+    <h4>🔥 MoE 通信生态走向统一</h4>
+    <p>NCCL EP 论文的发布标志着 NVIDIA 开始正视 MoE 通信碎片化问题。NCCL EP 以统一 API 替代 DeepEP 的多接口设计，并在 vLLM serving 中达到 DeepEP 90-93% 的性能。随着 AMD 同步完成 DeepEP ROCm 移植，MoE expert parallelism 的通信标准竞争将在 2026 Q2 进入白热化阶段。NCCL 能否在 Q2 roadmap 中将 EP 功能正式合并到主线，将是关键观察点。</p>
+    <div style="margin-top: 8px;">
+      <a class="ref-link" href="https://arxiv.org/html/2603.13606v3" target="_blank">NCCL EP 论文 ↗</a>
+      <a class="ref-link" href="https://github.com/ROCm/DeepEP" target="_blank">ROCm/DeepEP ↗</a>
+      <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank">NCCL Q2 Roadmap ↗</a>
+    </div>
+  </div>
+
+  <div class="trend-item">
+    <h4>⚡ Device-Initiated 通信成为标配</h4>
+    <p>本周 NCCL v2.30.3-1 的 GIN API 增强和 UCX v1.20 的 GPU device API 发布，加上 DeepEP 原生的 device-initiated all-to-all，标志着 GPU 通信正在从 CPU-proxy 模式全面转向 GPU 直接通信。NVSHMEM 的 tile API 和 device-side tensor construction 也沿着同一方向推进。这一趋势的核心驱动力是降低通信延迟和减少 CPU 瓶颈。</p>
+    <div style="margin-top: 8px;">
+      <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">NCCL GIN API ↗</a>
+      <a class="ref-link" href="https://github.com/openucx/ucx/releases" target="_blank">UCX GPU API ↗</a>
+      <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">NVSHMEM tile API ↗</a>
+    </div>
+  </div>
+
+  <div class="trend-item">
+    <h4>🐍 Python 生态全面升级</h4>
+    <p>NCCL v2.30.3-1 新增 freethreading 支持，NVSHMEM4Py 0.3.0 引入 CuTe DSL 和 device-side 构建，UCX 添加 Java API preview。所有主要通信库都在加大 Python 生态投入，这与 AI/ML 框架的 Python-first 趋势高度一致。torchcomms 的发布更是 PyTorch 对通信 API 简化的直接响应。</p>
+    <div style="margin-top: 8px;">
+      <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">NCCL Python ↗</a>
+      <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">NVSHMEM4Py ↗</a>
+      <a class="ref-link" href="https://pytorch.org/blog/torchcomms/" target="_blank">torchcomms ↗</a>
+    </div>
+  </div>
+
+  <div class="trend-item">
+    <h4>🏗️ Blackwell / B200 适配加速</h4>
+    <p>NCCL v2.30.3-1 的 NVLSTree Blackwell 调优、NVSHMEM 3.6.5 的 B200/GB200 GA 支持，以及 SGLang 社区在 B200 上的 NVSHMEM 实测，表明 2026 Q2 将是 Blackwell 通信栈成熟的关键季度。随着 Blackwell 产能爬坡，通信库的 Blackwell 优化将成为性能竞争的主战场。</p>
+    <div style="margin-top: 8px;">
+      <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">NCCL Blackwell ↗</a>
+      <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">NVSHMEM B200 ↗</a>
+      <a class="ref-link" href="https://github.com/sgl-project/sglang/issues/22583" target="_blank">SGLang B200 测试 ↗</a>
+    </div>
+  </div>
+
+  <div class="trend-item">
+    <h4>🌐 多网卡 / 多路径成为标配</h4>
+    <p>NCCL v2.30.3-1 的 Dynamic Direct Path、NVSHMEM 3.6.5 的 libfabric Multi-NIC、UCX 的 Direct NIC 数据路径，所有主要通信库都在本周/近期更新中强化了多网卡支持。这反映了大规模 AI 集群对网络冗余和带宽聚合的刚性需求增长。</p>
+    <div style="margin-top: 8px;">
+      <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank">NCCL Direct Path ↗</a>
+      <a class="ref-link" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3605.html" target="_blank">NVSHMEM Multi-NIC ↗</a>
+      <a class="ref-link" href="https://github.com/openucx/ucx/releases" target="_blank">UCX Direct NIC ↗</a>
+    </div>
+  </div>
+
+  <!-- Weekly Observation -->
+  <div class="summary-card" style="margin-top: 30px;">
+    <h3>📌 本周观察</h3>
+    <p>
+      本周通信库竞争格局的核心变化是：<strong>NVIDIA 通过 NCCL v2.30.3-1 和 NCCL EP 论文发起 MoE 通信标准化攻势</strong>，直接对标 DeepSeek 的 DeepEP；同时 AMD 完成 DeepEP ROCm 移植形成跨平台呼应。NCCL 在 Device API、Elastic Buffers 和 Cross-Clique 上的大幅推进表明其正从"集合通信库"向"全场景 GPU 通信平台"转型。NVSHMEM 3.6.5 和 UCX v1.20 的同期更新进一步夯实了 Device-Initiated 通信和多网卡支持的行业标准。整体而言，2026 Q2 将是 MoE 通信生态格局重塑的关键季度。
+    </p>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  <p>通信库竞品周报 · 2026-04-20 · 数据来源: GitHub, arXiv, NVIDIA Docs, PyTorch Blog, AMD ROCm</p>
+  <p style="margin-top: 6px; font-size: 12px;">所有信息均基于可验证的公开来源，点击引用链接可跳转至原始资料</p>
+</div>
+
+<script>
+function toggleCard(header) {
+  const body = header.nextElementSibling;
+  const isOpen = body.classList.contains('open');
+  if (isOpen) {
+    body.classList.remove('open');
+    header.classList.remove('open');
+  } else {
+    body.classList.add('open');
+    header.classList.add('open');
+  }
+}
+
+// Tab navigation
+const tabs = document.querySelectorAll('.nav-tab');
+const sections = document.querySelectorAll('.section');
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', function(e) {
+    e.preventDefault();
+    tabs.forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+// Update active tab on scroll
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(section => {
+    const sectionTop = section.offsetTop - 80;
+    if (window.scrollY >= sectionTop) {
+      current = section.getAttribute('id');
+    }
+  });
+  tabs.forEach(tab => {
+    tab.classList.remove('active');
+    if (tab.getAttribute('href') === '#' + current) {
+      tab.classList.add('active');
+    }
+  });
+});
+</script>
+
+</body>
+</html>

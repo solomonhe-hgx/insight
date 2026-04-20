@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlashOverlap: 信号驱动计算通信重叠论文详解</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .patent-card { transition: all 0.3s ease; }
+        .patent-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.5rem; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.8rem; overflow-x: auto; line-height: 1.5; }
+        .highlight-box { border-left: 4px solid #76b900; background: rgba(118, 185, 0, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .tech-diagram { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.75rem; padding: 1.5rem; }
+        .paper-badge { font-family: 'Fira Code', monospace; background: rgba(6, 182, 212, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .method-step { position: relative; padding-left: 2.5rem; }
+        .method-step::before { content: ''; position: absolute; left: 0.75rem; top: 2rem; bottom: -1rem; width: 2px; background: rgba(6, 182, 212, 0.3); }
+        .method-step:last-child::before { display: none; }
+        .method-step .step-number { position: absolute; left: 0; top: 0; width: 1.5rem; height: 1.5rem; background: rgba(6, 182, 212, 0.2); border: 2px solid rgba(6, 182, 212, 0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #06b6d4; font-weight: bold; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-bolt text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-cyan-600 bg-clip-text text-transparent">FlashOverlap 论文详解</h1>
+                        <p class="text-xs text-slate-400">信号驱动计算通信重叠 | EUROSYS '26</p>
+                    </div>
+                </div>
+                <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/10 to-cyan-700/10 border border-cyan-500/20">
+                    <div class="text-xs text-slate-400">最高加速比</div>
+                    <div class="text-lg font-bold text-cyan-400">1.65x</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <div class="glass-card rounded-xl p-6 mt-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="paper-badge">arXiv:2504.19519</span>
+                <h2 class="text-lg font-semibold text-cyan-400">Efficient and Adaptable Overlapping for Computation and Communication via Signaling and Reordering</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-cyan-500/10 to-cyan-700/10 border border-cyan-500/20">
+                    <div class="text-sm text-slate-400 mb-1">作者</div>
+                    <div class="text-xs text-cyan-400">Ke Hong (Tsinghua/Infinigence-AI), Xiuhong Li*, Minxu Liu, Qiuli Mao, Tianqi Wu, Zixiao Huang, Lufang Chen (Infinigence-AI), Zhong Wang, Yichong Zhang, Zhenhua Zhu (Tsinghua), Guohao Dai* (SJTU/Infinigence-AI), Yu Wang* (Tsinghua)</div>
+                </div>
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-cyan-500/10 to-cyan-700/10 border border-cyan-500/20">
+                    <div class="text-sm text-slate-400 mb-1">发表信息</div>
+                    <div class="text-xs text-cyan-400">EUROSYS '26, April 27-30, 2026, Edinburgh, Scotland UK</div>
+                    <div class="text-xs text-slate-500 mt-1">DOI: 10.1145/3767295.3769370</div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Abstract -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-file-alt"></i> 摘要</h3>
+                    <p class="text-sm text-slate-300 leading-relaxed">
+                        生成模型在多 GPU 计算中取得巨大成功，但 GPU 间通信成为瓶颈，尤其在消费级 GPU 上。利用并发硬件执行重叠计算和通信延迟是缓解通信开销的有效技术。作者指出高效且可适应的重叠设计应满足：(1) <strong>tile-wise 重叠</strong>以最大化重叠机会；(2) <strong>无干扰计算</strong>以保持原始计算性能；(3) <strong>通信不可知</strong>以减少针对不同通信原语的开发负担。现有设计无法同时优化这三个特性。本文提出 <strong>FlashOverlap</strong>，利用新型信号机制：当部分输出完成时，计算 kernel 发送信号触发该部分的通信，同时继续剩余部分的计算。在此之上包含两个关键组件：(1) 信号时机确定以提升重叠效率；(2) 通信前重排创建连续地址，允许直接调用 NCCL API。实验表明 FlashOverlap 通过重叠实现最高 <strong>1.65x 加速</strong>，在大多数情况下优于现有工作。
+                    </p>
+                    <div class="mt-2 text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2504.19519" target="_blank" class="ref-link">arXiv:2504.19519</a> | <a href="https://arxiv.org/html/2504.19519v2" target="_blank" class="ref-link">HTML 版本</a> | <a href="https://github.com/infinigence/FlashOverlap" target="_blank" class="ref-link">GitHub 代码</a></div>
+                </div>
+
+                <!-- Background & Motivation -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 背景与动机</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">多 GPU 并行模式与通信开销</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">生成模型参数量从数十亿增长到万亿级别 (如 to 2T parameters)。单 GPU 显存无法容纳，需要张量并行 (TP)、流水线并行 (PP)、专家并行 (EP) 和数据并行 (DP)。这些多 GPU 范式不可避免地引入 GPU 间通信开销，主要来自集合通信原语：AllReduce、ReduceScatter 和 All-to-All。消费级 GPU 使用 PCIe 互连 (通常 16-64 GB/s 双向带宽)，通信开销更加严重。</p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">GEMM + 通信模式分析</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">论文 profiling 了多种 LLM 推理和训练场景：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• <strong>GEMM + AllReduce (TP 推理):</strong> Llama3-70B (TP=8) 推理中，prefill 和 decode 阶段 GEMM+AR 占总时间约 8.8-8.9%</li>
+                                <li>• <strong>GEMM + ReduceScatter (FSDP 训练):</strong> Llama2-7B (TP=4, PP=2) 训练 backward 中 GEMM+RS 占约 30%</li>
+                                <li>• <strong>GEMM + All-to-All (MoE 训练):</strong> Mixtral-8x7B (EP=8) 训练 forward 中 GEMM+A2A 占超过 40%</li>
+                                <li>• <strong>Step-Video-T2V 推理 (TP=4):</strong> GEMM+AR 占约 9.9%</li>
+                            </ul>
+                        </div>
+
+                        <div class="highlight-box">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">高效可适应重叠的三个关键特性</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed"><strong>(1) Tile-wise 重叠:</strong> Tile 是 GEMM 输出中逻辑上最小的并行数据单元，tile-wise 重叠最大化重叠机会。</p>
+                            <p class="text-sm text-slate-300 leading-relaxed mt-2"><strong>(2) 无干扰计算:</strong> 为保持原始计算性能，应避免对 GEMM 的干扰，包括分割 (segmentation)、分块 (tiling) 或逻辑变更。</p>
+                            <p class="text-sm text-slate-300 leading-relaxed mt-2"><strong>(3) 通信不可知:</strong> 设计应对通信原语不可知，无需为不同通信原语重复开发。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing Methods -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-balance-scale"></i> 现有方法对比</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead><tr class="border-b border-slate-600"><th class="text-left py-2 px-3 text-slate-300">方法</th><th class="text-left py-2 px-3 text-cyan-400">Tile-wise</th><th class="text-left py-2 px-3 text-cyan-400">无干扰计算</th><th class="text-left py-2 px-3 text-cyan-400">通信不可知</th><th class="text-left py-2 px-3 text-slate-300">代表工作</th></tr></thead>
+                            <tbody>
+                                <tr class="border-b border-slate-800"><td class="py-2 px-3 font-medium">分解法 (Decomposition)</td><td class="py-2 px-3 text-red-400">否</td><td class="py-2 px-3 text-red-400">否</td><td class="py-2 px-3 text-green-400">是</td><td class="py-2 px-3">CoCoNet, Domino, Async-TP, MegaScale, Centauri</td></tr>
+                                <tr class="border-b border-slate-800"><td class="py-2 px-3 font-medium">融合法 (Fusion)</td><td class="py-2 px-3 text-green-400">是</td><td class="py-2 px-3 text-red-400">否</td><td class="py-2 px-3 text-red-400">否</td><td class="py-2 px-3">FLUX, DistServe, AMD 融合内核</td></tr>
+                                <tr><td class="py-2 px-3 text-cyan-400 font-medium">信号法 (FlashOverlap)</td><td class="py-2 px-3 text-green-400">是</td><td class="py-2 px-3 text-green-400">是</td><td class="py-2 px-3 text-green-400">是</td><td class="py-2 px-3">本文</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="space-y-2 mt-4">
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <p class="text-xs text-slate-400"><strong class="text-red-400">分解法问题:</strong> 将 GEMM 输出张量分解为多个子张量以实现异步重叠。但无法实现 tile-wise 重叠 (需要将 GEMM 分割为较小的 GEMM)，且干扰原始计算逻辑，可能导致性能退化需要进一步调优。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <p class="text-xs text-slate-400"><strong class="text-red-400">融合法问题:</strong> 将通信原语融合到 GEMM kernel 内部。虽高效但需要重复 GEMM 调优和通信原语实现，每次 GEMM 尺寸变化或通信原语变化都需要重新开发。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Core Design -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-cogs"></i> FlashOverlap 核心设计</h3>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-cyan-300 mb-3">系统总览</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">GEMM 计算保持在单个 GPU kernel 内，当每组 (G1, G2, G3) tiles 完成时，首先将组内 tiles 重排到连续地址，然后发送信号触发对应的 GPU 间通信。通信完成后，tiles 被重排回正确顺序。</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <div class="text-sm font-medium text-cyan-400 mb-2">计算侧</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">GEMM computation 保持单个 GPU kernel 执行，不做任何分割或逻辑变更。通过信号机制在部分数据完成计算时通知通信层，计算继续处理剩余数据。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <div class="text-sm font-medium text-cyan-400 mb-2">通信侧</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">通信作为独立 GPU kernel 在不同 stream 上异步执行。通过重排操作确保通信数据地址连续，可直接调用 NCCL API，无需自定义通信实现。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signaling -->
+                    <div>
+                        <h4 class="text-sm font-medium text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-signal"></i> 一、信号机制 (Signaling)</h4>
+
+                        <div class="space-y-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">动机: 数据依赖性</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">信号机制用于追踪已完成 GEMM 计算、可通信的数据，同时不对 GEMM 计算产生干扰。理想情况下，当某部分数据完成 GEMM 计算时，一个开销可忽略的信号用于启动对应的通信，而 GEMM kernel 继续计算。这样，信号链式连接数据依赖，无计算干扰和手工 kernel 融合。</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">关键洞察: GEMM 中的 Wave 模式</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">论文观察到 GEMM 执行中存在固有的 wave 模式：多个 tiles 几乎同时完成，如同在一个 wave 中。在 RTX 4090 上对 GEMM (M=2048, N=K=8192) 的 profiling 显示，tile 完成时间可明确分为 4 个 distinct waves，与 tile 数量 (512) 除以 SM 数量 (128) 的结果一致。</p>
+                                <p class="text-sm text-slate-400 leading-relaxed mt-2">因此，使用 wave 而非单个 tile 作为重叠单元，本质上相同的重叠机会下实现更好的带宽利用率。</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">Block Swizzling 的影响</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">GEMM 中 tile 执行顺序受 block swizzling 技术影响。Block swizzling 以交错方式将 tiles 调度到 SMs 以提升内存访问效率。这导致 wave 中 tile 的内存地址不连续，阻止已完成 tiles 的及时通信。因此需要引入数据重排技术来解决不匹配问题。</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">Wave Group 设计</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">静态 wave-wise 信号并非最优。存在更小但即时通信 vs 更大但延迟通信的权衡。因此信号时机设计为可调，在 waves 之上定义 <strong>wave group</strong>。一个 group G 包含 |G| >= 1 个 waves，对应通信在每个 group 完成 GEMM 计算后开始。每个 group 的大小可调。</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">实现方法: 组级 Tile 计数</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">引入计数表 (counting table) 追踪 tiles 完成情况，已完成的 tiles 按组分别记录。计数表大小为 P，表示 tiles 被分为 P 个不同组 (G1, G2, ..., GP)。当 G_j 中的一个 tile 完成时，计数表中第 j 个数字原子性地加 1。当第 j 个数字达到 |G_j| 时，G_j 的通信开始。使用 tile index 来识别 tile 属于哪个组。</p>
+                            </div>
+                        </div>
+
+                        <div class="code-block mt-4">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-cyan-400">// Wave Group 计数表示例 (3 组, 共 8 tiles, 4 waves)</div>
+                                <div class="text-cyan-400">// G1 = {W1} = {tile 0, 1},  |G1| = 2</div>
+                                <div class="text-cyan-400">// G2 = {W2, W3} = {tile 2,3,4,5}, |G2| = 4</div>
+                                <div class="text-cyan-400">// G3 = {W4} = {tile 6, 7},  |G3| = 2</div>
+                                <div></div>
+                                <div>Counting Table 初始化: [0, 0, 0]</div>
+                                <div></div>
+                                <div>W1 完成 (tiles 0,1)  -> 计数表 [2, 0, 0] -> G1 计数满 -> 触发 G1 通信</div>
+                                <div>W2 完成 (tiles 2,3)  -> 计数表 [2, 2, 0] -> G2 未满，等待</div>
+                                <div>W3 完成 (tiles 4,5)  -> 计数表 [2, 4, 0] -> G2 计数满 -> 触发 G2 通信</div>
+                                <div>W4 完成 (tiles 6,7)  -> 计数表 [2, 4, 2] -> G3 计数满 -> 触发 G3 通信</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reordering -->
+                    <div>
+                        <h4 class="text-sm font-medium text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-sort-amount-down"></i> 二、重排机制 (Reordering)</h4>
+
+                        <div class="space-y-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">动机: 通信需要连续地址</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">通过调用 NCCL 库的单次 GPU 间通信要求发送和接收缓冲区都有连续地址。要实现灵活的 tile 通信，一起通信的 tile 内 (intra-tile) 和 tile 间 (inter-tile) 数据都需要重排到连续地址。</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">挑战: 不规则的 Tile 执行顺序</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">除了 tile 内数据天然不连续外，GEMM 中 tile 间执行顺序也不规则。根本原因是 block swizzling 的应用——为优化 GEMM 性能，将 tiles 以交错方式调度到 GPU blocks。这导致同一 wave 中完成的 tiles 在内存地址上不连续。</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">解决方案: 映射表重排</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">使用映射表 (mapping table) 将不连续的 tile 索引映射到连续的重排序索引。预通信重排 (pre-communication reordering) 确保待发数据的连续地址，允许直接调用 NCCL API。通信后重排 (post-communication reordering) 纠正数据顺序，恢复原始布局。</p>
+                            </div>
+                        </div>
+
+                        <h5 class="text-sm font-medium text-cyan-400 mb-3 mt-6">不同通信原语的重排模式</h5>
+                        <div class="space-y-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h6 class="text-sm font-medium text-cyan-400 mb-2">(1) AllReduce</h6>
+                                <p class="text-sm text-slate-400 leading-relaxed">以 tile 为重排单元。使用映射表将不连续的 tile 索引 (如 tile 0 和 tile 3) 映射到连续的重排序索引 (0 和 1)。通信后通过逆映射表恢复原始顺序。AllReduce 保持每行在所有 GPU 上完整，重排仅改变 tile 的内存布局。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h6 class="text-sm font-medium text-cyan-400 mb-2">(2) ReduceScatter + AllGather</h6>
+                                <p class="text-sm text-slate-400 leading-relaxed">以 subtile 为重排单元。每个 tile 沿行维度等分为与 GPU 数量相同的 subtiles。无论 tiles 如何分配到 GPU，tile 内的第 k 个 subtile 最终总是驻留在第 k 个 GPU 上，所有第 k 个 subtiles 形成完整的行。映射表相应调整。后续 AllGather 聚合所有行，行顺序可通过本地行交换 (row exchange) 纠正——这只是简单的块循环置换，无需映射表，可与 element-wise 操作无缝融合。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h6 class="text-sm font-medium text-cyan-400 mb-2">(3) All-to-All</h6>
+                                <p class="text-sm text-slate-400 leading-relaxed">在 MoE 模型中，数据动态路由到特定 GPU 上的专家。以 subtoken 为重排单元。每个 tile 的输出按目标 GPU 分割为 subtokens。预通信重排确保发往同一 GPU 的 subtokens 地址连续。通信后，每个 GPU 上的 subtokens 通过映射表恢复正确顺序。映射表需要考虑动态路由模式。</p>
+                            </div>
+                        </div>
+
+                        <div class="code-block mt-4">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-cyan-400">// 预通信重排 (Pre-communication Reordering)</div>
+                                <div>// 输入: GEMM 输出 tiles [tile_0, tile_3, tile_1, tile_2, ...] (地址不连续)</div>
+                                <div>// 映射表: {tile_0 -> 0, tile_3 -> 1, tile_1 -> 2, tile_2 -> 3, ...}</div>
+                                <div>// 输出: 连续缓冲区 [tile_0_data, tile_3_data, tile_1_data, tile_2_data, ...]</div>
+                                <div>// -> 可直接调用 NCCL API: ncclAllReduce(contiguous_buf, ...)</div>
+                                <div></div>
+                                <div class="text-cyan-400">// 通信后重排 (Post-communication Reordering)</div>
+                                <div>// 输入: 通信结果 [result_0, result_1, result_2, result_3, ...]</div>
+                                <div>// 逆映射表: {0 -> tile_0, 1 -> tile_3, 2 -> tile_1, 3 -> tile_2, ...}</div>
+                                <div>// 输出: 恢复原始布局 [result_0 放回 tile_0 位置, result_1 放回 tile_3 位置, ...]</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wave Group Partition -->
+                    <div>
+                        <h4 class="text-sm font-medium text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-layer-group"></i> 三、Wave Group 划分设计空间</h4>
+
+                        <div class="space-y-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">设计空间大小</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">每次 wave 后，可选择通信 ("1") 或不通信 ("0")。最后一个 wave 例外——所有累积的 tiles 必须通信。假设有 T 个 waves，设计空间大小为 2^(T-1)。</p>
+                                <p class="text-sm text-slate-400 leading-relaxed mt-2">例如 T=5 时，有 2^4 = 16 种选择。一种选择是在 W1, W3, W5 后通信，得到 wave group 划分 (1, 2, 2)，即 |G1|=1, |G2|=2, |G3|=2。另一种选择在 W2, W5 后通信，得到划分 (2, 3)。</p>
+                            </div>
+
+                            <div class="highlight-box">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">为什么需要调优?</h5>
+                                <p class="text-sm text-slate-300 leading-relaxed">论文实验发现：在最细粒度划分 (每个 group 包含 1 个 wave) 作为基线的情况下，在 4 张 RTX 4090 上对 50+ 种 GEMM 尺寸使用 AllReduce 原语的测试中，<strong>只有 4% 的情况基线划分最优</strong>。使用基线划分平均导致 <strong>17.34% 性能退化</strong>。根本原因是分段通信导致带宽利用率不足，以及频繁 API 调用的开销，当通信延迟占主导时成为性能瓶颈。</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-cyan-400 mb-2">调优挑战</h5>
+                                <p class="text-sm text-slate-400 leading-relaxed">原始设计空间大小 2^(T-1)，每个候选划分需要在线执行来选择最优，导致不可忽略的调优开销。典型 GEMM (M=4096, N=8192, K=7168) 在 RTX 4090 上产生 T=8 个 waves，等于 128 个候选。在线执行约 5ms，profiling 通常包括 10 次 warm-up 和 100 次计时测试，超过 1 分钟 (模型前向延迟的 100+ 倍)，对端到端性能不可接受。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-Time Tuning -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-search"></i> 四、实时调优: 预测搜索方法</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">两阶段调优架构</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed"><strong>离线阶段 (Offline):</strong> 处理部署设置——获取 GEMM 配置 (tiling size, swizzling pattern, duration)、通信带宽曲线 (bandwidth curve)、SM 资源竞争分析。这些只在部署架构、硬件和网络拓扑固定时执行一次。</p>
+                            <p class="text-sm text-slate-400 leading-relaxed mt-2"><strong>在线阶段 (Online):</strong> 针对不同 GEMM 尺寸重复调优——基于延迟预测在设计空间中搜索最优划分，无需在线 profiling。</p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">离线阶段详情</h4>
+                            <div class="method-step mt-3">
+                                <div class="step-number">1</div>
+                                <p class="text-sm text-slate-400"><strong>GEMM 配置获取:</strong> 给定 M x N x K，利用现有高度优化的线性代数实现 (cuBLAS, CUTLASS) 获取 tiling size、swizzling pattern、对应 duration 等配置。</p>
+                            </div>
+                            <div class="method-step mt-3">
+                                <div class="step-number">2</div>
+                                <p class="text-sm text-slate-400"><strong>通信带宽曲线采样:</strong> 对给定 GPU 执行通信原语，带宽随数据大小连续变化。用多个密集点采样带宽曲线。</p>
+                            </div>
+                            <div class="method-step mt-3">
+                                <div class="step-number">3</div>
+                                <p class="text-sm text-slate-400"><strong>SM 资源竞争分析:</strong> 确定通信 kernel 占用的 SM 数量，从 GEMM 可用的 SM 中扣除。</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">在线阶段: 预测搜索算法</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">基于离线阶段获取的 GEMM 配置和带宽曲线，在线阶段使用延迟预测器替代在线 profiling 来搜索最优 wave group 划分。</p>
+                            <p class="text-sm text-slate-400 leading-relaxed mt-2">对于每个候选划分 G = (G1, G2, ..., GP)：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 对每个组 G_i，通过插值带宽曲线获取通信延迟 t_m = interp_latency(bdw_curve, data_size)</li>
+                                <li>• 计算该组的计算延迟 t_p = gemm_config.duration / T * |G_i|</li>
+                                <li>• 累积延迟: t_acc_m = max(t_acc_p, t_acc_m) + t_m, t_acc_p += t_p</li>
+                                <li>• 最后加上最后一组的通信延迟</li>
+                                <li>• 选择总累积延迟最小的划分作为最优解</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="code-block mt-4">
+                        <div class="text-slate-300 space-y-1">
+                            <div class="text-cyan-400">// Algorithm 1: Grouping Tuning Algorithm (简化伪代码)</div>
+                            <div class="text-yellow-400">// 离线阶段</div>
+                            <div>gemm_config = get_config(M, N, K, gpu)     // 获取 GEMM 配置</div>
+                            <div>T = gemm_config.tile_num / (gpu.sm_num - comm_op.sm_num)  // wave 数量</div>
+                            <div>bdw_curve = sample_bandwidth(comm_op, gpu)  // 采样带宽曲线</div>
+                            <div></div>
+                            <div class="text-yellow-400">// 在线阶段: 预测搜索</div>
+                            <div>candidates = get_candidates(T)  // 生成候选划分</div>
+                            <div>t_min = +inf</div>
+                            <div>for G in candidates:</div>
+                            <div>    t_acc_p = 0, t_acc_m = 0  // 累积计算/通信延迟</div>
+                            <div>    for i, G_i in enumerate(G):</div>
+                            <div>        data_size = get_data_size(G_{i-1})</div>
+                            <div>        t_m = interp_latency(bdw_curve, data_size)  // 预测通信延迟</div>
+                            <div>        t_p = gemm_config.duration / T * |G_i|  // 计算延迟</div>
+                            <div>        t_acc_m = max(t_acc_p, t_acc_m) + t_m</div>
+                            <div>        t_acc_p = t_acc_p + t_p</div>
+                            <div>    # 加上最后一组通信延迟</div>
+                            <div>    t_acc_m += interp_latency(bdw_curve, get_data_size(G_{-1}))</div>
+                            <div>    if t_acc_m < t_min:</div>
+                            <div>        t_min = t_acc_m, G_optimal = G</div>
+                            <div>return G_optimal</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CUTLASS Extension -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-code"></i> 五、CUTLASS 扩展实现</h3>
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">扩展主循环 (Main Loop)</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">FlashOverlap 扩展 CUTLASS 矩阵例程，保留核心计算循环，在其中嵌入信号和重排逻辑。在每个 wave 的 tile 完成时，原子性地更新计数表。当计数表指示某个 group 完成时，触发通信前的重排操作。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">Epilogue 集成</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">GEMM 执行包含主循环 (main loop) 和 epilogue。主循环执行核心乘加操作，占 GEMM 大部分时间。Epilogue 指矩阵乘法后执行的 element-wise 操作 (如 ReLU, SiLU, bias addition)。这些操作通常与前面的矩阵乘法融合到单个 GPU kernel 中，消除冗余内存访问和 kernel 启动开销。FlashOverlap 将通信后重排与 element-wise 操作融合，避免额外的 kernel 启动。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">专用监控内核</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">通过原子计数器 (atomic counters) 跟踪进度。独立执行流分别管理计算和传输工作流。信号机制使用 CUDA 事件或共享内存原子变量实现低开销通知。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Evaluation Results -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 实验评估结果</h3>
+
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="highlight-box">
+                                <div class="text-2xl font-bold text-cyan-400">1.65x</div>
+                                <div class="text-sm text-slate-400">最高加速比 (通过重叠实现)</div>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-2xl font-bold text-cyan-400">4%</div>
+                                <div class="text-sm text-slate-400">基线划分 (最细粒度) 最优比例</div>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-2xl font-bold text-cyan-400">17.34%</div>
+                                <div class="text-sm text-slate-400">基线划分平均性能退化</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">Wave Pattern 验证</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">在 RTX 4090 上对 GEMM (M=2048, N=K=8192) 的 profiling 显示，tile 完成时间可明确分为 4 个 distinct waves，与 tile 数量 (512) 除以 SM 数量 (128) 的结果一致。完成顺序与内存地址 (tile index) 不对齐，证实了 block swizzling 的影响。</p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">调优必要性验证</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">在 4 张 RTX 4090 上对 50+ 种 GEMM 尺寸使用 AllReduce 的测试中，只有 4% 的情况最细粒度划分 (每个 group 1 个 wave) 是最优的。使用基线划分平均导致 17.34% 性能退化，证明 wave group 调优的必要性。</p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">预测搜索精度</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">预测搜索方法通过离线采样的带宽曲线和 GEMM 配置，在线预测各候选划分的延迟，避免了昂贵的在线 profiling (1 分钟+ vs 毫秒级预测)，同时保持高精度找到最优或接近最优的划分。</p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2">测试硬件与模型</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">实验覆盖多种硬件和模型场景：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• <strong>NVIDIA A800:</strong> Llama3-70B 推理 (TP=8), Mixtral-8x7B 训练 (EP=8), Step-Video-T2V 推理 (TP=4), Llama2-7B 训练 (TP=4, PP=2)</li>
+                                <li>• <strong>NVIDIA RTX 4090:</strong> 50+ GEMM 尺寸, AllReduce, 4 GPU 测试</li>
+                                <li>• 通信原语覆盖: AllReduce, ReduceScatter, All-to-All</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Insights -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-key"></i> 核心洞察</h3>
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">1. 信号机制解耦计算与通信</h4>
+                            <p class="text-sm text-slate-400">FlashOverlap 的核心创新是使用信号 (signal) 而非分解或融合来链式连接计算-通信数据依赖。GEMM 保持单个 kernel 执行，仅在部分数据完成时发送轻量信号触发通信，实现真正的无干扰计算。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">2. Wave 模式是天然的重叠单元</h4>
+                            <p class="text-sm text-slate-400">GEMM 执行中 tile 完成时间的 wave 模式 (与 SM 数量对应的批次) 提供了天然的重叠粒度。使用 wave 而非单个 tile 作为信号单元，在几乎不损失重叠机会的情况下提升带宽利用率。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">3. Wave Group 调优至关重要</h4>
+                            <p class="text-sm text-slate-400">最细粒度划分仅在 4% 情况下最优，平均退化 17.34%。通信带宽利用率和 API 调用开销的权衡使得最优划分随 GEMM 尺寸、通信原语和硬件变化。预测搜索方法使实时调优成为可能。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">4. 重排实现通信不可知</h4>
+                            <p class="text-sm text-slate-400">预通信重排创建连续地址使直接调用 NCCL API 成为可能，无需为每种通信原语自定义实现。通信后重排恢复原始数据顺序。这对 AllReduce、ReduceScatter 和 All-to-All 均有适配方案。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Links -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                    <div class="space-y-2">
+                        <a href="https://arxiv.org/abs/2504.19519" target="_blank" class="ref-link mr-4"><i class="fas fa-external-link-alt mr-1"></i>arXiv:2504.19519 原文</a>
+                        <a href="https://arxiv.org/html/2504.19519v2" target="_blank" class="ref-link mr-4"><i class="fas fa-external-link-alt mr-1"></i>HTML 版本</a>
+                        <a href="https://github.com/infinigence/FlashOverlap" target="_blank" class="ref-link"><i class="fab fa-github mr-1"></i>GitHub 代码仓库</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>FlashOverlap: 信号驱动计算通信重叠论文详解 | EUROSYS '26</p>
+            <p class="mt-1">数据来源: arXiv:2504.19519, EUROSYS '26</p>
+        </div>
+    </footer>
+
+</body>
+</html>

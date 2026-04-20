@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA GPU MMU 专利详解 - 四大发明深度解读</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #76b900 0%, #5a8f00 100%); color: white; box-shadow: 0 4px 15px rgba(118, 185, 0, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .patent-card { transition: all 0.3s ease; }
+        .patent-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.5rem; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.85rem; overflow-x: auto; }
+        .highlight-box { border-left: 4px solid #76b900; background: rgba(118, 185, 0, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .tech-diagram { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.75rem; padding: 1.5rem; }
+        .flow-arrow { color: #76b900; font-size: 1.5rem; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .detail-toggle { cursor: pointer; transition: all 0.2s; }
+        .detail-toggle:hover { color: #76b900; }
+        .detail-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out; }
+        .detail-content.expanded { max-height: 5000px; }
+        .patent-number { font-family: 'Fira Code', monospace; background: rgba(118, 185, 0, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">NVIDIA GPU MMU 专利详解</h1>
+                        <p class="text-xs text-slate-400">四大发明深度解读 | 地址翻译加速与统一内存架构</p>
+                    </div>
+                </div>
+                <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                    <div class="text-2xl font-bold text-green-400">4</div>
+                    <div class="text-xs text-slate-400">专利/论文</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('overview')" id="tab-overview" class="tab-active px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-layer-group"></i> 总览
+            </button>
+            <button onclick="showTab('patent1')" id="tab-patent1" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-file-alt"></i> US20240202136A1
+            </button>
+            <button onclick="showTab('patent2')" id="tab-patent2" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-file-alt"></i> US9514559B2
+            </button>
+            <button onclick="showTab('patent3')" id="tab-patent3" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-file-alt"></i> US11620256B2
+            </button>
+            <button onclick="showTab('paper')" id="tab-paper" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-graduation-cap"></i> LATPC 论文
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+
+        <!-- ==================== OVERVIEW TAB ==================== -->
+        <section id="content-overview" class="space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-sitemap text-green-400"></i> 四大发明技术关系图</h2>
+                <p class="text-sm text-slate-400 mb-6">四项发明从不同层面解决 GPU 地址翻译和内存管理问题，形成完整的技术栈。</p>
+                <div class="tech-diagram">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <div class="highlight-box">
+                                <h4 class="font-medium text-green-300 mb-1">硬件层: US20240202136A1</h4>
+                                <p class="text-sm text-slate-400">MMU 页表遍历引擎 - 批量翻译命令分组，顺序访存提升 DRAM Row Buffer 命中率</p>
+                            </div>
+                            <div class="highlight-box">
+                                <h4 class="font-medium text-green-300 mb-1">架构层: US9514559B2</h4>
+                                <p class="text-sm text-slate-400">统一内存架构 - CPU/GPU 共享虚拟地址空间，页表共享，消除显式数据拷贝</p>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="highlight-box">
+                                <h4 class="font-medium text-green-300 mb-1">缓存层: US11620256B2</h4>
+                                <p class="text-sm text-slate-400">缓存效率优化 - TLB 嵌入式部署，PTE 索引内嵌，动态缓存优先级调整</p>
+                            </div>
+                            <div class="highlight-box">
+                                <h4 class="font-medium text-green-300 mb-1">算法层: LATPC 论文</h4>
+                                <p class="text-sm text-slate-400">局域感知 TLB 预取 + MSHR 压缩 - 利用空间/时间局域性预测翻译，压缩待处理条目</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-card rounded-xl p-5">
+                    <h3 class="font-medium text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-bullseye"></i> 解决的核心问题</h3>
+                    <ul class="space-y-2 text-sm text-slate-400">
+                        <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i><span>GPU 大规模并行线程产生海量地址翻译请求，传统页表遍历速度远低于处理器处理速度</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i><span>CPU 和 GPU 各自独立页表导致数据冗余拷贝和同步开销</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i><span>TLB Miss 导致昂贵的 DRAM 访问，GPU 数千线程并发时形成系统瓶颈</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i><span>不规则内存访问模式 (如图计算、稀疏矩阵) 加剧地址翻译延迟</span></li>
+                    </ul>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <h3 class="font-medium text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-lightbulb"></i> 技术创新总结</h3>
+                    <ul class="space-y-2 text-sm text-slate-400">
+                        <li class="flex items-start gap-2"><i class="fas fa-star text-yellow-500 mt-1"></i><span>批量分组翻译: 将共享相同虚拟地址前缀的命令分组，顺序访存提升 Row Buffer 命中率</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-star text-yellow-500 mt-1"></i><span>统一虚拟内存: CPU/GPU 共享页表，GPU MMU 可直接读取 CPU 页表条目</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-star text-yellow-500 mt-1"></i><span>嵌入式 TLB + PTE 索引: 在 multiprocessor 内部署 TLB，PTE 内嵌缓存行索引</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-star text-yellow-500 mt-1"></i><span>LATPC 预取: 利用页面表局域性预测翻译需求，MSHR 压缩减少待处理条目数量</span></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== PATENT 1: US20240202136A1 ==================== -->
+        <section id="content-patent1" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="patent-number">US20240202136A1</span>
+                    <h2 class="text-lg font-semibold text-green-400">Memory management unit and method of walking page table</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">申请公司</div>
+                        <div class="text-lg font-bold text-green-400">NVIDIA</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">公开日期</div>
+                        <div class="text-lg font-bold text-green-400">2024-06</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">性能提升</div>
+                        <div class="text-lg font-bold text-green-400">最高 2.93x IPC</div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-file-contract"></i> 摘要</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            本发明公开了一种内存管理单元 (MMU) 架构，集成了快速地址翻译缓存 (translation cache)、待命命令缓冲区 (pending command buffer) 和并行遍历引擎 (parallel traversal engines)。当缓存未命中时，系统将共享相同虚拟地址前缀的待翻译命令分组，然后发出顺序内存访问请求，检索所需的映射条目并更新缓存。该设计通过批量处理针对同一物理内存行的翻译命令，顺序访存提升了 DRAM Row Buffer 命中率，从而加速地址解析而无需增加额外的并行遍历电路。
+                        </p>
+                        <div class="mt-2 text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US20240202136A1/en" target="_blank" class="ref-link">Google Patents - US20240202136A1</a></div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 技术背景</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            现代处理器依赖虚拟内存系统，需要通过分层目录结构 (页表) 进行地址翻译。<strong>页表遍历速度可能远低于处理器的处理速度</strong>。在 GPU 大规模并行工作负载中，频繁的 TLB Miss 会产生系统瓶颈。简单地增加更多遍历硬件会增加功耗和硅片面积。
+                        </p>
+                        <div class="highlight-box mt-3">
+                            <p class="text-sm text-slate-300"><strong>关键问题:</strong> GPU 的 SIMT 架构产生数千个并行线程，每个线程可能访问不同的虚拟地址页面。当多个线程同时触发页表遍历时，传统的单线程遍历方式成为严重瓶颈。不规则内存访问模式 (如图遍历、稀疏矩阵、粒子模拟) 加剧了这一问题。</p>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-cogs"></i> 发明内容</h3>
+                        <div class="tech-diagram mb-4">
+                            <h4 class="text-sm font-medium text-green-300 mb-3">核心架构组件</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="space-y-2">
+                                    <div class="bg-slate-800/50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-green-400">1. 翻译缓存 (Translation Cache)</div>
+                                        <p class="text-xs text-slate-400 mt-1">相当于 TLB，存储近期使用过的虚拟-物理地址映射</p>
+                                    </div>
+                                    <div class="bg-slate-800/50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-green-400">2. 待命队列 (Pending Queue)</div>
+                                        <p class="text-xs text-slate-400 mt-1">缓存未命中的翻译命令排队缓冲区</p>
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <div class="bg-slate-800/50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-green-400">3. 遍历引擎 (Traversal Engine)</div>
+                                        <p class="text-xs text-slate-400 mt-1">包含搜索电路、分组缓冲区、缓存行选择器、获取控制器和处理逻辑</p>
+                                    </div>
+                                    <div class="bg-slate-800/50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-green-400">4. 概率成员过滤器 (Probabilistic Membership Filter)</div>
+                                        <p class="text-xs text-slate-400 mt-1">计数过滤器 (Counting Filter)，快速检测具有匹配地址前缀的命令</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 class="text-sm font-medium text-green-300 mb-3">工作流程</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">1</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>选择待处理翻译命令:</strong> 遍历引擎从待命队列中选择一个翻译请求作为种子命令。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">2</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>前缀匹配扫描:</strong> 使用计数过滤器快速扫描队列，找出所有在当前遍历深度具有相同虚拟地址前缀的命令。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">3</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>目标缓存行识别:</strong> 通过位向量 (bit vector) 识别目标内存行中需要获取的缓存行。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">4</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>顺序内存访问:</strong> "连续发出对缓存行的请求" 给内存控制器。第一次访问加载 DRAM 行，后续访问直接从感应放大器 (sense amplifiers) 读取，绕过主阵列。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">5</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>提取映射数据:</strong> 从获取的数据中提取翻译条目，转发到缓存，或推进到下一级目录。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-code"></i> 关键技术细节</h3>
+                        <div class="space-y-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">多级页表支持</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">分组逻辑可根据当前遍历深度，对目录条目 (directory entries) 或最终翻译条目 (final translation entries) 进行分组。每个层级的基地址使用特定的高位比特范围动态计算。支持 2 级、3 级、4 级页表结构。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">Row Buffer 大小与页面大小适配</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">分组逻辑适应不同的内存行 (Row Buffer) 和操作系统页面大小比例。处理 Row Buffer 大于或小于分配页面的情况。当 Row Buffer = 2KB、页面 = 4KB 时，一次激活可服务 2 个页面的翻译请求。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">并行处理能力</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">每个遍历引擎每周期可同时处理 4 个或更多翻译命令。无需增加额外的并行遍历电路 (walker circuits)，仅通过智能分组和顺序访存即可实现性能提升。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 性能效果</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="highlight-box">
+                                <div class="text-2xl font-bold text-green-400">2.93x</div>
+                                <div class="text-sm text-slate-400">最大 IPC 提升 (相比基线)</div>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-2xl font-bold text-green-400">显著</div>
+                                <div class="text-sm text-slate-400">DRAM Row Buffer 命中率提升</div>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-2xl font-bold text-green-400">降低</div>
+                                <div class="text-sm text-slate-400">页表遍历请求处理延迟</div>
+                            </div>
+                        </div>
+                        <p class="text-sm text-slate-400 mt-4">模拟结果显示，在图形渲染和稀疏内存访问模式等多样化工作负载下，该设计实现了最高 2.93 倍基线 IPC 的性能提升。</p>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-clipboard-list"></i> 核心权利要求步骤</h3>
+                        <div class="code-block">
+                            <div class="text-slate-300 space-y-1">
+                                <div>1. 选择一个待处理的地址翻译命令</div>
+                                <div>2. 扫描待命队列，找出在当前遍历深度具有匹配地址前缀的命令</div>
+                                <div>3. 识别目标内存行中所需的缓存行</div>
+                                <div>4. "连续发出对这些缓存行的请求" 给内存控制器</div>
+                                <div>5. 从获取的数据中提取映射条目并转发到缓存</div>
+                                <div>6. 如需继续遍历，推进到下一级目录</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                        <a href="https://patents.google.com/patent/US20240202136A1/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents - US20240202136A1 原文</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== PATENT 2: US9514559B2 ==================== -->
+        <section id="content-patent2" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="patent-number">US9514559B2</span>
+                    <h2 class="text-lg font-semibold text-green-400">Memory sharing via a unified memory architecture</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">申请公司</div>
+                        <div class="text-lg font-bold text-green-400">NVIDIA</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">授权日期</div>
+                        <div class="text-lg font-bold text-green-400">2016-12</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">技术影响</div>
+                        <div class="text-lg font-bold text-green-400">CUDA 统一内存基础</div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-file-contract"></i> 摘要</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            本发明公开了一种通过统一内存架构 (Unified Memory Architecture, UMA) 实现 CPU 和 GPU 内存共享的方法。该方法包括在内存中分配一个表面 (surface)，创建将该表面映射到虚拟地址空间的页表条目，<strong>MMU 包含 CPU 页表</strong>，支持统一内存架构下 CPU/GPU 共享虚拟地址空间。GPU 可以直接读取 CPU 页表条目，消除显式数据拷贝，简化编程模型。
+                        </p>
+                        <div class="mt-2 text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US9514559B2/en" target="_blank" class="ref-link">Google Patents - US9514559B2</a></div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 技术背景</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            在传统的 GPU 编程模型中，CPU 和 GPU 拥有各自独立的虚拟地址空间和页表。数据需要在 CPU 内存和 GPU 显存之间显式拷贝 (cudaMemcpy)，这带来了以下问题：
+                        </p>
+                        <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                            <li>• 程序员需要手动管理数据迁移，增加编程复杂度</li>
+                            <li>• 拷贝操作消耗带宽和时间</li>
+                            <li>• CPU 和 GPU 页表冗余，同步困难</li>
+                            <li>• 无法实现细粒度的页面级迁移</li>
+                        </ul>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-cogs"></i> 发明内容</h3>
+                        <div class="tech-diagram mb-4">
+                            <h4 class="text-sm font-medium text-green-300 mb-3">统一内存架构核心设计</h4>
+                            <div class="space-y-3">
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">1. 共享虚拟地址空间</div>
+                                    <p class="text-xs text-slate-400 mt-1">CPU 和 GPU 使用相同的虚拟地址引用数据，消除地址空间分离。一个指针在 CPU 和 GPU 代码中指向相同的物理内存位置。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">2. GPU MMU 读取 CPU 页表</div>
+                                    <p class="text-xs text-slate-400 mt-1">GPU 的 MMU 包含 CPU 页表的访问能力。当 GPU 访问尚未迁移到本地显存的页面时，MMU 可以通过读取 CPU 页表找到物理位置，触发页面迁移。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">3. 页面级迁移机制</div>
+                                    <p class="text-xs text-slate-400 mt-1">当 GPU 访问未在本地显存中的页面时，产生页错误 (page fault)，驱动页面从 CPU 内存迁移到 GPU 显存。迁移以页面为单位 (通常 4KB)，支持细粒度数据管理。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">4. 表面分配与映射</div>
+                                    <p class="text-xs text-slate-400 mt-1">方法包括 "在内存中分配一个表面 (surface)"，创建将该表面映射到虚拟地址空间的页表条目。表面可以是纹理、缓冲区或任意数据结构。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 class="text-sm font-medium text-green-300 mb-3">工作流程</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">1</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>统一分配:</strong> 程序员使用 cudaMallocManaged() 分配统一内存，系统在虚拟地址空间中创建映射。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">2</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>页表创建:</strong> 系统创建页表条目，将分配的表面对象映射到虚拟地址空间。CPU 和 GPU 共享相同的页表结构。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">3</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>GPU 访问:</strong> GPU 线程访问虚拟地址时，GPU MMU 首先查询本地 TLB。如果 Miss，则遍历页表。页表可能在 CPU 内存中。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">4</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>页面迁移:</strong> 如果页面不在 GPU 本地显存中，GPU MMU 产生页错误。驱动将页面从 CPU 内存迁移到 GPU 显存，更新页表。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-green-400 font-bold text-sm">5</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>后续访问:</strong> 迁移完成后，GPU 直接访问本地副本。页面可以在 CPU 和 GPU 之间动态迁移，由硬件和驱动自动管理。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-code"></i> 关键技术细节</h3>
+                        <div class="space-y-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">MMU 设计</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">GPU MMU 包含 CPU 页表的读取能力。MMU 126 包含 CPU 页表 (CPU page table)，可以解析 CPU 管理的虚拟地址。这使得 GPU 可以在不需要显式数据拷贝的情况下访问 CPU 分配的内存。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">页错误处理</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">GPU 产生的页错误由 CPU 驱动处理。驱动决定将页面迁移到 GPU 显存还是保持原位。这支持了按需迁移 (on-demand migration) 策略，仅在真正需要时才迁移数据。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">一致性模型</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">统一内存提供弱一致性模型。程序员需要使用 cudaDeviceSynchronize() 或 cudaStreamSynchronize() 确保 CPU 和 GPU 对共享内存的访问顺序正确。硬件不保证自动缓存一致性。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 技术影响</h3>
+                        <div class="highlight-box">
+                            <p class="text-sm text-slate-300">该专利是 NVIDIA CUDA 统一内存 (Unified Memory) 特性的核心技术基础。从 Kepler 架构开始引入，在 Pascal、Volta、Ampere、Hopper 架构中持续增强。统一内存已成为 GPU 编程的标准范式，极大简化了异构编程模型。</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div class="bg-slate-800/50 rounded-lg p-3">
+                                <div class="text-sm font-medium text-green-400">编程简化</div>
+                                <p class="text-xs text-slate-400 mt-1">消除了显式 cudaMemcpy 调用，单个指针在 CPU 和 GPU 代码中通用</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-3">
+                                <div class="text-sm font-medium text-green-400">细粒度迁移</div>
+                                <p class="text-xs text-slate-400 mt-1">页面级 (4KB) 迁移粒度，相比粗粒度整个缓冲区拷贝更加高效</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                        <a href="https://patents.google.com/patent/US9514559B2/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents - US9514559B2 原文</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== PATENT 3: US11620256B2 ==================== -->
+        <section id="content-patent3" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="patent-number">US11620256B2</span>
+                    <h2 class="text-lg font-semibold text-green-400">Systems and methods for improving cache efficiency and utilization</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">申请公司</div>
+                        <div class="text-lg font-bold text-green-400">NVIDIA</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">授权日期</div>
+                        <div class="text-lg font-bold text-green-400">2023-04</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-green-500/10 to-green-700/10 border border-green-500/20">
+                        <div class="text-sm text-slate-400 mb-1">技术方向</div>
+                        <div class="text-lg font-bold text-green-400">缓存效率优化</div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-file-contract"></i> 摘要</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            本发明公开了一种在并行图形处理器中控制缓存操作以提高缓存效率的系统和方法。架构动态调整主缓存和次缓存的优先级，结合指令级属性、默认设置和页表覆盖 (PTE overrides)。采用可配置的共享缓存分区和可选的硬件一致性协议。这些特性使缓存行为适应特定工作负载模式，最大化并行计算集群间的本地数据重用。
+                        </p>
+                        <div class="mt-2 text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US11620256B2/en" target="_blank" class="ref-link">Google Patents - US11620256B2</a></div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 技术背景</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            GPU 包含多级缓存层次结构 (L1/L2/L3)，不同工作负载对缓存的使用模式差异很大。图形渲染需要高空间局域性缓存，而计算工作负载可能需要更大的容量或不同的替换策略。传统的固定缓存配置无法适应多样化工作负载需求，导致缓存命中率低下和资源浪费。
+                        </p>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-cogs"></i> 发明内容</h3>
+                        <div class="tech-diagram mb-4">
+                            <h4 class="text-sm font-medium text-green-300 mb-3">核心技术创新</h4>
+                            <div class="space-y-3">
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">1. 动态缓存优先级调整</div>
+                                    <p class="text-xs text-slate-400 mt-1">结合三种来源确定缓存行为: (a) 指令级属性 - 每条指令可以指定缓存优先级; (b) 默认设置 - 系统级默认缓存策略; (c) <strong>页表条目 (PTE) 覆盖</strong> - 页面级别的缓存策略覆盖默认规则。PTE 配置可以覆盖标准 L2/L3 优先级规则，实现细粒度、工作负载特定的内存路由。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">2. PTE 内嵌缓存行索引</div>
+                                    <p class="text-xs text-slate-400 mt-1">页表条目 (PTE) 包含用于映射虚拟地址到物理地址的条目，<strong>同时内嵌索引值</strong>。该索引值支持快速的缓存状态验证，无需额外的翻译步骤。通过在内嵌转换条目中包含缓存行索引，硬件可以即时判断获取是否成功。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">3. 嵌入式 TLB 部署</div>
+                                    <p class="text-xs text-slate-400 mt-1">为减少翻译延迟，设计将 "地址翻译后备缓冲区 (TLB) 或缓存" 直接部署在图形多处理器 (graphics multiprocessors) 或主缓存结构内部。靠近执行单元的部署允许线程在本地解析虚拟地址，避免到集中式内存控制器的昂贵往返。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-green-400">4. 可配置共享缓存分区</div>
+                                    <p class="text-xs text-slate-400 mt-1">支持 L2/L3 缓存的动态分区配置。不同计算集群 (SM/TPC) 可以分配不同比例的共享缓存容量。支持硬件可选的一致性协议，在需要时保持多集群间缓存数据一致性。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 class="text-sm font-medium text-green-300 mb-3">MMU 与 PTE 结构设计</h4>
+                        <div class="code-block">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-green-400">// PTE 结构 (简化示意)</div>
+                                <div>struct PageTableEntry {</div>
+                                <div>&nbsp;&nbsp;phys_addr: PhysicalAddress,  // 物理地址</div>
+                                <div>&nbsp;&nbsp;cache_index: CacheLineIndex,   // 内嵌缓存行索引</div>
+                                <div>&nbsp;&nbsp;cache_policy: CachePolicy,     // 缓存策略覆盖</div>
+                                <div>&nbsp;&nbsp;tile_index: TileIndex,         // Tile 索引</div>
+                                <div>&nbsp;&nbsp;valid: bool,                  // 有效位</div>
+                                <div>&nbsp;&nbsp;access_perms: AccessControl,   // 访问权限</div>
+                                <div>}</div>
+                            </div>
+                        </div>
+                        <p class="text-sm text-slate-400 mt-3">PTE 用于 "将虚拟地址映射到 tile 的物理地址"，同时包含内嵌索引值。这使得硬件可以即时判断缓存命中状态，实现 "分区单元间高效请求交错"，减少空闲周期和内存争用。</p>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-code"></i> TLB Miss 减少机制</h3>
+                        <div class="space-y-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">嵌入式 TLB 架构</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">TLB 不集中在内存控制器，而是分布在每个 graphics multiprocessor 内部。这允许每个 SM 独立处理地址翻译，减少跨芯片通信延迟。SM 内的线程可以直接访问本地 TLB，命中时零延迟获取物理地址。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">早期缓存状态判断</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">通过 PTE 内嵌的缓存行索引，硬件在地址翻译完成的同时即可判断目标数据是否在缓存中。这实现了 "高效请求交错"，允许内存控制器提前调度请求，减少等待时间。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-green-300 mb-2">缓存命中率提升</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">通过动态优先级调整和 PTE 覆盖，系统可以根据工作负载特点优化缓存行为。图形工作负载获得高空间局域性缓存，计算工作负载获得更大的有效容量，ML 工作负载获得优化的权重缓存策略。综合优化目标是 "命中率提升" 和 "延迟降低"。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 性能目标</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="highlight-box">
+                                <div class="text-lg font-bold text-green-400">命中率提升</div>
+                                <div class="text-sm text-slate-400">通过动态优先级和 PTE 覆盖优化缓存行重用</div>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-lg font-bold text-green-400">延迟降低</div>
+                                <div class="text-sm text-slate-400">嵌入式 TLB + PTE 索引实现早期地址解析</div>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-lg font-bold text-green-400">吞吐加速</div>
+                                <div class="text-sm text-slate-400">加速图形渲染和机器学习工作负载吞吐</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-green-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                        <a href="https://patents.google.com/patent/US11620256B2/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents - US11620256B2 原文</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== LATPC PAPER TAB ==================== -->
+        <section id="content-paper" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="badge-research px-3 py-1 rounded text-xs text-white">MICRO '25</span>
+                    <h2 class="text-lg font-semibold text-cyan-400">LATPC: Accelerating GPU Address Translation Using Locality-Aware TLB Prefetching and MSHR Compression</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-cyan-500/10 to-cyan-700/10 border border-cyan-500/20">
+                        <div class="text-sm text-slate-400 mb-1">发表会议</div>
+                        <div class="text-lg font-bold text-cyan-400">MICRO 2025</div>
+                        <div class="text-xs text-slate-500">IEEE/ACM Int'l Symposium</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-cyan-500/10 to-cyan-700/10 border border-cyan-500/20">
+                        <div class="text-sm text-slate-400 mb-1">核心机制</div>
+                        <div class="text-lg font-bold text-cyan-400">TLB 预取 + MSHR 压缩</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-cyan-500/10 to-cyan-700/10 border border-cyan-500/20">
+                        <div class="text-sm text-slate-400 mb-1">DOI</div>
+                        <div class="text-xs font-mono text-cyan-400">10.1145/3725843.3756069</div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-file-alt"></i> 摘要</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            本文提出 LATPC，一种利用空间和时间局域性预取 TLB 条目的新机制，并结合 MSHR (Miss Status Holding Register) 压缩技术来加速 GPU 地址翻译。LATPC 通过检测 GPU 工作负载中页面访问的局域性模式，预测性地预取可能需要的页表条目到 TLB 中。同时，MSHR 压缩技术通过合并具有相同页面翻译需求的待处理请求，减少待处理翻译条目数量，提高 TLB 预取的覆盖率和准确率。
+                        </p>
+                        <div class="mt-2 text-xs text-slate-500">来源: <a href="https://dl.acm.org/doi/10.1145/3725843.3756069" target="_blank" class="ref-link">ACM Digital Library</a> | <a href="https://www.researchgate.net/publication/396654236_LATPC_Accelerating_GPU_Address_Translation_Using_Locality-Aware_TLB_Prefetching_and_MSHR_Compression" target="_blank" class="ref-link">ResearchGate</a></div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 技术背景</h3>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            GPU 的大规模并行架构使得地址翻译成为性能瓶颈。随着 GPU 内存容量增长到数十 GB，页表本身也变得更加庞大和多级化。传统的 TLB 预取器主要面向 CPU 设计，没有充分考虑 GPU 工作负载的独特特征：
+                        </p>
+                        <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                            <li>• GPU 线程束 (warp) 内的线程往往访问相邻或相关的内存页面 (空间局域性)</li>
+                            <li>• 同一 kernel 的不同执行阶段可能重复访问相同的页表区域 (时间局域性)</li>
+                            <li>• 不规则应用 (图遍历、稀疏矩阵) 的页面访问模式难以用简单的 stride 预测</li>
+                            <li>• MSHR 中大量待处理翻译请求造成资源浪费</li>
+                        </ul>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-cogs"></i> LATPC 核心技术</h3>
+                        <div class="tech-diagram mb-4">
+                            <h4 class="text-sm font-medium text-cyan-300 mb-3">一、局域感知 TLB 预取机制 (Locality-Aware TLB Prefetching)</h4>
+                            <div class="space-y-3">
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-cyan-400">1. 空间局域性检测</div>
+                                    <p class="text-xs text-slate-400 mt-1">LATPC 检测 GPU 线程束内线程访问的页面之间的空间关系。当同一 warp 的多个线程访问相邻页面时，预取器预测这些页面所属的页表目录节点 (page table directory nodes) 可能被后续访问，提前将其预取到 TLB 中。预取器利用页面表本身的多级结构，在访问叶子节点 (PTE) 之前预取中间级目录。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-cyan-400">2. 时间局域性跟踪</div>
+                                    <p class="text-xs text-slate-400 mt-1">LATPC 跟踪页面访问的历史模式，识别重复访问的页面区域。通过记录近期访问的页表区域，当检测到类似的访问模式重现时，提前触发预取。这对于迭代算法 (如图算法的 BFS/SSSP、稀疏矩阵的 SpMV) 特别有效，因为这些算法在多轮迭代中访问相同的页面结构。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-cyan-400">3. 页面表局域性利用</div>
+                                    <p class="text-xs text-slate-400 mt-1">页表本身在内存中是连续分配的。当访问某个页面时，其相邻页面的页表条目很可能在相同的页表页面中。LATPC 利用这一特性，在获取一个 PTE 的同时预取整个页表页面中可能需要的相邻条目。这显著提高了预取覆盖率，减少了后续 TLB Miss。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tech-diagram mb-4">
+                            <h4 class="text-sm font-medium text-cyan-300 mb-3">二、MSHR 压缩技术 (MSHR Compression)</h4>
+                            <div class="space-y-3">
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-cyan-400">MSHR 的问题</div>
+                                    <p class="text-xs text-slate-400 mt-1">MSHR (Miss Status Holding Register) 用于跟踪待处理的 TLB Miss 请求。在 GPU 中，数千个并发线程可能产生大量 TLB Miss，每个 Miss 需要一个 MSHR 条目。MSHR 容量有限，当条目耗尽时，新的翻译请求必须等待，造成性能瓶颈。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-cyan-400">压缩机制</div>
+                                    <p class="text-xs text-slate-400 mt-1">LATPC 的 MSHR 压缩技术通过合并具有相同页面翻译需求的请求来减少 MSHR 条目占用。具体来说：当多个线程需要翻译同一页面 (或同一页表页面内的不同偏移) 时，LATPC 将这些请求合并为一个 MSHR 条目。翻译完成后，结果分发给所有等待的线程。</p>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-lg p-3">
+                                    <div class="text-sm font-medium text-cyan-400">实现方式</div>
+                                    <p class="text-xs text-slate-400 mt-1">MSHR 压缩使用哈希表或 Bloom Filter 快速检测待处理请求中是否存在页面重叠。当新的翻译请求到达时，首先检查是否有已有的 MSHR 条目覆盖该页面。如果有，则将请求附加到现有条目 (而不是创建新条目)。如果没有，则创建新的 MSHR 条目。这显著减少了 MSHR 压力，提高了并发翻译能力。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 class="text-sm font-medium text-cyan-300 mb-3">LATPC 工作流程</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-cyan-400 font-bold text-sm">1</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>监控 GPU 内存访问:</strong> 跟踪每个 warp 的页面访问模式，记录空间和时间局域性。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-cyan-400 font-bold text-sm">2</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>检测局域性模式:</strong> 分析相邻页面访问关系，识别重复访问区域。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-cyan-400 font-bold text-sm">3</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>触发 TLB 预取:</strong> 基于检测到的局域性模式，提前将可能的页表条目预取到 TLB。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-cyan-400 font-bold text-sm">4</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>MSHR 压缩:</strong> 合并待处理的翻译请求，减少 MSHR 条目占用。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0"><span class="text-cyan-400 font-bold text-sm">5</span></div>
+                                <div>
+                                    <p class="text-sm text-slate-300"><strong>分发结果:</strong> 翻译完成后，将结果分发给所有等待的线程。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 评估结果</h3>
+                        <p class="text-sm text-slate-300 mb-4">LATPC 在多种 GPU 工作负载上进行了评估，包括规则和不规则内存访问模式。</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="highlight-box">
+                                <div class="text-sm font-medium text-cyan-400 mb-2">TLB Miss 减少</div>
+                                <p class="text-sm text-slate-400">通过局域感知预取，显著减少 L1/L2 TLB Miss 率。对于具有强空间局域性的工作负载 (如矩阵操作、卷积)，预取准确率更高。</p>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-sm font-medium text-cyan-400 mb-2">MSHR 压力降低</div>
+                                <p class="text-sm text-slate-400">MSHR 压缩减少了待处理翻译条目数量，提高了并发翻译能力。对于多线程密集型工作负载效果显著。</p>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-sm font-medium text-cyan-400 mb-2">预取覆盖率和准确率</div>
+                                <p class="text-sm text-slate-400">LATPC 利用页面表局域性提高了预取覆盖率，同时通过局域性感知过滤减少了无用预取，提高了准确率。</p>
+                            </div>
+                            <div class="highlight-box">
+                                <div class="text-sm font-medium text-cyan-400 mb-2">性能提升</div>
+                                <p class="text-sm text-slate-400">综合 TLB 预取和 MSHR 压缩，LATPC 在多种工作负载上实现了显著的性能提升，特别是不规则内存访问模式。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-flask"></i> 与现有技术的对比</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead><tr class="border-b border-slate-600"><th class="text-left py-2 px-3 text-slate-300">技术</th><th class="text-left py-2 px-3 text-slate-300">预取机制</th><th class="text-left py-2 px-3 text-slate-300">MSHR 压缩</th><th class="text-left py-2 px-3 text-slate-300">GPU 适配</th></tr></thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3">传统 CPU 预取器</td><td class="py-2 px-3">Stride/Stream</td><td class="py-2 px-3 text-red-400">无</td><td class="py-2 px-3 text-red-400">不适用</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3">Morrigan</td><td class="py-2 px-3">复合指令预取</td><td class="py-2 px-3 text-red-400">无</td><td class="py-2 px-3 text-yellow-400">部分</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3">Snake</td><td class="py-2 px-3">可变长度链式</td><td class="py-2 px-3 text-red-400">无</td><td class="py-2 px-3 text-green-400">是</td></tr>
+                                    <tr><td class="py-2 px-3 text-cyan-400 font-medium">LATPC (本文)</td><td class="py-2 px-3">局域感知 (空间+时间)</td><td class="py-2 px-3 text-green-400">是</td><td class="py-2 px-3 text-green-400">是</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="text-base font-semibold text-cyan-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                        <div class="space-y-2">
+                            <a href="https://dl.acm.org/doi/10.1145/3725843.3756069" target="_blank" class="ref-link mr-4"><i class="fas fa-external-link-alt mr-1"></i>ACM Digital Library</a>
+                            <a href="https://www.researchgate.net/publication/396654236_LATPC_Accelerating_GPU_Address_Translation_Using_Locality-Aware_TLB_Prefetching_and_MSHR_Compression" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>ResearchGate</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>NVIDIA GPU MMU 专利详解 | 地址翻译加速与统一内存架构</p>
+            <p class="mt-1">数据来源: Google Patents, ACM Digital Library, MICRO '25</p>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            const tabs = ['overview', 'patent1', 'patent2', 'patent3', 'paper'];
+            tabs.forEach(tab => {
+                document.getElementById('content-' + tab).classList.add('hidden');
+                document.getElementById('tab-' + tab).classList.remove('tab-active');
+                document.getElementById('tab-' + tab).classList.add('tab-inactive');
+            });
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            document.getElementById('tab-' + tabName).classList.remove('tab-inactive');
+            document.getElementById('tab-' + tabName).classList.add('tab-active');
+        }
+    </script>
+</body>
+</html>

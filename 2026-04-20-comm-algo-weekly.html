@@ -39,6 +39,11 @@
         .ref-link.purple:hover { background: rgba(139, 92, 246, 0.3); }
         .ref-link.cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; }
         .ref-link.cyan:hover { background: rgba(6, 182, 212, 0.3); }
+        .feature-detail { animation: slideDown 0.3s ease-out; }
+        .feature-expand-btn { cursor: pointer; transition: all 0.15s; }
+        .feature-expand-btn:hover { background: rgba(59, 130, 246, 0.1); }
+        .feature-expand-icon { transition: transform 0.3s ease; }
+        .feature-expand-icon.expanded { transform: rotate(90deg); }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -182,7 +187,23 @@
                                 <ul class="space-y-2 text-sm text-slate-400">
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>GIN 上下文隔离：</strong>GIN contexts 不再被同一 host communicator 背书的 device communicator 共享，新增 per-context resource modes <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></span></li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>Device API 增强：</strong>新增 TrafficClass 路由、超时处理、ncclDevComm 版本控制 <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></span></li>
-                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>Elastic Buffers (LSA)：</strong>超大 tensor 分段窗口切分，活跃数据驻留 GPU，其余 offload 至 host 内存 <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a> <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>Elastic Buffers (LSA)：</strong>超大 tensor 分段窗口切分，活跃数据驻留 GPU，其余 offload 至 host 内存 <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a> <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a> <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('elastic-buffer')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-elastic-buffer"></i>设计原理</span></span>
+                                        <div id="feature-elastic-buffer" class="hidden feature-detail mt-3 ml-6 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Elastic Buffers 详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">核心问题：</strong>当通信涉及的 tensor 超过 GPU 显存容量时，如何自动完成 GPU/host 之间的数据调度，而不让用户手动管理。</div>
+                                                <div><strong class="text-slate-300">三层架构：</strong>
+                                                    <ul class="ml-4 mt-1 space-y-1">
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>Window 注册与对称地址映射：</strong>基于 NCCL Device API 的 Window 机制，将超大 tensor 切分为多个 segment，每个 segment 对应一个 window。GPU 端和 host 端在虚拟地址空间上连续编址，device kernel 看到的是线性地址范围。</span></li>
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>活跃区域管理：</strong>维护"活跃窗口"——当前通信涉及的 segment 驻留 GPU 显存，其余存放 host pinned memory。通信推进时通过 CUDA 页面迁移或 prefetch 将下一批 segment 搬到 GPU。</span></li>
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>LSA 集成：</strong>LSA (Load/Store Access) 允许 device 代码直接用 load/store 指令读写 peer 内存，不需要传统 collective call。Elastic Buffer + LSA 的组合让 kernel 用简单指针遍历整个超大 tensor，底层 segment 切换对 kernel 代码透明。</span></li>
+                                                    </ul>
+                                                </div>
+                                                <div><strong class="text-slate-300">软件感知需求：</strong>大部分场景不需要——仍调用标准 NCCL collective API，NCCL 内部自动判断 tensor 是否超过阈值并启用 elastic buffer。但需要：(1) 环境变量配置活跃窗口大小和 spilling 阈值；(2) GIN 支持尚未完成，当前主要服务 LSA 路径；(3) 性能调优需了解 active region 划分策略。</div>
+                                                <div><strong class="text-slate-300">与 CUDA UVM 的区别：</strong>UVM 基于 page fault 的通用页面迁移，通信场景下 page fault 开销太大。Elastic Buffer 是 NCCL 专用的、基于通信语义的预取式调度——知道接下来需要哪些 segment（因为 collective 通信模式是确定的），提前 prefetch 避免 stall。</div>
+                                            </div>
+                                        </div>
+                                    </li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>GIN Nonblocking Get：</strong>实验性 gin.get 支持非阻塞刷新（需 GDAKI） <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></span></li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>Symmetric Memory 增强：</strong>AVG operator、动态 group-based offloading、CUDA graph replay for signal ops <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></span></li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>TMA 集成：</strong>symmetric kernels 中 offload 大批量数据传输 <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.3-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></span></li>
@@ -226,7 +247,24 @@
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>CuTe DSL 集成：统一 NCCL device API 编程模型 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Elastic Buffer for GIN：扩展至 GIN device API <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Batched Get for GIN：批量异步获取 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
-                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Lamport-style Synchronization：symmetric kernels 低延迟同步 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Lamport-style Synchronization：symmetric kernels 低延迟同步 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a> <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lamport-sync')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lamport-sync"></i>设计原理</span></span>
+                                        <div id="feature-lamport-sync" class="hidden feature-detail mt-3 ml-6 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Lamport-style Synchronization 详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">理论来源：</strong>Leslie Lamport 1978 年经典论文提出的分布式系统"逻辑时钟"和"屏障同步"概念——不需要全局物理时钟，每个参与者通过维护计数器 (phase)，仅依赖本地状态和消息传递达成全局同步。核心设计是 arrival (到达通知) 和 wait (阻塞等待) 的解耦。</div>
+                                                <div><strong class="text-slate-300">当前问题：</strong>NCCL symmetric kernel 多节点场景下，每个 GPU 完成传输后在 signal pad 写入标记，然后所有 GPU 轮询所有 peer 的 signal pad 确认数据就绪。"全局对齐"模式导致：(1) 所有 GPU 必须等待最慢的那个——网络抖动、PCIe 争用导致完成时间分散，快的 GPU 空转 (tail latency)；(2) 轮询消耗 SM 资源；(3) 集中式 barrier 在 rank 数扩展时延迟线性增长。</div>
+                                                <div><strong class="text-slate-300">三个关键设计：</strong>
+                                                    <ul class="ml-4 mt-1 space-y-1">
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>Phase-based 异步屏障：</strong>将 barrier 拆分为多个 phase，每个 phase 有独立逻辑时钟。GPU 完成传输后调用 arrive 获得 phase token 后立刻进入下一阶段计算或预取，不需要等待其他 GPU。只有真正需要消费 peer 数据时才调用 wait(token) 检查 phase 是否完成。继承 CUDA mbarrier 的非阻塞 arrive + blocking wait 模式，但扩展到跨节点多 GPU 场景。</span></li>
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>分布式到达计数：</strong>将 barrier 的"全局计数"拆分为"局部依赖图"。每个 GPU 只关注自己依赖的子集——例如 ring all-reduce 中只需确认左右邻，tree 拓扑中叶子只需和父节点同步。类似 Lamport 的"因果一致性"——只有存在数据依赖的 GPU 之间才需要同步。</span></li>
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>Multi-phase 流水线：</strong>允许多个 phase 同时活跃 (in-flight)。GPU 0 处理 phase N 传输时，GPU 1 可能已进入 phase N+1 计算。通过双缓冲/环形缓冲互不干扰。对应 CUDA mbarrier 的 phase 翻转机制——每个 mbarrier 有 phase bit，计数归零时自动翻转，等待方通过 phase bit 区分新旧信号。</span></li>
+                                                    </ul>
+                                                </div>
+                                                <div><strong class="text-slate-300">Tail Latency 降低原理：</strong>通过两条路径：(1) 消除不必要的全局等待——GPU 只需等待直接依赖的 peer，tree 拓扑中中间节点可在部分子树完成时开始向上聚合；(2) 计算通信重叠——arrive 之后、wait 之前执行独立计算，将通信等待隐藏在计算之后。</div>
+                                                <div><strong class="text-slate-300">与现有机制对比：</strong>当前 signal pad + 轮询需 O(N) 次轮询且全局阻塞；NVSHMEM sync/barrier_all 仍是全局同步点；CUDA mbarrier 在单 GPU 内实现异步计数但跨 GPU 需额外协调。Lamport-style 方案整合逻辑时钟 + phase 计数 + 分布式因果一致性为多节点同步协议，保持无锁且实现细粒度局部同步。</div>
+                                            </div>
+                                        </div>
+                                    </li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Symmetric A2A：分层对称 All-to-All kernels <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
                                     <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Cost Model 重构 + RAS API + Profiler 改进 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
                                 </ul>
@@ -481,6 +519,12 @@
             const icon = document.getElementById('icon-' + detailId);
             if (detail.classList.contains('hidden')) { detail.classList.remove('hidden'); icon.classList.add('expanded'); }
             else { detail.classList.add('hidden'); icon.classList.remove('expanded'); }
+        }
+        function toggleFeatureDetail(featureId) {
+            const el = document.getElementById('feature-' + featureId);
+            const icon = document.getElementById('icon-feature-' + featureId);
+            if (el.classList.contains('hidden')) { el.classList.remove('hidden'); icon.classList.add('expanded'); }
+            else { el.classList.add('hidden'); icon.classList.remove('expanded'); }
         }
         document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('activityChart').getContext('2d');

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA Open GPU Kernel Weekly Report — 2026-04-22</title>
+    <style>
+        :root {
+            --nv-green: #76b900;
+            --nv-dark: #1a1a1a;
+            --nv-darker: #111;
+            --nv-card: #222;
+            --nv-border: #333;
+            --text: #e0e0e0;
+            --text-dim: #999;
+            --accent-red: #e74c3c;
+            --accent-blue: #3498db;
+            --accent-yellow: #f39c12;
+            --accent-green: #2ecc71;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--nv-darker);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        header {
+            background: linear-gradient(135deg, var(--nv-dark), #2a2a2a);
+            border-bottom: 3px solid var(--nv-green);
+            padding: 2rem 1.5rem;
+        }
+        header h1 {
+            font-size: 1.8rem;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+        header h1 span { color: var(--nv-green); }
+        header .subtitle {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+        }
+        header .meta {
+            margin-top: 0.75rem;
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+        header .meta span {
+            background: rgba(118, 185, 0, 0.15);
+            border: 1px solid var(--nv-green);
+            color: var(--nv-green);
+            padding: 0.2rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+        }
+        nav {
+            background: var(--nv-dark);
+            border-bottom: 1px solid var(--nv-border);
+            padding: 0 1rem;
+            display: flex;
+            gap: 0;
+            overflow-x: auto;
+        }
+        nav a {
+            display: block;
+            padding: 0.85rem 1.25rem;
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        nav a:hover, nav a.active {
+            color: #fff;
+            border-bottom-color: var(--nv-green);
+        }
+        main {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 4rem;
+        }
+        section { margin-bottom: 3rem; }
+        section h2 {
+            font-size: 1.35rem;
+            color: #fff;
+            border-left: 4px solid var(--nv-green);
+            padding-left: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+        .card {
+            background: var(--nv-card);
+            border: 1px solid var(--nv-border);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card h3 {
+            font-size: 1.05rem;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+        .card p {
+            color: var(--text-dim);
+            font-size: 0.92rem;
+            margin-bottom: 0.5rem;
+        }
+        .card .tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 4px;
+            margin-right: 0.4rem;
+            margin-bottom: 0.3rem;
+            font-weight: 600;
+        }
+        .tag.release { background: var(--nv-green); color: #000; }
+        .tag.bug { background: var(--accent-red); color: #fff; }
+        .tag.pr { background: var(--accent-blue); color: #fff; }
+        .tag.community { background: var(--accent-yellow); color: #000; }
+        .tag.feature { background: #9b59b6; color: #fff; }
+        .tag.roadmap { background: var(--accent-green); color: #000; }
+        .tag.no-update { background: #555; color: #ccc; }
+        .card .ref {
+            color: var(--nv-green);
+            text-decoration: none;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+        .card .ref:hover { text-decoration: underline; }
+        .card .date {
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: 0.35rem;
+        }
+        details {
+            background: var(--nv-card);
+            border: 1px solid var(--nv-border);
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+        }
+        details summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: #fff;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '\25B6';
+            font-size: 0.7rem;
+            color: var(--nv-green);
+            transition: transform 0.2s;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details .body {
+            padding: 0 1.25rem 1.25rem;
+            color: var(--text-dim);
+            font-size: 0.92rem;
+        }
+        details .body p { margin-bottom: 0.5rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        table th, table td {
+            text-align: left;
+            padding: 0.65rem 0.75rem;
+            border-bottom: 1px solid var(--nv-border);
+        }
+        table th {
+            background: var(--nv-dark);
+            color: var(--nv-green);
+            font-weight: 600;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        table td { color: var(--text-dim); }
+        table a {
+            color: var(--nv-green);
+            text-decoration: none;
+        }
+        table a:hover { text-decoration: underline; }
+        .observation {
+            background: linear-gradient(135deg, rgba(118,185,0,0.1), rgba(118,185,0,0.03));
+            border: 1px solid var(--nv-green);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-top: 2rem;
+        }
+        .observation h3 {
+            color: var(--nv-green);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        .observation p {
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        .no-updates {
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .module-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+        footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: #555;
+            font-size: 0.8rem;
+            border-top: 1px solid var(--nv-border);
+        }
+        code {
+            background: #1a1a1a;
+            color: var(--nv-green);
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+        }
+        @media (max-width: 640px) {
+            header h1 { font-size: 1.4rem; }
+            nav a { padding: 0.75rem 0.85rem; font-size: 0.82rem; }
+            main { padding: 1.25rem 1rem 3rem; }
+            table { font-size: 0.8rem; }
+            table th, table td { padding: 0.5rem 0.4rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1><span>NVIDIA</span> Open GPU Kernel — Weekly Tracker</h1>
+    <p class="subtitle">Weekly monitoring of open-gpu-kernel-modules releases, commits, community, and NVIDIA official channels</p>
+    <div class="meta">
+        <span>Week of 2026-04-15 to 2026-04-22</span>
+        <span>Generated: 2026-04-22</span>
+        <span>Repo: NVIDIA/open-gpu-kernel-modules</span>
+    </div>
+</header>
+
+<nav>
+    <a href="#nvlink">NVLink</a>
+    <a href="#nvswitch">NVSwitch</a>
+    <a href="#nvlink-c2c">NVLink C2C</a>
+    <a href="#mmu">MMU / UVM</a>
+    <a href="#community">Community Feedback</a>
+    <a href="#comparison">Version Comparison</a>
+    <a href="#trend">Trend Analysis</a>
+</nav>
+
+<main>
+
+<!-- ============================================================ -->
+<!-- RELEASES OVERVIEW -->
+<!-- ============================================================ -->
+<section>
+    <h2>Recent Releases Overview</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Version</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>595.44.05</code></td>
+                <td>2026-04-02</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Vulkan Developer Beta — experimental Vulkan features & bug fixes</td>
+            </tr>
+            <tr>
+                <td><code>595.58.03</code></td>
+                <td>2026-03-24</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Stable driver release (current baseline)</td>
+            </tr>
+            <tr>
+                <td><code>595.44.03</code></td>
+                <td>2026-03-13</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Vulkan Developer Beta</td>
+            </tr>
+            <tr>
+                <td><code>580.142</code></td>
+                <td>2026-03-10</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Production branch release</td>
+            </tr>
+            <tr>
+                <td><code>595.44.02</code></td>
+                <td>2026-03-09</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Vulkan Developer Beta</td>
+            </tr>
+            <tr>
+                <td><code>595.45.04</code></td>
+                <td>2026-03-05</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Vulkan Developer Beta</td>
+            </tr>
+            <tr>
+                <td><code>580.126.20</code></td>
+                <td>2026-02-23</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Data center Tesla driver branch</td>
+            </tr>
+            <tr>
+                <td><code>580.126.18</code></td>
+                <td>2026-02-17</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Data center Tesla driver branch</td>
+            </tr>
+            <tr>
+                <td><code>580.94.18</code></td>
+                <td>2026-02-17</td>
+                <td><span class="tag release">Release</span></td>
+                <td>Vulkan Developer Beta</td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="no-updates" style="font-size:0.85rem; margin-top:0.5rem;">
+        <strong>No new releases in the tracking window (Apr 15–22).</strong> The latest release remains <code>595.44.05</code> (Apr 2).
+        See <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases">GitHub Releases</a>.
+    </p>
+</section>
+
+<!-- ============================================================ -->
+<!-- NVLINK -->
+<!-- ============================================================ -->
+<section id="nvlink">
+    <h2>NVLink</h2>
+
+    <div class="card">
+        <h3>NVLink Fusion Expands to Marvell Custom XPUs</h3>
+        <p>
+            NVIDIA announced that Marvell will integrate NVLink Fusion into its custom XPU designs, extending the NVLink ecosystem beyond NVIDIA's own GPUs into heterogeneous AI infrastructure.
+            This enables third-party accelerators to participate in NVLink scale-up topologies, a significant expansion of the NVLink ecosystem.
+        </p>
+        <span class="tag roadmap">Ecosystem Expansion</span>
+        <span class="tag feature">NVLink Fusion</span>
+        <div class="date">Announced at GTC 2026 / March 2026</div>
+        <p class="date">
+            Ref: <a class="ref" href="https://nvidianews.nvidia.com/news/nvidia-ai-ecosystem-expands-as-marvell-joins-forces-through-nvlink-fusion">NVIDIA Newsroom — Marvell x NVLink Fusion</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>NVLink-C2C in Workstation Supercomputers</h3>
+        <p>
+            At GTC 2026, NVIDIA highlighted NVLink-C2C as the chip-to-chip interconnect bridging the Grace CPU and GPU inside deskside supercomputer configurations.
+            The Vera Rubin platform continues to leverage NVLink-C2C for coherent CPU-GPU memory access.
+        </p>
+        <span class="tag feature">NVLink-C2C</span>
+        <span class="tag roadmap">Vera Rubin</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://blogs.nvidia.com/blog/gtc-2026-news/">NVIDIA GTC 2026: Live Updates</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>NVLink Switch — 260 TB/s GPU Bandwidth</h3>
+        <p>
+            NVIDIA's official NVSwitch page now documents 260 TB/s of aggregate GPU bandwidth in NVLink Switch-enabled configurations,
+            supporting the GB300 NVL72 rack-scale deployments.
+        </p>
+        <span class="tag feature">NVSwitch</span>
+        <span class="tag feature">GB300 NVL72</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://www.nvidia.com/en-us/data-center/nvlink/">NVIDIA NVLink &amp; NVSwitch</a>
+        </p>
+    </div>
+
+    <p class="no-updates">
+        No open-gpu-kernel-modules specific commits or PRs touching NVLink code paths were identified this week.
+        NVLink development remains primarily in NVIDIA's proprietary stack.
+    </p>
+</section>
+
+<!-- ============================================================ -->
+<!-- NVSWITCH -->
+<!-- ============================================================ -->
+<section id="nvswitch">
+    <h2>NVSwitch</h2>
+
+    <div class="card">
+        <h3>GB300 NVL72 Platform with NVSwitch</h3>
+        <p>
+            The GB300 NVL72 platform, announced at GTC 2026, integrates 72 Blackwell GPUs interconnected via NVLink Switch fabric,
+            delivering 260 TB/s of aggregate GPU bandwidth. This represents the current state-of-the-art for rack-scale GPU interconnects.
+        </p>
+        <span class="tag roadmap">GB300 NVL72</span>
+        <span class="tag feature">260 TB/s</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://www.nvidia.com/en-us/data-center/nvlink/">NVIDIA NVLink &amp; NVSwitch</a>,
+            <a class="ref" href="https://blogs.nvidia.com/blog/gtc-2026-news/">GTC 2026 News</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>NVSwitch Firmware Update Tooling</h3>
+        <p>
+            NVIDIA documentation covers NVLink Switch firmware update processes via the <code>nvfwupd</code> tool for DGX GB200 systems,
+            indicating ongoing firmware-level development for NVSwitch reliability.
+        </p>
+        <span class="tag feature">Firmware</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://docs.nvidia.com/dgx/dgxgb200-fw-update-guide/switch-fw-update.html">DGX GB200 FW Update Guide</a>
+        </p>
+    </div>
+
+    <p class="no-updates">
+        No open-gpu-kernel-modules specific commits or PRs targeting NVSwitch were identified this week.
+        NVSwitch kernel support is part of the broader <code>nvidia</code> and <code>nvidia-peermem</code> modules.
+    </p>
+</section>
+
+<!-- ============================================================ -->
+<!-- NVLINK C2C -->
+<!-- ============================================================ -->
+<section id="nvlink-c2c">
+    <h2>NVLink C2C</h2>
+
+    <div class="card">
+        <h3>Vera Rubin Platform Features NVLink-C2C</h3>
+        <p>
+            The new Vera Rubin full-stack computing platform announced at GTC 2026 features the NVIDIA Vera CPU connected to the GPU via NVLink-C2C.
+            This extends the Grace-Blackwell C2C model to the next-generation platform, enabling coherent memory access between the Vera CPU and Rubin GPU.
+            NVIDIA also released the Vera Rubin DSX AI Factory reference design.
+        </p>
+        <span class="tag roadmap">Vera Rubin</span>
+        <span class="tag feature">NVLink-C2C</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://blogs.nvidia.com/blog/gtc-2026-news/">GTC 2026: Live Updates</a>,
+            <a class="ref" href="https://www.nvidia.com/en-us/data-center/nvlink-c2c/">NVIDIA NVLink-C2C</a>
+        </p>
+    </div>
+
+    <p class="no-updates">
+        No open-gpu-kernel-modules specific commits for NVLink-C2C this week.
+        C2C support is primarily handled at the firmware and proprietary driver level.
+    </p>
+</section>
+
+<!-- ============================================================ -->
+<!-- MMU / UVM -->
+<!-- ============================================================ -->
+<section id="mmu">
+    <h2>MMU / UVM</h2>
+
+    <p style="color:var(--text-dim); font-size:0.9rem; margin-bottom:1rem;">
+        The MMU/UVM module saw the most activity this week in the open-gpu-kernel-modules repository, with multiple open PRs addressing critical bugs.
+    </p>
+
+    <details open>
+        <summary>#1110 — uvm: fix NULL pointer dereference in uvm_hmm_unregister_gpu</summary>
+        <div class="body">
+            <p>
+                A critical fix for a NULL pointer dereference in the UVM HMM (Heterogeneous Memory Management) unregister path.
+                This addresses a potential kernel crash when unregistering GPU memory from HMM-managed regions.
+                Affects <code>kernel-open/nvidia-uvm/</code> source tree.
+            </p>
+            <span class="tag bug">Bug Fix</span>
+            <span class="tag pr">Open PR</span>
+            <div class="date">
+                Date: 2026-04-16 &nbsp;|&nbsp;
+                Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1110">PR #1110</a>
+            </div>
+        </div>
+    </details>
+
+    <details open>
+        <summary>#1088 — fix(uvm): check pRmApi->Control status in nvGpuOpsSetPageDirectory</summary>
+        <div class="body">
+            <p>
+                Adds missing error checking for the <code>pRmApi->Control</code> return status in <code>nvGpuOpsSetPageDirectory</code>,
+                which manages GPU page directory setup. This could lead to silent failures in page table configuration.
+                File path: <code>kernel-open/nvidia-uvm/uvm_gpu.c</code> (or related UVM source).
+            </p>
+            <span class="tag bug">Bug Fix</span>
+            <span class="tag pr">Open PR</span>
+            <span class="tag feature">MMU</span>
+            <div class="date">
+                Date: 2026-03-30 &nbsp;|&nbsp;
+                Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1088">PR #1088</a>
+            </div>
+        </div>
+    </details>
+
+    <details>
+        <summary>#1015 — uvm: Fix build failure for Linux 6.19+ due to HMM and PMM API changes</summary>
+        <div class="body">
+            <p>
+                Fixes compilation of the UVM module against Linux kernel 6.19+ where the HMM (Heterogeneous Memory Management)
+                and PMM (Physical Memory Manager) APIs have changed. This is a forward-compatibility fix for upcoming kernel versions.
+            </p>
+            <span class="tag feature">Build Fix</span>
+            <span class="tag pr">Closed/Merged</span>
+            <div class="date">
+                Date: 2026-03-29 &nbsp;|&nbsp;
+                Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1015">PR #1015</a>
+            </div>
+        </div>
+    </details>
+
+    <details open>
+        <summary>#1108 — Bug: nvidia_uvm causes kernel panic under heavy I/O and parallel compilation</summary>
+        <div class="body">
+            <p>
+                A user-reported critical bug where the <code>nvidia_uvm</code> module causes a full kernel panic under sustained heavy I/O
+                (e.g., compressing large directories) and parallel C++ compilation. The issue does <em>not</em> occur with the proprietary driver
+                of the same version (595.58.03-1), suggesting an open-module-specific regression.
+                Reproduced on Arch Linux with kernel 6.18.22-1-lts, GPU: RTX 4050 Laptop.
+            </p>
+            <span class="tag bug">Critical Bug</span>
+            <span class="tag community">User Report</span>
+            <div class="date">
+                Date: 2026-04-15 &nbsp;|&nbsp;
+                Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1108">Issue #1108</a>
+            </div>
+        </div>
+    </details>
+
+    <details open>
+        <summary>#1107 — Crash in nvidia_vma_access</summary>
+        <div class="body">
+            <p>
+                Another UVM-related crash report involving <code>nvidia_vma_access</code>.
+                This function handles VMA (Virtual Memory Area) access for GPU memory, and crashes here indicate potential issues
+                in the open module's memory management path.
+            </p>
+            <span class="tag bug">Bug</span>
+            <div class="date">
+                Date: 2026-04-14 &nbsp;|&nbsp;
+                Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1107">Issue #1107</a>
+            </div>
+        </div>
+    </details>
+
+    <details>
+        <summary>#1096 — nvidia: fix mmap_context use-before-initialization in VMA access</summary>
+        <div class="body">
+            <p>
+                Fixes a use-before-initialization bug in <code>mmap_context</code> during VMA access, which could lead to undefined behavior
+                or crashes when mapping GPU memory regions. Affects core <code>nvidia</code> module VMA handling.
+            </p>
+            <span class="tag bug">Bug Fix</span>
+            <span class="tag pr">Open PR</span>
+            <div class="date">
+                Date: 2026-04-03 &nbsp;|&nbsp;
+                Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1096">PR #1096</a>
+            </div>
+        </div>
+    </details>
+
+    <details>
+        <summary>#1093 — Fix installation option and update repository links</summary>
+        <div class="body">
+            <p>
+                Closes a fix for installation options and updates repository links in the build/install scripts.
+                This improves the developer experience for building the open kernel modules.
+            </p>
+            <span class="tag feature">Build/Install</span>
+            <span class="tag pr">Closed</span>
+            <div class="date">
+                Date: 2026-04-13 &nbsp;|&nbsp;
+                Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1093">PR #1093</a>
+            </div>
+        </div>
+    </details>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMMUNITY FEEDBACK -->
+<!-- ============================================================ -->
+<section id="community">
+    <h2>Community Feedback</h2>
+
+    <div class="card">
+        <h3>UVM Kernel Panics on Open Modules — Divergence from Proprietary Driver</h3>
+        <p>
+            Multiple reports this week highlight that the open GPU kernel modules are exhibiting kernel panics and crashes
+            that do <strong>not</strong> occur with the proprietary driver of the same version.
+            Issue #1108 (nvidia_uvm kernel panic under heavy I/O) and Issue #1107 (crash in nvidia_vma_access) both point to
+            potential regressions in the open-module code path vs. the closed-source equivalent.
+            This is a recurring concern for users evaluating the open modules for production workloads.
+        </p>
+        <span class="tag community">High Priority</span>
+        <span class="tag bug">Stability</span>
+        <p class="date">
+            Refs:
+            <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1108">#1108</a>,
+            <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1107">#1107</a>,
+            <a class="ref" href="https://forums.developer.nvidia.com/t/nvidia-driver-on-ubuntu-24-04-04-lts-with-amd-threadripper-3995wx-nvidia-rtx-3080-ti-fails-and-gdm-x-session-deletes-gpu-0/363186">NVIDIA Forums — UVM fatal error</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>RTX 4070 Ti Issues with Open Kernel Module 580.142 on Fedora 43</h3>
+        <p>
+            Issue #1115 reports consistent issues with open kernel module version 580.142 on Fedora 43 with an RTX 4070 Ti.
+            The issue has been reproducible since March, indicating a persistent regression affecting consumer GPUs on newer kernel versions.
+        </p>
+        <span class="tag bug">Bug</span>
+        <span class="tag community">User Report</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1115">Issue #1115</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>GSP Firmware Halt on sm_120 (RTX Pro 6000 Blackwell)</h3>
+        <p>
+            Issue #1111 reports a GSP (GPU System Processor) firmware halt on the new RTX Pro 6000 Blackwell GPU (sm_120)
+            running open GPU kernel modules version 580.126.20.
+            This highlights the challenge of supporting newer architectures in the open modules before proprietary drivers mature.
+        </p>
+        <span class="tag bug">Bug</span>
+        <span class="tag feature">Blackwell</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1111">Issue #1111</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>Nova DRM Driver Progress for Linux 6.19+</h3>
+        <p>
+            Phoronix reports on Rust graphics driver changes for Linux 6.19, including continued work on the Nouveau/Nova open-source driver
+            for NVIDIA GPUs. While not directly related to NVIDIA's official open kernel modules, this is part of the broader open-source
+            NVIDIA GPU support ecosystem.
+        </p>
+        <span class="tag community">Ecosystem</span>
+        <span class="tag feature">Nova DRM</span>
+        <p class="date">
+            Ref: <a class="ref" href="https://www.phoronix.com/news/Rust-DRM-For-Linux-7.1">Phoronix — Rust DRM for Linux 7.1</a>
+        </p>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VERSION COMPARISON TABLE -->
+<!-- ============================================================ -->
+<section id="comparison">
+    <h2>Version Comparison Table</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Version</th>
+                <th>Branch</th>
+                <th>Date</th>
+                <th>Key Focus</th>
+                <th>MMU/UVM Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>595.44.05</code></td>
+                <td>main</td>
+                <td>2026-04-02</td>
+                <td>Vulkan Beta — experimental features</td>
+                <td>—</td>
+            </tr>
+            <tr>
+                <td><code>595.58.03</code></td>
+                <td>main</td>
+                <td>2026-03-24</td>
+                <td>Stable driver — current baseline</td>
+                <td>Referenced in Issues #1107, #1108</td>
+            </tr>
+            <tr>
+                <td><code>580.142</code></td>
+                <td>main</td>
+                <td>2026-03-10</td>
+                <td>Production branch</td>
+                <td>Referenced in Issue #1115 (Fedora 43)</td>
+            </tr>
+            <tr>
+                <td><code>580.126.20</code></td>
+                <td>main</td>
+                <td>2026-02-23</td>
+                <td>Data center Tesla driver</td>
+                <td>Referenced in Issue #1111 (GSP halt)</td>
+            </tr>
+            <tr>
+                <td><code>595.45.04</code></td>
+                <td>main</td>
+                <td>2026-03-05</td>
+                <td>Vulkan Beta</td>
+                <td>GMMU headers updated in this release</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- TREND ANALYSIS -->
+<!-- ============================================================ -->
+<section id="trend">
+    <h2>Trend Analysis</h2>
+
+    <div class="card">
+        <h3>Open Module Stability Gap Widening</h3>
+        <p>
+            This week's data shows a growing gap between the proprietary driver and the open GPU kernel modules in terms of stability.
+            Multiple critical bugs (kernel panics, VMA crashes, GSP firmware halts) are reported exclusively on the open modules,
+            with users confirming the proprietary driver of the same version does not exhibit these issues.
+            PRs #1110, #1096, and #1088 all target UVM/MMU stability, suggesting NVIDIA is aware and actively working on fixes,
+            but the rate of incoming bug reports exceeds the merge rate.
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>Forward Compatibility with Linux 6.19+</h3>
+        <p>
+            PR #1015 (merged) addressed HMM and PMM API changes in Linux 6.19+, showing NVIDIA's commitment to maintaining
+            forward compatibility with upstream kernel changes. This is critical for adoption on bleeding-edge distributions.
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>GTC 2026 Hardware Roadmap Implications</h3>
+        <p>
+            The Vera Rubin platform announcement (Vera CPU + Rubin GPU via NVLink-C2C) and the GB300 NVL72 ramp signal that
+            the open kernel modules will need to support these new architectures. The current open modules primarily target
+            Ampere and later, but full Vera Rubin support will require new SoC definitions and interconnect initialization code.
+            The Marvell NVLink Fusion partnership also suggests the open modules may eventually need to support heterogeneous
+            NVLink topologies.
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>Enterprise Adoption: Red Hat Signed Modules</h3>
+        <p>
+            The Red Hat collaboration for signing open GPU kernel modules for RHEL 9 (with Secure Boot support) removes a significant
+            barrier for enterprise deployment. Once the tech preview concludes and modules land in the NVIDIA Compute repositories,
+            enterprise adoption of the open modules is expected to increase significantly.
+        </p>
+        <p class="date">
+            Ref: <a class="ref" href="https://developer.nvidia.com/blog/nvidia-open-gpu-datacenter-drivers-for-rhel9-signed-by-red-hat/">NVIDIA Developer Blog — RHEL9 Signed Modules</a>
+        </p>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 本周观察 -->
+<!-- ============================================================ -->
+<div class="observation">
+    <h3>本周观察</h3>
+    <p>
+        本周 open-gpu-kernel-modules 仓库在 MMU/UVM 模块出现了多个关键 bug 报告和修复 PR，
+        尤其是 nvidia_uvm 内核恐慌问题（Issue #1108）和 VMA 访问崩溃（Issue #1107），
+        凸显了开源模块与闭源驱动之间的稳定性差距。
+        同时，GTC 2026 公布的 Vera Rubin 平台和 Marvell NVLink Fusion 合作为开源内核模块的长期支持提出了新的架构挑战。
+        建议密切关注 PR #1110（UVM HMM NULL 指针修复）的合并进展，以及 595.x 分支的下一个 release。
+    </p>
+</div>
+
+</main>
+
+<footer>
+    <p>
+        Generated by open-gpu-kernel weekly tracker &middot; 2026-04-22 &middot;
+        Data sources: <a class="ref" href="https://github.com/NVIDIA/open-gpu-kernel-modules">GitHub</a> &middot;
+        <a class="ref" href="https://developer.nvidia.com/blog/">NVIDIA Developer Blog</a> &middot;
+        <a class="ref" href="https://www.phoronix.com/">Phoronix</a> &middot;
+        <a class="ref" href="https://forums.developer.nvidia.com/">NVIDIA Forums</a>
+    </p>
+</footer>
+
+</body>
+</html>

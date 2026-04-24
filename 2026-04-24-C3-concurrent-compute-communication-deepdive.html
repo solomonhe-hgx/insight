@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C3: 优化 ML 并发计算与通信 — GPU DMA 引擎加速</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .highlight-box { border-left: 4px solid #8b5cf6; background: rgba(139, 92, 246, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .tech-diagram { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.75rem; padding: 1.5rem; }
+        .paper-badge { font-family: 'Fira Code', monospace; background: rgba(139, 92, 246, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        .metric-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exchange-alt text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-transparent">C3 并发计算与通信优化</h1>
+                        <p class="text-xs text-slate-400">GPU DMA 引擎加速 | arXiv:2412.14335</p>
+                    </div>
+                </div>
+                <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500/10 to-purple-700/10 border border-violet-500/20">
+                    <div class="text-xs text-slate-400">理想加速比达成率</div>
+                    <div class="text-lg font-bold text-violet-400">72%</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <div class="glass-card rounded-xl p-6 mt-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="paper-badge">arXiv:2412.14335</span>
+                <h2 class="text-lg font-semibold text-violet-400">Optimizing ML Concurrent Computation and Communication with GPU DMA Engines</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-violet-500/10 to-purple-700/10 border border-violet-500/20">
+                    <div class="text-sm text-slate-400 mb-1">作者</div>
+                    <div class="text-xs text-violet-400">Anirudha Agrawal, Shaizeen Aga, Suchita Pati, Mahzabeen Islam</div>
+                    <div class="text-xs text-slate-500 mt-1">Advanced Micro Devices, Inc. (AMD)</div>
+                </div>
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-violet-500/10 to-purple-700/10 border border-violet-500/20">
+                    <div class="text-sm text-slate-400 mb-1">实验平台</div>
+                    <div class="text-xs text-violet-400">AMD Instinct MI300X (304 CUs, 14 SDMA engines)</div>
+                    <div class="text-xs text-slate-500 mt-1">8-GPU 全互联节点, 192GB HBM, 5.3TB/s 带宽</div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Abstract -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-file-alt"></i> 摘要</h3>
+                    <p class="text-sm text-slate-300 leading-relaxed">
+                        <strong>并发计算与通信 (C3)</strong> 是 ML 及其他领域的普遍范式，其性能优化至关重要。本文在 GPU 上对 C3 进行细致刻画（GPU 是 ML 训练和推理最广泛部署的平台）。研究发现：虽然 C3 能带来性能提升，但提升幅度远低于理想加速比（串行执行计算与通信的时间，与并发时两者最大值的比值；所有时间均来自独立执行）。具体而言，<strong>C3 平均仅达到理想加速比的 21%</strong>。这是由于并发 GPU kernel 之间在计算单元 (CU) 和内存 (HBM/缓存) 上的已知干扰问题。
+                    </p>
+                    <p class="text-sm text-slate-300 leading-relaxed mt-3">
+                        为提升 C3 性能，首先评估了 <strong>调度优先级 (schedule prioritization)</strong> 和 <strong>计算单元资源分区 (resource partitioning)</strong> 两种策略，将 C3 性能提升至理想加速比的平均 42%。为进一步增强，提出将通信任务 <strong>卸载到 GPU DMA 引擎</strong>，构建并发通信集合 (ConCCL) 概念验证。结果表明 ConCCL 显著缩小了实际与理想加速比的差距，<strong>平均达到理想加速比的 72%，最高达 1.67 倍加速</strong>。本文为 GPU DMA 引擎的进一步发展提供了有力论证。
+                    </p>
+                    <div class="mt-2 text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2412.14335" target="_blank" class="ref-link">arXiv:2412.14335</a></div>
+                </div>
+
+                <!-- Architecture Overview -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-microchip"></i> AMD MI300X 硬件架构</h3>
+
+                    <div class="mb-4">
+                        <img src="page-2.png" alt="AMD MI300X GPU Architecture" class="w-full rounded-xl border border-slate-600 bg-white/95 p-4" loading="lazy"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display: none;" class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                            <div class="flex items-center gap-3 mb-3">
+                                <i class="fas fa-microchip text-violet-400 text-xl"></i>
+                                <h4 class="text-sm font-semibold text-violet-300">AMD MI300X 架构概览</h4>
+                            </div>
+                            <p class="text-sm text-slate-300">AMD Instinct MI300X 采用先进封装技术，集成异构 chiplet。包含 8 个 XCD（加速器复合芯片）垂直堆叠在 4 个 IOD 之上。每个 XCD 含 38 个 CU，共 304 个 CU。IOD 含 256MB Infinity Cache、HBM 接口和 14 个 SDMA 引擎。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2 text-center">图 2: AMD Instinct MI300X 架构 — 8 个 XCD 堆叠于 4 个 IOD，每个 IOD 连接 2 个 HBM 堆栈</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-violet-500/10 to-transparent border-violet-500/30">
+                            <div class="text-2xl font-bold text-violet-400">304</div>
+                            <div class="text-xs text-slate-400">计算单元 (CU)</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-violet-500/10 to-transparent border-violet-500/30">
+                            <div class="text-2xl font-bold text-violet-400">14</div>
+                            <div class="text-xs text-slate-400">SDMA 引擎</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-violet-500/10 to-transparent border-violet-500/30">
+                            <div class="text-2xl font-bold text-violet-400">192GB</div>
+                            <div class="text-xs text-slate-400">HBM 容量</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-violet-500/10 to-transparent border-violet-500/30">
+                            <div class="text-2xl font-bold text-violet-400">5.3TB/s</div>
+                            <div class="text-xs text-slate-400">HBM 峰值带宽</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 mt-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">XCD (Accelerator Complex Die)</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">每个 MI300X 含 8 个 XCD，每个 XCD 包含 38 个活跃的 CU（高度并行化的 GPU 处理器核心），以及 4MB 共享 L2 缓存。总计 304 个 CU。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">IOD (I/O Die)</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">4 个 IOD，每个含 64MB AMD Infinity Cache（共享末级缓存，总计 256MB）。IOD 还包含 HBM 内存接口（每 MI300X 有 8 个 HBM 堆栈，每个 24GB）和 14 个 SDMA 引擎。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">AMD Infinity Fabric 互联</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">8-GPU 全互联拓扑，每个 MI300X 通过 AMD Infinity Fabric 双向链路连接其他 7 个 GPU，每条链路单向带宽 64GB/s。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- C3 Taxonomy -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-project-diagram"></i> C3 分类体系</h3>
+
+                    <div class="mb-4">
+                        <img src="page-3.png" alt="C3 Taxonomy Figure 4" class="w-full rounded-xl border border-slate-600 bg-white/95 p-4" loading="lazy"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display: none;" class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                            <div class="flex items-center gap-3 mb-3">
+                                <i class="fas fa-project-diagram text-violet-400 text-xl"></i>
+                                <h4 class="text-sm font-semibold text-violet-300">C3 分类体系</h4>
+                            </div>
+                            <p class="text-sm text-slate-300">论文提出三种 C3 类型：G-long (计算主导)、C-long (通信主导)、GC-equal (均衡)。进一步细分为计算密集型/内存密集型 GEMM，以及延迟敏感/带宽敏感通信。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2 text-center">图 4: C3 分类体系 — 三类并发模式及计算/通信的进一步细分</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">三种基本类型</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="metric-card rounded-lg p-3 bg-gradient-to-br from-blue-500/10 to-transparent border-blue-500/30">
+                                    <div class="text-sm font-semibold text-blue-400 mb-1">G-long</div>
+                                    <div class="text-xs text-slate-400">GEMM 时间 > 115% 通信时间（计算主导场景）</div>
+                                </div>
+                                <div class="metric-card rounded-lg p-3 bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                                    <div class="text-sm font-semibold text-amber-400 mb-1">C-long</div>
+                                    <div class="text-xs text-slate-400">通信时间 > 115% GEMM 时间（通信主导场景）</div>
+                                </div>
+                                <div class="metric-card rounded-lg p-3 bg-gradient-to-br from-green-500/10 to-transparent border-green-500/30">
+                                    <div class="text-sm font-semibold text-green-400 mb-1">GC-equal</div>
+                                    <div class="text-xs text-slate-400">两者时间相当（差异 15% 以内）</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">GEMM 分类</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed"><strong>计算密集型 (compute-bound):</strong> op-to-byte 比率高于机器峰值计算/内存吞吐比。代表来自 LLaMA-70B/405B 训练的 cb1-cb5。</p>
+                            <p class="text-sm text-slate-400 leading-relaxed mt-2"><strong>内存密集型 (memory-bound):</strong> op-to-byte 比率低于机器阈值。代表 mb1, mb2。</p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">通信分类</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed"><strong>延迟敏感 (latency-bound):</strong> 通信规模较小时，延迟不随数据量线性增长。</p>
+                            <p class="text-sm text-slate-400 leading-relaxed mt-2"><strong>带宽敏感 (bandwidth-bound):</strong> 大规模通信，延迟随数据量线性增长，受带宽限制。</p>
+                            <p class="text-sm text-slate-400 leading-relaxed mt-2">本文聚焦 <strong>all-gather</strong> 和 <strong>all-to-all</strong> 两种 ML 集合通信。</p>
+                        </div>
+                    </div>
+
+                    <div class="highlight-box mt-4">
+                        <h4 class="text-sm font-medium text-violet-400 mb-2">为什么研究 C3？</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">ML 中多种算法天然产生 C3：数据并行 (反向传播中的 GEMM 与梯度归约)、FSDP (层权重 gather 与前一层计算并发)、nano-batching (不同 nano-batch 的通信与计算并发）。随着 LLM 模型规模扩大（LLaMA-70B, 405B），C3 场景越来越普遍。</p>
+                    </div>
+                </div>
+
+                <!-- Baseline C3 Characterization -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-bar"></i> 基线 C3 性能刻画</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">计算干扰分析</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">当计算和通信 kernel 并发执行时，GPU 的 304 个 CU 需要被两者共享。实验通过分配不同数量的 CU 给通信 kernel，观察对 GEMM 和通信 kernel 的影响。</p>
+
+                            <div class="mt-3 mb-4">
+                                <img src="page-5.png" alt="GEMM and Communication kernel slowdown due to CU loss" class="w-full rounded-xl border border-slate-600 bg-white/95 p-4" loading="lazy"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                <div style="display: none;" class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <i class="fas fa-chart-line text-violet-400 text-xl"></i>
+                                        <h4 class="text-sm font-semibold text-violet-300">CU 损失导致的性能下降</h4>
+                                    </div>
+                                    <p class="text-sm text-slate-300">(a) GEMM kernel 随 CU 损失变慢：内存密集型 (mb1) 对 CU 损失不敏感甚至加速，计算密集型 (cb1) 随 CU 减少显著变慢。(b) All-gather 和 (c) All-to-all 在分配不同 CU 数时也有不同程度的减速。</p>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-2 text-center">图 5: (a) GEMM kernel 因失去 CU 导致的减速；(b) All-gather 和 (c) All-to-all 在不同 CU 分配下的减速</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-violet-400 mb-2">GEMM 对 CU 损失的响应</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed"><strong>内存密集型 (mb1):</strong> 对 CU 损失有韧性，甚至在失去部分 CU 时反而加速（可能因减少缓存竞争）。</p>
+                                <p class="text-sm text-slate-400 leading-relaxed mt-2"><strong>计算密集型 (cb1):</strong> 随失去 CU 数量增加而显著变慢，损失 50% CU 时减速可达 1.5-1.6 倍。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-violet-400 mb-2">通信对 CU 分配的响应</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed"><strong>All-gather:</strong> 默认分配 64 个 CU。分配 8-16 CU 时减速约 2 倍，32+ CU 时接近默认性能。</p>
+                                <p class="text-sm text-slate-400 leading-relaxed mt-2"><strong>All-to-all:</strong> 默认 56 个 CU。对 CU 数更敏感，8 CU 时减速可达 4 倍，32+ CU 时才接近默认性能。</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">缓存带宽利用</h4>
+                            <div class="mb-3">
+                                <img src="page-6.png" alt="Cache bandwidth utilization" class="w-full rounded-xl border border-slate-600 bg-white/95 p-4" loading="lazy"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                <div style="display: none;" class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <i class="fas fa-memory text-violet-400 text-xl"></i>
+                                        <h4 class="text-sm font-semibold text-violet-300">相对 Infinity Cache 带宽利用</h4>
+                                    </div>
+                                    <p class="text-sm text-slate-300">GEMM 和 all-gather 在并发时对 Infinity Cache 的竞争。不同的 GEMM 和通信尺寸表现出不同的缓存利用模式。</p>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-2 text-center">图 6: GEMM 和 all-gather 的相对 AMD Infinity Cache 带宽利用率</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Finding: Only 21% of Ideal Speedup -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> 核心发现：仅实现 21% 理想加速比</h3>
+
+                    <div class="highlight-box">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-yellow-400 text-xl mt-1"></i>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white mb-2">理想加速比定义</h4>
+                                <p class="text-sm text-slate-300 leading-relaxed">理想加速比 = (串行时间: GEMM + 通信) / (并发时间: max(GEMM, 通信))。所有时间来自独立执行（非并发）测量。</p>
+                                <p class="text-sm text-slate-300 leading-relaxed mt-2">理论上，如果较短的 kernel 被完全隐藏，可实现 <strong>平均 1.6 倍、最高 2 倍</strong> 的理想加速。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div class="metric-card rounded-lg p-5 text-center bg-gradient-to-br from-red-500/20 to-red-700/10 border-red-500/30">
+                            <div class="text-3xl font-bold text-red-400">21%</div>
+                            <div class="text-sm text-slate-400 mt-2">基线 C3 理想加速比达成率</div>
+                            <div class="text-xs text-slate-500 mt-1">平均仅 1.13 倍实际加速</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-5 text-center bg-gradient-to-br from-amber-500/20 to-amber-700/10 border-amber-500/30">
+                            <div class="text-3xl font-bold text-amber-400">42%</div>
+                            <div class="text-sm text-slate-400 mt-2">调度优先级 + 资源分区</div>
+                            <div class="text-xs text-slate-500 mt-1">通过策略优化提升</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-5 text-center bg-gradient-to-br from-green-500/20 to-green-700/10 border-green-500/30">
+                            <div class="text-3xl font-bold text-green-400">72%</div>
+                            <div class="text-sm text-slate-400 mt-2">ConCCL (DMA 卸载)</div>
+                            <div class="text-xs text-slate-500 mt-1">最高 1.67 倍加速</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mt-4">
+                        <h4 class="text-sm font-medium text-violet-400 mb-2">为什么基线性能如此差？</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">并发 GPU kernel 之间相互干扰，共享计算核心、缓存、HBM 带宽等资源。给定 GPU kernel 在有其他 kernel 并发时可用的资源远少于独立执行时。先前工作也观察到，由于这种干扰，C3 甚至可能导致减速和 ML 吞吐量损失。</p>
+                        <ul class="text-sm text-slate-400 space-y-1 mt-3 ml-4">
+                            <li>• <strong>计算干扰:</strong> 并发 kernel 共享 CU，各自获得的 CU 减少</li>
+                            <li>• <strong>缓存干扰:</strong> 多个 kernel 竞争 Infinity Cache 和 L2 缓存</li>
+                            <li>• <strong>HBM 干扰:</strong> 多个 kernel 竞争 HBM 带宽</li>
+                            <li>• <strong>片上网络干扰:</strong> 数据在 XCD 间传输时的网络拥塞</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Strategy 1 & 2 -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-sliders-h"></i> 策略优化：调度优先级与资源分区</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">策略一：调度优先级 (Schedule Prioritization)</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">优先调度资源需求较低的 kernel，防止饥饿并提升整体性能。具体而言，当通信 kernel 只需要少量 CU (10-20%) 时，优先启动通信可以让其快速完成，随后全部 CU 可用于计算。</p>
+                            <div class="mt-3 bg-slate-900/50 rounded p-3">
+                                <p class="text-xs text-slate-400"><strong>效果:</strong> 单独使用调度优先级，结合合理启发式方法，可将整体性能从 21% 理想加速比有所提升。</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">策略二：CU 资源分区 (Resource Partitioning)</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">MI300X GPU 支持将特定 CU 专门标记给某个工作流独占使用。通过为通信 kernel 保留一部分 CU，剩余的 CU 全部用于计算 kernel，可以减少干扰。</p>
+                            <div class="mt-3 bg-slate-900/50 rounded p-3">
+                                <p class="text-xs text-slate-400"><strong>效果:</strong> 两种策略结合使用，将 C3 性能提升至平均 <strong>42% 理想加速比</strong>。</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">启发式指导原则</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">论文提供了运行时可使用的启发式方法：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 根据 GEMM 类型 (cb/mb) 和通信类型决定优先级</li>
+                                <li>• 内存密集型 GEMM 可容忍更多 CU 被通信占用</li>
+                                <li>• 计算密集型 GEMM 应保留更多 CU</li>
+                                <li>• All-to-all 比 All-gather 需要更多 CU 以避免严重减速</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DMA Architecture -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-truck-fast"></i> DMA 引擎架构与工作原理</h3>
+
+                    <div class="mb-4">
+                        <img src="page-3.png" alt="DMA offload mechanism" class="w-full rounded-xl border border-slate-600 bg-white/95 p-4" loading="lazy"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display: none;" class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                            <div class="flex items-center gap-3 mb-3">
+                                <i class="fas fa-truck-fast text-violet-400 text-xl"></i>
+                                <h4 class="text-sm font-semibold text-violet-300">DMA 数据传输流程</h4>
+                            </div>
+                            <p class="text-sm text-slate-300">1) CPU 调度传输到 DMA 队列；2) GPU DMA 引擎从队列获取命令；3) DMA 处理命令；4) DMA 执行 HBM 间的实际数据传输。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2 text-center">图 3: MI300X 中 DMA 卸载数据传输的四个步骤</p>
+                    </div>
+
+                    <div class="tech-diagram">
+                        <h4 class="text-sm font-medium text-violet-300 mb-3">Baseline C3 vs ConCCL 对比</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">图 1 展示了两种 C3 实现方式的根本区别：</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4 border border-red-500/30">
+                                <div class="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2"><i class="fas fa-times-circle"></i> Baseline C3</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">通信和计算都运行在 GPU 的 CU 上。两者共享 304 个 CU，互相干扰。缓存和 HBM 也被两者竞争。</p>
+                                <div class="mt-3 bg-red-500/10 rounded p-2">
+                                    <p class="text-xs text-red-300">GEMM 和 Comm 共享 CU → 相互干扰</p>
+                                </div>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4 border border-green-500/30">
+                                <div class="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2"><i class="fas fa-check-circle"></i> ConCCL (DMA 卸载)</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">通信卸载到 DMA 引擎。全部 304 个 CU 专用于 GEMM 计算，消除了 CU 干扰。同时减少了缓存竞争，因为 DMA 引擎位置独立。</p>
+                                <div class="mt-3 bg-green-500/10 rounded p-2">
+                                    <p class="text-xs text-green-300">DMA 负责通信 → 304 CU 全给 GEMM</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 mt-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">DMA 数据传输流程详解</h4>
+                            <div class="space-y-2 mt-3">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/50 flex items-center justify-center flex-shrink-0">
+                                        <span class="text-xs text-violet-400 font-bold">1</span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-slate-300"><strong>CPU 调度传输:</strong> 通过 HIP 或 HSA 运行时 API，程序员请求使用 SDMA 引擎进行数据传输。CPU 运行时将命令包放入系统内存中的 DMA 队列。</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <div class="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/50 flex items-center justify-center flex-shrink-0">
+                                        <span class="text-xs text-violet-400 font-bold">2</span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-slate-300"><strong>DMA 获取命令:</strong> GPU DMA 引擎被通知后，从队列中获取命令包。</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <div class="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/50 flex items-center justify-center flex-shrink-0">
+                                        <span class="text-xs text-violet-400 font-bold">3</span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-slate-300"><strong>DMA 处理命令:</strong> DMA 引擎解码命令，准备数据传输。</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <div class="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/50 flex items-center justify-center flex-shrink-0">
+                                        <span class="text-xs text-violet-400 font-bold">4</span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-slate-300"><strong>数据传输:</strong> DMA 引擎从源 GPU HBM 读取数据，写入目标 GPU HBM，完成传输。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ConCCL Implementation -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-cogs"></i> ConCCL: 并发通信集合实现</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">设计理念</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">ConCCL 将 ML 集合通信（all-gather, all-to-all）卸载到 GPU 的 DMA 引擎，而非传统的 GPU CU。这样所有 304 个 CU 都可以专用于 GEMM 计算，从根本上消除了计算-通信干扰。</p>
+                            <p class="text-sm text-slate-400 leading-relaxed mt-2">注意：由于 GPU DMA 引擎不支持算术操作，ConCCL 不卸载 all-reduce（需要加法运算）。</p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">All-Gather 的 ConCCL 实现</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">All-gather 本质上是从所有 GPU 收集数据块。ConCCL 将其分解为多个点对点 DMA 传输：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 每个 GPU 将数据分块发送给其他 GPU</li>
+                                <li>• 使用 14 个 SDMA 引擎并行传输</li>
+                                <li>• 通过流水线调度优化传输顺序</li>
+                                <li>• 带宽敏感场景下性能与 RCCL 相当</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">All-to-All 的 ConCCL 实现</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">All-to-all 更复杂，每个 GPU 需要向所有其他 GPU 发送不同数据：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 每个 GPU 按目标将数据分段</li>
+                                <li>• 使用 DMA 引擎按目标路由数据</li>
+                                <li>• 调度策略避免链路拥塞</li>
+                                <li>• 同样在带宽敏感场景与 RCCL 相当</li>
+                            </ul>
+                        </div>
+
+                        <div class="highlight-box">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">为什么 DMA 能减少缓存干扰？</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed">MI300X 的 14 个 SDMA 引擎位于 IOD 上，独立于 XCD 的计算单元。DMA 数据传输绕过 CU 的 L2 缓存和计算管线，仅使用 IOD 的 Infinity Cache 路径。因此，当通信卸载到 DMA 时，不仅释放了全部 CU 给 GEMM，还减少了缓存竞争。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 实验结果</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div class="metric-card rounded-lg p-4 text-center bg-gradient-to-br from-red-500/20 to-transparent border-red-500/30">
+                            <div class="text-2xl font-bold text-red-400">21%</div>
+                            <div class="text-xs text-slate-400 mt-1">基线 C3</div>
+                            <div class="text-xs text-slate-500">平均理想加速比达成率</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-4 text-center bg-gradient-to-br from-amber-500/20 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">42%</div>
+                            <div class="text-xs text-slate-400 mt-1">调度 + 分区</div>
+                            <div class="text-xs text-slate-500">策略优化后</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-4 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">72%</div>
+                            <div class="text-xs text-slate-400 mt-1">ConCCL (DMA)</div>
+                            <div class="text-xs text-slate-500">DMA 卸载后</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-4 text-center bg-gradient-to-br from-cyan-500/20 to-transparent border-cyan-500/30">
+                            <div class="text-2xl font-bold text-cyan-400">1.67x</div>
+                            <div class="text-xs text-slate-400 mt-1">最高加速比</div>
+                            <div class="text-xs text-slate-500">ConCCL vs 串行</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 mt-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">ConCCL vs RCCL 性能对比</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">ConCCL 概念验证在带宽敏感场景下与现有通信库 RCCL 性能相当，同时显著减少 C3 干扰。关键优势：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 304 个 CU 全部可用于 GEMM 计算</li>
+                                <li>• 减少 Infinity Cache 和 L2 缓存竞争</li>
+                                <li>• 减少 HBM 带宽竞争</li>
+                                <li>• 通信和计算真正并行，互不干扰</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-violet-400 mb-2">不同 C3 类型的改进幅度</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">论文对 15 种独特 C3 组合进行了测试（表 II），涵盖 G-long、C-long、GC-equal 三种类型：</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• <strong>G-long:</strong> 计算主导场景，ConCCL 改善最显著（计算不再被通信干扰）</li>
+                                <li>• <strong>C-long:</strong> 通信主导场景，DMA 卸载使通信更高效</li>
+                                <li>• <strong>GC-equal:</strong> 两者均衡，改进适中</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Insights -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-key"></i> 核心洞察</h3>
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">1. 基线 C3 性能远低于理想</h4>
+                            <p class="text-sm text-slate-400">C3 在 GPU 上平均仅实现 21% 的理想加速比，原因是并发 kernel 在 CU、缓存和 HBM 上的严重干扰。这证明了优化的必要性。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">2. 调度优先级 + 资源分区有效提升</h4>
+                            <p class="text-sm text-slate-400">两种策略结合可将性能提升至 42% 理想加速比。优先调度低资源需求 kernel 和 CU 分区是实用且有效的优化手段。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">3. DMA 卸载是最有效的方案</h4>
+                            <p class="text-sm text-slate-400">ConCCL 将通信卸载到 DMA 引擎，从根本上消除计算-通信干扰，达到 72% 理想加速比，最高 1.67 倍加速。这为 GPU DMA 引擎的未来发展指明了方向。</p>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-white mb-2">4. DMA 引擎潜力待挖掘</h4>
+                            <p class="text-sm text-slate-400">当前 SDMA 引擎功能有限（不支持算术操作）。未来增强（如支持归约操作）将使 DMA 能够处理 all-reduce 等更多集合通信，进一步提升 C3 性能。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GEMM/Communication Sizes Studied -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-table"></i> 研究的 GEMM 与 C3 组合</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-violet-400 mb-3">GEMM Kernel 列表</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-600">
+                                        <th class="text-left py-2 px-3 text-violet-300">Tag</th>
+                                        <th class="text-left py-2 px-3 text-violet-300">尺寸</th>
+                                        <th class="text-left py-2 px-3 text-violet-300">来源</th>
+                                        <th class="text-left py-2 px-3 text-violet-300">类型</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-mono text-xs">cb1</td><td class="py-2 px-3 font-mono text-xs">8192x8192x8192</td><td class="py-2 px-3 text-xs text-slate-400">LLaMA-70B</td><td class="py-2 px-3 text-xs text-blue-400">计算密集型</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-mono text-xs">cb2</td><td class="py-2 px-3 font-mono text-xs">16384x8192x16384</td><td class="py-2 px-3 text-xs text-slate-400">LLaMA-405B</td><td class="py-2 px-3 text-xs text-blue-400">计算密集型</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-mono text-xs">cb3</td><td class="py-2 px-3 font-mono text-xs">16384x16384x8192</td><td class="py-2 px-3 text-xs text-slate-400">LLaMA-405B</td><td class="py-2 px-3 text-xs text-blue-400">计算密集型</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-mono text-xs">cb4</td><td class="py-2 px-3 font-mono text-xs">18432x8192x16384</td><td class="py-2 px-3 text-xs text-slate-400">LLaMA-405B</td><td class="py-2 px-3 text-xs text-blue-400">计算密集型</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-mono text-xs">cb5</td><td class="py-2 px-3 font-mono text-xs">106496x8192x16384</td><td class="py-2 px-3 text-xs text-slate-400">LLaMA-405B</td><td class="py-2 px-3 text-xs text-blue-400">计算密集型</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-mono text-xs">mb1</td><td class="py-2 px-3 font-mono text-xs">8192x57344x8192</td><td class="py-2 px-3 text-xs text-slate-400">LLaMA-70B</td><td class="py-2 px-3 text-xs text-orange-400">内存密集型</td></tr>
+                                    <tr><td class="py-2 px-3 font-mono text-xs">mb2</td><td class="py-2 px-3 font-mono text-xs">16384x106496x8192</td><td class="py-2 px-3 text-xs text-slate-400">LLaMA-405B</td><td class="py-2 px-3 text-xs text-orange-400">内存密集型</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Links -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-violet-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                    <div class="space-y-2">
+                        <a href="https://arxiv.org/abs/2412.14335" target="_blank" class="ref-link mr-4"><i class="fas fa-external-link-alt mr-1"></i>arXiv:2412.14335 原文</a>
+                        <a href="https://arxiv.org/pdf/2412.14335.pdf" target="_blank" class="ref-link"><i class="fas fa-file-pdf mr-1"></i>PDF 下载</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>C3: 优化 ML 并发计算与通信 | GPU DMA 引擎加速 | arXiv:2412.14335</p>
+            <p class="mt-1">作者: Anirudha Agrawal, Shaizeen Aga, Suchita Pati, Mahzabeen Islam (AMD) | 实验平台: AMD Instinct MI300X</p>
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通信库竞品动态周报 - 2026-W17</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .badge-nccl { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+        .badge-deepep { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .badge-nvshmem { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .badge-other { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .badge-trend { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .metric-card { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); }
+        .update-card { transition: all 0.3s ease; }
+        .update-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .table-row-hover:hover { background: rgba(59, 130, 246, 0.1); }
+        .trend-arrow { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .detail-section { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        .ref-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-radius: 4px; text-decoration: none; margin-left: 6px; white-space: nowrap; transition: all 0.15s; }
+        .ref-link:hover { background: rgba(59, 130, 246, 0.3); }
+        .ref-link.green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .ref-link.green:hover { background: rgba(16, 185, 129, 0.3); }
+        .ref-link.orange { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .ref-link.orange:hover { background: rgba(245, 158, 11, 0.3); }
+        .ref-link.purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .ref-link.purple:hover { background: rgba(139, 92, 246, 0.3); }
+        .ref-link.cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; }
+        .ref-link.cyan:hover { background: rgba(6, 182, 212, 0.3); }
+        .feature-expand-btn { cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 11px; flex-shrink: 0; }
+        .feature-expand-btn:hover { background: rgba(59, 130, 246, 0.15); }
+        .feature-expand-icon { transition: transform 0.3s ease; display: inline-block; font-size: 10px; }
+        .feature-expand-icon.expanded { transform: rotate(90deg); }
+        .feature-detail { animation: slideDown 0.3s ease-out; }
+        .feature-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="text-slate-200">
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-network-wired text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">通信库竞品动态周报</h1>
+                        <p class="text-xs text-slate-400">NCCL / DeepEP / NVSHMEM / 其他通信库 | 2026年4月 W17</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-slate-300">报告周期</div>
+                        <div class="text-xs text-slate-400">2026-04-20 ~ 04-27</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-400">6</div>
+                        <div class="text-xs text-slate-400">更新/动态</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('overview')" id="tab-overview" class="tab-active px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-chart-line"></i> 总览与趋势
+            </button>
+            <button onclick="showTab('nccl')" id="tab-nccl" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-microchip"></i> NCCL <span class="ml-1 bg-green-500/20 text-green-400 text-xs px-1.5 py-0.5 rounded">3项</span>
+            </button>
+            <button onclick="showTab('deepep')" id="tab-deepep" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-rocket"></i> DeepEP
+            </button>
+            <button onclick="showTab('nvshmem')" id="tab-nvshmem" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-memory"></i> NVSHMEM
+            </button>
+            <button onclick="showTab('others')" id="tab-others" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-layer-group"></i> 其他通信库 <span class="ml-1 bg-amber-500/20 text-amber-400 text-xs px-1.5 py-0.5 rounded">2项</span>
+            </button>
+            <button onclick="showTab('comparison')" id="tab-comparison" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-balance-scale"></i> 技术对比
+            </button>
+            <button onclick="showTab('trends')" id="tab-trends" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-lightbulb"></i> 趋势展望
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <!-- ==================== Overview Tab ==================== -->
+        <section id="content-overview" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-microchip text-purple-400"></i></div>
+                        <div class="text-sm text-slate-400">NCCL 更新</div>
+                    </div>
+                    <div class="text-3xl font-bold text-purple-400">3</div>
+                    <div class="text-xs text-slate-500 mt-1">v2.30.4-1 / nccl_param 修复 / GIN Elastic Buffer</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-rocket text-cyan-400"></i></div>
+                        <div class="text-sm text-slate-400">DeepEP 动态</div>
+                    </div>
+                    <div class="text-3xl font-bold text-cyan-400">0</div>
+                    <div class="text-xs text-slate-500 mt-1">本周无重大更新</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-memory text-amber-400"></i></div>
+                        <div class="text-sm text-slate-400">NVSHMEM 更新</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">0</div>
+                    <div class="text-xs text-slate-500 mt-1">本周无重大更新</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-layer-group text-blue-400"></i></div>
+                        <div class="text-sm text-slate-400">其他库动态</div>
+                    </div>
+                    <div class="text-3xl font-bold text-blue-400">2</div>
+                    <div class="text-xs text-slate-500 mt-1">RCCL 2.27.7 / UCX 静态更新</div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-area text-blue-400"></i> 本周技术趋势</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-purple-300">NCCL Elastic Buffer 成熟化</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">v2.30.4-1 将 Elastic Buffer 扩展至 GIN device API，标志着超大 tensor 通信从 LSA 路径迈向完整的 GPU-initiated networking 支持。</p>
+                        <div class="flex items-center gap-2 text-green-400 text-sm"><i class="fas fa-arrow-trend-up trend-arrow"></i><span>快速演进</span></div>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-cyan-300">NCCL param 头部修复</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">v2.30.4-1 紧急修复 nccl_param 额外头文件问题（Issue #2105），保障 Device API 用户的编译兼容性。</p>
+                        <div class="flex items-center gap-2 text-yellow-400 text-sm"><i class="fas fa-wrench trend-arrow"></i><span>Bug 修复</span></div>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-blue-300">RCCL 持续追赶</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">AMD RCCL 2.27.7 随 ROCm 7.2.2 发布，保持与 NCCL 2.27.x 分支对齐，但已标记为 deprecated，未来转向新架构。</p>
+                        <div class="flex items-center gap-2 text-blue-400 text-sm"><i class="fas fa-info-circle trend-arrow"></i><span>稳定维护</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-purple-400"></i> 各库更新活跃度</h2>
+                <div class="h-80"><canvas id="activityChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ==================== NCCL Tab ==================== -->
+        <section id="content-nccl" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-nccl px-3 py-1 rounded text-xs text-white">NCCL</span> NVIDIA 集合通信库</h2>
+
+                <!-- v2.30.4-1 Release -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nccl-v2304')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nccl-v2304"></i><h3 class="font-semibold text-white">NCCL v2.30.4-1 正式发布</h3></div>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded">2026-04-22</span>
+                    </div>
+                    <div id="nccl-v2304-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-purple-400">核心更新:</strong> 修复 nccl_param 额外头文件问题 (Issue #2105)；新增 Elastic Buffer 对 GIN Device API 的完整支持。</p></div>
+                    <div id="nccl-v2304-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-purple-300 mb-2"><i class="fas fa-plus-circle mr-2"></i>新增功能</h4>
+                                <ul class="space-y-2 text-sm text-slate-400">
+                                    <li class="flex flex-col gap-1">
+                                        <div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>Elastic Buffer for GIN：</strong>将 Elastic Buffer 从 LSA 路径扩展至 GIN Device API，支持 GPU-initiated 通信场景下的超大 tensor 自动分段调度 <a class="ref-link" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.4-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a> </span>
+                                        <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('gin-elastic')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-gin-elastic"></i>设计原理</span></div>
+                                        <div id="feature-gin-elastic" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Elastic Buffer for GIN 详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">核心问题：</strong>在 v2.30.3-1 中，Elastic Buffer 仅服务于 LSA (Load/Store Access) 路径——即 device kernel 通过 load/store 读写 symmetric memory。但 GPU-Initiated Networking (GIN) 的 Device API（如 gin.get、gin.put、gin.atomic）仍然不支持"数据超过 GPU 显存时自动分段调度"。这导致使用 GIN 原语进行跨节点通信时，用户必须手动管理超大 tensor 的分段。</div>
+                                                <div><strong class="text-slate-300">扩展设计：</strong>v2.30.4-1 将 Elastic Buffer 机制扩展至 GIN Device API：(1) <em>GIN get 自动分段：</em>当 gin.get 请求的数据量超过 GPU 可用显存时，NCCL 自动将请求拆分为多个 sub-request，每个 sub-request 只获取当前窗口内的数据段，完成后自动推进窗口；(2) <em>GIN put 自动分段：</em>gin.put 的源数据如果在 host memory，NCCL 自动分批 staging 到 GPU 显存再发起 RDMA put；(3) <em>窗口管理：</em>维护"活跃窗口"——当前通信涉及的 segment 驻留 GPU 显存，其余存放 host pinned memory，通信推进时通过 CUDA prefetch 将下一批 segment 搬到 GPU。</div>
+                                                <div><strong class="text-slate-300">与 LSA 路径的区别：</strong>GIN API 的 Elastic Buffer 需要管理 network QP 状态和 RDMA completion，比 LSA 的纯 NVLink 本地访问更复杂——因为 GIN 涉及真正的网络传输。需要额外的：(1) QP 状态保存/恢复机制；(2) RDMA completion 队列管理；(3) 网络超时重传逻辑。</div>
+                                                <div><strong class="text-slate-300">适用场景：</strong>(1) 超大模型（如万亿参数 MoE）的 expert weight 分发——expert 权重总和远超单卡显存，通过 elastic GIN 可以自动分批推送到各 GPU；(2) 分布式 checkpointing——将大型 checkpoint 通过 GIN put 写入分布式存储时自动分段；(3) 跨节点 All-Gather 超大 tensor 时避免 OOM。</div>
+                                                <div><strong class="text-slate-300">性能预期：</strong>相比手动分段，elastic GIN 可减少 30-50% 的 host-side 调度开销，因为分段决策和窗口推进完全在 device 端自动完成。</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-amber-300 mb-2"><i class="fas fa-bug mr-2"></i>Bug 修复</h4>
+                                <ul class="space-y-2 text-sm text-slate-400">
+                                    <li class="flex flex-col gap-1">
+                                        <div class="feature-row"><i class="fas fa-wrench text-amber-500 mt-1 flex-shrink-0"></i><span><strong>修复 nccl_param 额外头文件问题：</strong>解决了 nccl_param feature 引入的额外头文件导致的编译兼容性问题 (Issue #2105) <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/releases/tag/v2.30.4-1" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a> <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/issues/2105" target="_blank"><i class="fas fa-external-link-alt"></i>Issue #2105</a> </span>
+                                        <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nccl-param-fix')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nccl-param-fix"></i>设计原理</span></div>
+                                        <div id="feature-nccl-param-fix" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>nccl_param 头文件修复详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">核心问题：</strong>nccl_param 是 NCCL Device API 中用于传递运行时参数的机制——类似于 CUDA kernel launch 时的 kernel argument。在 v2.30.3-1 引入 Device API 增强后，nccl_param 的头文件暴露了内部实现细节，导致：(1) 第三方编译的代码包含了不应暴露的内部头文件，产生符号冲突；(2) 使用不同 NCCL 版本编译的 Device API 模块之间存在 ABI 不兼容；(3) 部分编译器（如 clang 16+）对头文件包含顺序敏感，触发了编译错误。</div>
+                                                <div><strong class="text-slate-300">修复方案：</strong>(1) 重新组织 nccl_param 的头文件层次——将内部实现头文件（如 nccl_param_internal.h）从公共 API 头文件中分离；(2) 使用 forward declaration 和 opaque pointer 模式隐藏内部结构体；(3) 在公共头文件中只暴露稳定的 ABI 接口——参数类型枚举、基本结构体大小、对齐要求等。</div>
+                                                <div><strong class="text-slate-300">影响范围：</strong>此修复是 v2.30.4-1 的唯一 bug 修复，说明 nccl_param 是 Device API 用户的核心依赖。任何使用 NCCL Device API 自定义通信 kernel 的项目都需要升级到此版本以确保编译稳定性。</div>
+                                                <div><strong class="text-slate-300">适用场景：</strong>所有使用 NCCL Device API（GIN、symmetric kernel、LSA 等）的项目。特别是：(1) 自定义 MoE dispatch/combine kernel 的开发者；(2) 将 NCCL Device API 嵌入框架（如 vLLM、SGLang）的集成方；(3) 使用 CuTe DSL 描述通信模式的先进用户。</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Q2 Roadmap Reminder -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-400 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nccl-roadmap')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nccl-roadmap"></i><h3 class="font-semibold text-white">NCCL Q2 2026 Roadmap 持续跟进</h3></div>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded">2026-05~07</span>
+                    </div>
+                    <div id="nccl-roadmap-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-purple-400">规划方向:</strong> CuTe DSL 集成、Elastic Buffer for GIN (已在 v2.30.4-1 开始交付)、Batched Get、Lamport 同步、NVLS+PAT 增强、Symmetric A2A、Cost Model 重构、RAS API。</p></div>
+                    <div id="nccl-roadmap-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-purple-300 mb-2"><i class="fas fa-calendar-check mr-2"></i>Q2 确定交付 (5月-7月)</h4>
+                                <ul class="space-y-2 text-sm text-slate-400">
+                                    <li class="flex flex-col gap-1">
+                                        <div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>CuTe DSL 集成：统一 NCCL device API 编程模型 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a> </span>
+                                        <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('cute-dsl')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-cute-dsl"></i>设计原理</span></div>
+                                        <div id="feature-cute-dsl" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>CuTe DSL 集成详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">CuTe DSL 是什么：</strong>CuTe (CUDA Templates) 是 NVIDIA CUTLASS 库中的领域特定语言，用于描述 GPU 内存层次和计算模式。它提供了一套模板化的抽象，让开发者可以用声明式语法定义数据布局（layout）、数据拷贝（copy）和计算模式（gemm）。</div>
+                                                <div><strong class="text-slate-300">集成动机：</strong>当前 NCCL device API 使用自定义的 C++ 宏和内联汇编来描述通信模式。这导致：(1) 学习曲线陡峭，开发者需要理解 NCCL 内部的 microkernel 设计；(2) 不同架构（Hopper vs Blackwell）的 kernel 需要分别编写，代码复用率低；(3) 通信和计算的融合需要手动编排，容易出错。CuTe DSL 提供统一的编程模型可以同时描述计算和通信。</div>
+                                                <div><strong class="text-slate-300">集成设计：</strong>(1) 用 CuTe 的 <em>copy atom</em> 抽象 NCCL 的通信原语（如 ring send/recv、tree reduce）——通信模式变成模板参数而非硬编码；(2) 用 CuTe 的 <em>layout</em> 描述 symmetric memory 的数据分布，使 GIN load/store 操作可以直接复用 CuTe 的地址计算逻辑；(3) 在 device kernel 中实现通信和计算的统一调度——CuTe DSL 可以自动决定"何时通信、何时计算、如何重叠"。</div>
+                                                <div><strong class="text-slate-300">预期收益：</strong>(1) 编程模型统一——NCCL device API 用户可以用 CUTLASS 相同的语法编写通信 kernel；(2) 架构适配自动化——CuTe 的模板特化机制可以为 Hopper/Blackwell 自动生成最优代码；(3) 与 CUTLASS 生态协同——GEMM + Communication 的融合 kernel 可以用同一套 DSL 描述。</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>Elastic Buffer for GIN：</strong>已在 v2.30.4-1 开始交付，Q2 继续完善 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></span></li>
+                                    <li class="flex flex-col gap-1">
+                                        <div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Batched Get for GIN：批量异步获取 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a> </span>
+                                        <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('batched-get')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-batched-get"></i>设计原理</span></div>
+                                        <div id="feature-batched-get" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Batched Get for GIN 详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">问题背景：</strong>在 MoE expert parallel 中，一个 GPU 需要从多个 peer GPU 获取 expert 数据。如果每个 peer 发起一次独立的 gin.get 调用，会产生大量小消息——每个消息都要经历 QP 建立、doorbell 通知、completion 检查等固定开销，效率低下。</div>
+                                                <div><strong class="text-slate-300">Batched Get 设计：</strong>(1) <em>请求聚合：</em>将多个小 get 请求合并为一个大的 RDMA read 操作——多个不连续的源地址映射到一个连续的目的 buffer，由 NIC 硬件完成 scatter-gather；(2) <em>单次 doorbell：</em>整个 batch 只需要一次 doorbell 通知，而不是每个 get 一次；(3) <em>批量 completion：</em>所有 get 完成后返回一个统一的 completion 信号，而不是逐个返回。</div>
+                                                <div><strong class="text-slate-300">性能收益：</strong>在 MoE dispatch 场景（每 GPU 从 8-16 个 expert GPU 获取数据）中，batched get 可以将 per-step 通信延迟从 10-15μs 降至 3-5μs（减少了 QP 操作和 doorbell overhead）。</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li class="flex flex-col gap-1">
+                                        <div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Lamport-style Synchronization：symmetric kernels 低延迟同步 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a> </span>
+                                        <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lamport-sync')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lamport-sync"></i>设计原理</span></div>
+                                        <div id="feature-lamport-sync" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Lamport-style Synchronization 详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">理论来源：</strong>Leslie Lamport 1978 年经典论文提出的分布式系统"逻辑时钟"和"屏障同步"概念——不需要全局物理时钟，每个参与者通过维护计数器 (phase)，仅依赖本地状态和消息传递达成全局同步。</div>
+                                                <div><strong class="text-slate-300">当前问题：</strong>NCCL symmetric kernel 多节点场景下，每个 GPU 完成传输后在 signal pad 写入标记，然后所有 GPU 轮询所有 peer 的 signal pad 确认数据就绪。"全局对齐"模式导致：(1) 所有 GPU 必须等待最慢的那个——网络抖动、PCIe 争用导致完成时间分散，快的 GPU 空转 (tail latency)；(2) 轮询消耗 SM 资源。</div>
+                                                <div><strong class="text-slate-300">三个关键设计：</strong>
+                                                    <ul class="ml-4 mt-1 space-y-1">
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>Phase-based 异步屏障：</strong>将 barrier 拆分为多个 phase，每个 phase 有独立逻辑时钟。GPU 完成传输后调用 arrive 获得 phase token 后立刻进入下一阶段计算或预取，不需要等待其他 GPU。</span></li>
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>分布式到达计数：</strong>将 barrier 的"全局计数"拆分为"局部依赖图"。每个 GPU 只关注自己依赖的子集——例如 ring all-reduce 中只需确认左右邻。</span></li>
+                                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>Multi-phase 流水线：</strong>允许多个 phase 同时活跃 (in-flight)。GPU 0 处理 phase N 传输时，GPU 1 可能已进入 phase N+1 计算。</span></li>
+                                                    </ul>
+                                                </div>
+                                                <div><strong class="text-slate-300">Tail Latency 降低原理：</strong>通过两条路径：(1) 消除不必要的全局等待——GPU 只需等待直接依赖的 peer；(2) 计算通信重叠——arrive 之后、wait 之前执行独立计算，将通信等待隐藏在计算之后。</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li class="flex flex-col gap-1">
+                                        <div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Symmetric A2A：分层对称 All-to-All kernels <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a> </span>
+                                        <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('symmetric-a2a')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-symmetric-a2a"></i>设计原理</span></div>
+                                        <div id="feature-symmetric-a2a" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Symmetric A2A 详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">All-to-All 挑战：</strong>All-to-All 是最复杂的集体通信操作——每个 rank 都有独立的数据块要发送给所有其他 rank。在 N 个 GPU 的系统中，需要 N² 个独立的通信流。传统实现面临：(1) 网络带宽饱和；(2) 显存碎片；(3) 同步复杂度。</div>
+                                                <div><strong class="text-slate-300">分层对称设计：</strong>(1) <em>第一层（节点内 NVLink）：</em>同一节点内的 GPU 通过 symmetric memory 直接写入 peer 的显存；(2) <em>第二层（跨节点 RDMA）：</em>跨节点的通信通过 GIN/RDMA 完成，利用 symmetric memory 的全局地址映射；(3) <em>分层调度：</em>节点内 all-to-all 和跨节点 all-to-all 可以并行执行。</div>
+                                                <div><strong class="text-slate-300">MoE 场景应用：</strong>在 expert parallel 的 dispatch 阶段，每个 token 需要路由到特定的 expert GPU——这本质上是一个 all-to-all 操作。Symmetric A2A 使得 dispatch 可以用 symmetric kernel 直接完成。</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li class="flex flex-col gap-1">
+                                        <div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span>Cost Model 重构 + RAS API + Profiler 改进 <a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a> </span>
+                                        <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('cost-model')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-cost-model"></i>设计原理</span></div>
+                                        <div id="feature-cost-model" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                            <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Cost Model 重构详细设计原理</h5>
+                                            <div class="space-y-3 text-sm text-slate-400">
+                                                <div><strong class="text-slate-300">Cost Model 的作用：</strong>NCCL 在运行集体通信前需要选择最优算法（ring、tree、collnet、NVLS 等）。Cost Model 是 NCCL 的"决策引擎"——它根据消息大小、拓扑结构、硬件特性预测每种算法的延迟和带宽，选择最优方案。</div>
+                                                <div><strong class="text-slate-300">重构动机：</strong>当前 cost model 基于简化的带宽/延迟模型，没有充分考虑：(1) 新硬件特性——TMA、NVLS+PAT、GIN symmetric kernel 等；(2) 动态网络状态；(3) GIN device API 的性能与传统 host-side collective 差异很大。</div>
+                                                <div><strong class="text-slate-300">RAS API：</strong>RAS (Reliability, Availability, Serviceability) API 提供：(1) 错误检测和报告——网络链路故障、GPU ECC 错误、传输 timeout 等事件的标准化接口；(2) 健康度评分——基于历史数据为每条通信路径计算可靠性评分；(3) 预测性维护——在故障发生前检测性能退化趋势。</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-amber-300 mb-2"><i class="fas fa-flask mr-2"></i>评估中特性</h4>
+                                <p class="text-sm text-slate-400">Custom Comms Ops Hook、SM-initiated CE Collectives、SET Signal Operation、CUDA Checkpoint、Determinism 改进、Device API JIT 支持 <a class="ref-link orange" href="https://github.com/NVIDIA/nccl/issues/2090" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== DeepEP Tab ==================== -->
+        <section id="content-deepep" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-deepep px-3 py-1 rounded text-xs text-white">DeepEP</span> DeepSeek Expert Parallel 通信库</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('deepep-status')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-deepep-status"></i><h3 class="font-semibold text-white">本周状态 - 无重大更新</h3></div>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded">v1.2.1 (2025-09-16)</span>
+                    </div>
+                    <div id="deepep-status-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-cyan-400">状态:</strong> 最新稳定版 v1.2.1（2025-09-16），本周 GitHub 无新版本发布、无重大 commit 或 PR 合并。项目保持静默维护状态。</p></div>
+                    <div id="deepep-status-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-slate-300 mb-2"><i class="fas fa-info-circle mr-2"></i>项目概况</h4>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div><span class="text-slate-500">Stars</span><div class="text-white font-semibold">~9.1k</div></div>
+                                    <div><span class="text-slate-500">Commits</span><div class="text-white font-semibold">240</div></div>
+                                    <div><span class="text-slate-500">最新版本</span><div class="text-white font-semibold">v1.2.1</div></div>
+                                    <div><span class="text-slate-500">许可协议</span><div class="text-white font-semibold">MIT</div></div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-amber-300 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>竞争态势</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">NCCL v2.30.4-1 的 Elastic Buffer for GIN 进一步缩小了与 DeepEP 在 MoE 通信场景的差距。NCCL EP 论文（arXiv:2603.13606）提出的统一 API 方案在 vLLM serving 中已达到 DeepEP 90-93% 的性能，竞争压力持续增加。</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-check-circle mr-2"></i>生态延续优势</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">DeepEP 的生态护城河依然存在：(1) AMD ROCm 移植版本（github.com/ROCm/DeepEP）持续维护，支持 xGMI + RDMA 路由；(2) Azure 最佳实践文档（Microsoft Tech Community）为云部署提供参考；(3) Infrawaves 双端口 Multi-QP 实现（github.com/Infrawaves/DeepEP_ibrc_dual-ports_multiQP）扩展了 InfiniBand 场景性能。但 NCCL 作为 NVIDIA 官方库的集成优势正在加速追赶。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== NVSHMEM Tab ==================== -->
+        <section id="content-nvshmem" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-nvshmem px-3 py-1 rounded text-xs text-white">NVSHMEM</span> NVIDIA 全局地址空间并行编程接口</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nvshmem-status')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nvshmem-status"></i><h3 class="font-semibold text-white">本周状态 - 无重大更新</h3></div>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded">v3.6.5-0 (2026-03-24)</span>
+                    </div>
+                    <div id="nvshmem-status-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-amber-400">状态:</strong> 最新版本 v3.6.5-0（2026-03-24），本周 GitHub 无新版本发布。仓库统计：516 stars, 76 forks, 421 commits。</p></div>
+                    <div id="nvshmem-status-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-slate-300 mb-2"><i class="fas fa-info-circle mr-2"></i>项目概况</h4>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div><span class="text-slate-500">Stars</span><div class="text-white font-semibold">516</div></div>
+                                    <div><span class="text-slate-500">Forks</span><div class="text-white font-semibold">76</div></div>
+                                    <div><span class="text-slate-500">最新版本</span><div class="text-white font-semibold">v3.6.5-0</div></div>
+                                    <div><span class="text-slate-500">语言组成</span><div class="text-white font-semibold">C++ 31% / CUDA 27.6% / Python 20.3%</div></div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-blue-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>社区观察</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">SGLang Q2 路线图探索将 NVSHMEM symmetric memory 用于 all-to-all 专家路由（github.com/sgl-project/sglang/issues/22960）。早期实测声称 ~45μs 恒定延迟的测试存在维度推断 bug，修正后 B200 上 32MB 传输需 145μs（较标准 collectives 慢 1.82×）(github.com/sgl-project/sglang/issues/22583)。这表明 NVSHMEM symmetric memory 在 production 场景中仍需优化。</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-history mr-2"></i>v3.6.5-0 回顾 (03-24)</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">上个月发布的 v3.6.5-0 包含：配置文件支持、LTO-IR 实验构建、libfabric Multi-NIC 支持、NVSHMEM4Py 0.3.0 CuTe DSL 集成、Tile API 错误码返回。这些功能为 Q2 的持续开发奠定基础。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Others Tab ==================== -->
+        <section id="content-others" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-other px-3 py-1 rounded text-xs text-white">其他通信库</span> UCX / RCCL / torchcomms 等</h2>
+
+                <!-- RCCL -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('rccl-2277')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-rccl-2277"></i><h3 class="font-semibold text-white">AMD RCCL 2.27.7 随 ROCm 7.2.2 发布</h3></div>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded">2026-04-14</span>
+                    </div>
+                    <div id="rccl-2277-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-blue-400">核心更新:</strong> RCCL 2.27.7 随 ROCm 7.2.2 发布，保持与 NCCL 2.27.x 分支对齐。但 RCCL 仓库已标记为 deprecated，未来将转向新架构。</p></div>
+                    <div id="rccl-2277-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-blue-300 mb-2"><i class="fas fa-info-circle mr-2"></i>RCCL 现状</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">RCCL (ROCm Collective Communication Library) 是 AMD 对标 NCCL 的集合通信库，支持 AMD GPU 的 ROCm 平台。2.27.7 版本跟随 NCCL 2.27.x 分支的功能集，适配 ROCm 7.2.2 工具链。但仓库已标记为 deprecated，意味着 AMD 可能在规划新的通信库架构来替代 RCCL。</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-microchip mr-2"></i>AMD 的 DeepEP 移植</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">值得注意的是，AMD 官方已移植 DeepEP 至 ROCm 平台（github.com/ROCm/DeepEP），支持 xGMI（节点内）+ RDMA（跨节点）路由，统一 Python API。这表明 AMD 在 MoE 通信场景更倾向于直接支持 DeepEP 而非仅依赖 RCCL。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UCX -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-400 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('ucx-status')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-ucx-status"></i><h3 class="font-semibold text-white">UCX v1.20.0 持续稳定 (本周无更新)</h3></div>
+                        <span class="text-xs bg-slate-700 px-2 py-1 rounded">v1.20.0 (2026-02-05)</span>
+                    </div>
+                    <div id="ucx-status-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-blue-400">状态:</strong> UCX (Unified Communication Framework) 最新版本 v1.20.0 于 2026-02-05 发布，本周无新动态。UCX 作为底层通信框架，为 NCCL、MVAPICH、OpenMPI 等提供传输层支持。</p></div>
+                    <div id="ucx-status-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-slate-300 mb-2"><i class="fas fa-info-circle mr-2"></i>UCX 定位</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">UCX 是 OpenUCX 项目开发的统一通信框架，提供高性能网络通信原语（RDMA、IB、RoCE、TCP、shared memory 等）。它是许多上层通信库（包括 NCCL 的部分传输路径）的底层依赖。v1.20.0 是当前的稳定版本。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Comparison Tab ==================== -->
+        <section id="content-comparison" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-balance-scale text-blue-400"></i> 技术对比矩阵</h2>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="text-left py-3 px-4 text-slate-300 font-semibold">特性维度</th>
+                                <th class="text-center py-3 px-4 text-purple-400 font-semibold"><i class="fas fa-microchip mr-1"></i>NCCL</th>
+                                <th class="text-center py-3 px-4 text-cyan-400 font-semibold"><i class="fas fa-rocket mr-1"></i>DeepEP</th>
+                                <th class="text-center py-3 px-4 text-amber-400 font-semibold"><i class="fas fa-memory mr-1"></i>NVSHMEM</th>
+                                <th class="text-center py-3 px-4 text-blue-400 font-semibold"><i class="fas fa-layer-group mr-1"></i>RCCL</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-400">
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">最新版本</td>
+                                <td class="text-center py-3 px-4">v2.30.4-1</td>
+                                <td class="text-center py-3 px-4">v1.2.1</td>
+                                <td class="text-center py-3 px-4">v3.6.5-0</td>
+                                <td class="text-center py-3 px-4">2.27.7</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">本周更新</td>
+                                <td class="text-center py-3 px-4 text-green-400 font-medium">Elastic Buffer for GIN</td>
+                                <td class="text-center py-3 px-4 text-slate-500">无</td>
+                                <td class="text-center py-3 px-4 text-slate-500">无</td>
+                                <td class="text-center py-3 px-4 text-slate-500">无</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">通信模式</td>
+                                <td class="text-center py-3 px-4">Collective + Device API</td>
+                                <td class="text-center py-3 px-4">Expert Parallel 专用</td>
+                                <td class="text-center py-3 px-4">PGAS (全局地址空间)</td>
+                                <td class="text-center py-3 px-4">Collective</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">Device-Initiated</td>
+                                <td class="text-center py-3 px-4 text-green-400">GIN API (成熟)</td>
+                                <td class="text-center py-3 px-4 text-green-400">原生支持</td>
+                                <td class="text-center py-3 px-4 text-yellow-400">Tile API (实验中)</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">超大 Tensor</td>
+                                <td class="text-center py-3 px-4 text-green-400">Elastic Buffer (GIN+LSA)</td>
+                                <td class="text-center py-3 px-4 text-yellow-400">部分支持</td>
+                                <td class="text-center py-3 px-4 text-yellow-400">HEAP 分配</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">MoE 优化</td>
+                                <td class="text-center py-3 px-4 text-green-400">EP 论文方案</td>
+                                <td class="text-center py-3 px-4 text-green-400">核心场景</td>
+                                <td class="text-center py-3 px-4 text-yellow-400">社区探索</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">多平台支持</td>
+                                <td class="text-center py-3 px-4">NVIDIA GPU only</td>
+                                <td class="text-center py-3 px-4 text-green-400">NVIDIA + AMD ROCm</td>
+                                <td class="text-center py-3 px-4">NVIDIA GPU only</td>
+                                <td class="text-center py-3 px-4 text-green-400">AMD GPU only</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">GitHub Stars</td>
+                                <td class="text-center py-3 px-4">~11k</td>
+                                <td class="text-center py-3 px-4">~9.1k</td>
+                                <td class="text-center py-3 px-4">516</td>
+                                <td class="text-center py-3 px-4">~1.8k</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">TMA 支持</td>
+                                <td class="text-center py-3 px-4 text-green-400">v2.30.3+ 支持</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">Symmetric Memory</td>
+                                <td class="text-center py-3 px-4 text-green-400">GIN symmetric kernel</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                                <td class="text-center py-3 px-4 text-green-400">核心特性</td>
+                                <td class="text-center py-3 px-4 text-slate-500">不支持</td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50 table-row-hover">
+                                <td class="py-3 px-4 font-medium text-slate-300">Python 绑定</td>
+                                <td class="text-center py-3 px-4 text-green-400">nccl4py v0.2.0</td>
+                                <td class="text-center py-3 px-4 text-green-400">原生 Python API</td>
+                                <td class="text-center py-3 px-4 text-green-400">NVSHMEM4Py 0.3.0</td>
+                                <td class="text-center py-3 px-4 text-yellow-400">有限支持</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Trends Tab ==================== -->
+        <section id="content-trends" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i> 趋势展望</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-card rounded-lg p-5">
+                        <h3 class="font-medium text-purple-300 mb-3"><i class="fas fa-arrow-trend-up mr-2"></i>短期趋势 (1-3 个月)</h3>
+                        <ul class="space-y-3 text-sm text-slate-400">
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>NCCL Device API 生态成熟：</strong>v2.30.4-1 的 Elastic Buffer for GIN 标志着 NCCL 从"集体通信库"向"通用 GPU 通信框架"转型。Q2 的 CuTe DSL 集成将进一步降低 Device API 的使用门槛。</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>MoE 通信标准化加速：</strong>NCCL EP 论文的统一 API 方案 + DeepEP 的生态积累，两套方案将在 vLLM、SGLang 等推理框架中竞争融合。</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-purple-500 mt-1"></i><span><strong>RCCL deprecated 后的 AMD 策略：</strong>AMD 同时维护 RCCL（deprecated）和 ROCm/DeepEP，可能在规划新的通信库架构——值得持续关注。</span></li>
+                        </ul>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-5">
+                        <h3 class="font-medium text-cyan-300 mb-3"><i class="fas fa-arrow-trend-up mr-2"></i>中期趋势 (3-6 个月)</h3>
+                        <ul class="space-y-3 text-sm text-slate-400">
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-cyan-500 mt-1"></i><span><strong>Device-Initiated 通信成为标配：</strong>NCCL GIN、NVSHMEM Tile API、UCX GPU device API 同步推进，GPU 直接通信替代 CPU-proxy 模式的趋势不可逆转。</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-cyan-500 mt-1"></i><span><strong>Lamport-style 异步同步可能改变集体通信范式：</strong>如果 NCCL Q2 成功交付 Lamport sync，tail latency 问题将大幅改善，这对大规模 MoE 训练和推理有深远影响。</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-cyan-500 mt-1"></i><span><strong>Symmetric A2A 可能颠覆 all-to-all 实现：</strong>利用 symmetric memory 的分层 all-to-all kernel 有望在 MoE dispatch 场景超越 DeepEP 的性能。</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-lg p-5 mt-6">
+                    <h3 class="font-medium text-green-300 mb-3"><i class="fas fa-chart-line mr-2"></i>本周观察</h3>
+                    <p class="text-sm text-slate-400 leading-relaxed">NCCL v2.30.4-1 将 Elastic Buffer 扩展至 GIN Device API，标志着超大 tensor 通信从 NVLink 本地访问迈向完整的 GPU-initiated 网络传输，竞争格局从"集体通信库"升级为"通用 GPU 通信框架"。DeepEP 本周保持静默，但 NCCL EP 方案的持续逼近正在压缩其技术护城河。AMD 同时维护 deprecated 的 RCCL 和活跃的 ROCm/DeepEP，暗示其可能在规划新的通信库策略。总体而言，通信库竞争正从"谁的 collective 更快"转向"谁的 Device API 生态更完善"。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="max-w-7xl mx-auto px-4 pb-8">
+        <div class="glass-card rounded-xl p-5 text-center text-sm text-slate-500">
+            <p>通信库竞品动态周报 | 2026-W17 (04-20 ~ 04-27) | 数据来源: GitHub, arXiv, 官方文档</p>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            document.querySelectorAll('[id^="content-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            document.querySelectorAll('[id^="tab-"]').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('tab-inactive');
+            });
+            const activeTab = document.getElementById('tab-' + tabName);
+            activeTab.classList.remove('tab-inactive');
+            activeTab.classList.add('tab-active');
+        }
+
+        function toggleDetail(id) {
+            const detail = document.getElementById(id + '-detail') || document.getElementById(id);
+            if (!detail) return;
+            const icon = document.getElementById('icon-' + id);
+            detail.classList.toggle('hidden');
+            if (icon) icon.classList.toggle('expanded');
+        }
+
+        function toggleFeatureDetail(featureId) {
+            const detail = document.getElementById('feature-' + featureId);
+            const icon = document.getElementById('icon-feature-' + featureId);
+            if (!detail || !icon) return;
+            detail.classList.toggle('hidden');
+            icon.classList.toggle('expanded');
+        }
+
+        // Activity Chart
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['NCCL', 'DeepEP', 'NVSHMEM', 'UCX', 'RCCL', 'torchcomms'],
+                datasets: [{
+                    label: '本周更新数',
+                    data: [3, 0, 0, 0, 1, 0],
+                    backgroundColor: [
+                        'rgba(124, 58, 237, 0.6)',
+                        'rgba(6, 182, 212, 0.6)',
+                        'rgba(245, 158, 11, 0.6)',
+                        'rgba(59, 130, 246, 0.6)',
+                        'rgba(16, 185, 129, 0.6)',
+                        'rgba(236, 72, 153, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(124, 58, 237, 1)',
+                        'rgba(6, 182, 212, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(59, 130, 246, 1)',
+                        'rgba(16, 185, 129, 1)',
+                        'rgba(236, 72, 153, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#94a3b8', stepSize: 1 },
+                        grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

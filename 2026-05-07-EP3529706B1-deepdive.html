@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EP3529706B1 专利深度解读 — NVIDIA 自同步远程内存操作技术</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); min-height: 100vh; color: #e2e8f0; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; border-bottom: 3px solid transparent; }
+        .nav-tab:hover { background: rgba(148, 163, 184, 0.1); }
+        .nav-tab.active { border-bottom-color: #8b5cf6; background: rgba(139, 92, 246, 0.1); }
+        .patent-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); transition: all 0.2s ease; }
+        .patent-card:hover { border-color: rgba(139, 92, 246, 0.4); box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; transition: all 0.2s; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .highlight-box { border-left: 4px solid #8b5cf6; background: rgba(139, 92, 246, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .tech-box { border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.08); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .insight-box { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.08); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .code-block { background: #0d1117; border: 1px solid #30363d; border-radius: 0.5rem; font-family: 'Fira Code', monospace; font-size: 0.85rem; overflow-x: auto; }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .company-badge { font-family: 'Fira Code', monospace; background: rgba(139, 92, 246, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .comparison-table th { background: rgba(139, 92, 246, 0.2); }
+        .comparison-table tr:hover { background: rgba(148, 163, 184, 0.05); }
+        .trend-card { background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(30, 41, 59, 0.5) 100%); border: 1px solid rgba(139, 92, 246, 0.3); }
+        .architecture-diagram { background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(30, 41, 59, 0.8) 100%); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .flow-step { position: relative; padding-left: 3rem; }
+        .flow-step::before { content: ''; position: absolute; left: 1.25rem; top: 2.5rem; bottom: -1.5rem; width: 2px; background: linear-gradient(to bottom, #8b5cf6, transparent); }
+        .flow-step:last-child::before { display: none; }
+        h3 { font-size: 1.125rem; }
+        h4 { font-size: 1rem; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-globe text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">EP3529706B1 专利深度解读</h1>
+                        <p class="text-xs text-slate-400">NVIDIA 自同步远程内存操作 — Self-Synchronizing Remote Memory Operations</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <div class="glass-card px-4 py-2 rounded-lg border border-blue-500/20">
+                        <div class="text-xs text-slate-400">专利号</div>
+                        <div class="text-sm font-bold text-blue-400 font-mono">EP3529706B1</div>
+                    </div>
+                    <div class="glass-card px-4 py-2 rounded-lg border border-amber-500/20">
+                        <div class="text-xs text-slate-400">美国同族</div>
+                        <div class="text-sm font-bold text-amber-400 font-mono">US12105960B2</div>
+                    </div>
+                    <div class="glass-card px-4 py-2 rounded-lg border border-green-500/20">
+                        <div class="text-xs text-slate-400">解读日期</div>
+                        <div class="text-sm font-bold text-green-400">2026-05-07</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="sticky top-[72px] z-40 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-1 overflow-x-auto py-2 text-sm">
+                <div class="nav-tab active px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="overview"><i class="fas fa-info-circle mr-2"></i>专利概览</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="problem"><i class="fas fa-exclamation-triangle mr-2"></i>问题背景</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="architecture"><i class="fas fa-sitemap mr-2"></i>总体架构</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="merge"><i class="fas fa-compress-arrows-alt mr-2"></i>操作合并机制</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="split"><i class="fas fa-code-branch mr-2"></i>一致性点分离</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="mmu"><i class="fas fa-memory mr-2"></i>MMU 集成</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="coalesce"><i class="fas fa-layer-group mr-2"></i>更新合并</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="demotion"><i class="fas fa-arrow-down mr-2"></i>操作降级</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="gpudirect"><i class="fas fa-network-wired mr-2"></i>GPUDirect RDMA</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="claims"><i class="fas fa-gavel mr-2"></i>权利要求</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="impact"><i class="fas fa-chart-line mr-2"></i>影响分析</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 pb-12 mt-6 space-y-8">
+
+        <!-- ==================== OVERVIEW ==================== -->
+        <section id="overview" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-info-circle text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-blue-400">专利概览</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">专利名称</div>
+                    <div class="font-semibold text-white text-sm">Self-Synchronizing Remote Memory Operations in a Multiprocessor System</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">专利权人</div>
+                    <div class="font-semibold text-blue-400">NVIDIA Corporation</div>
+                    <div class="text-xs text-slate-500 mt-1">9 位发明人</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">申请/授权日期</div>
+                    <div class="font-semibold text-green-400">2019-02-20 / 授权 (B1)</div>
+                    <div class="text-xs text-slate-500 mt-1">美国同族 US12105960B2: 2024-10-01</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">专利类型</div>
+                    <div class="font-semibold text-amber-400">European Patent (B1)</div>
+                    <div class="text-xs text-slate-500 mt-1">已授权 · 欧洲专利局 (EPO)</div>
+                </div>
+            </div>
+
+            <div class="patent-card rounded-xl p-6">
+                <h3 class="font-semibold text-blue-300 mb-3">摘要</h3>
+                <p class="text-sm text-slate-300 leading-relaxed">
+                    本专利 (EP3529706B1) 是 NVIDIA 在美国同族专利 US12105960B2 基础上的欧洲授权版本,披露了一种<strong class="text-blue-400">自同步远程内存操作 (self-synchronizing remote memory operations)</strong> 技术,用于多处理器系统中的高效远程内存访问。该系统将远程 store 操作和同步元数据<strong class="text-blue-400">合并为单一操作单元</strong>,在传输过程中减少互连流量。在接近目标处理器的<strong class="text-blue-400">"一致性点 (point of consistency)"</strong>,组件将合并操作分离,确保 store 操作在同步更新之前执行。这种设计消除了传统方案中独立的同步消息、确认和原子更新步骤,显著降低了跨处理器互连的延迟。多个同步更新可以被<strong class="text-blue-400">合并 (coalesced)</strong> 为单次原子更新,进一步优化带宽。
+                </p>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">Google Patents - EP3529706B1</a>,
+                    <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">美国同族 US12105960B2</a>
+                </div>
+            </div>
+
+            <!-- Inventors -->
+            <div class="patent-card rounded-xl p-6">
+                <h3 class="font-semibold text-blue-300 mb-4">发明人团队</h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-sm">
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">S. Madugula</div>
+                        <div class="text-xs text-slate-500">首席发明人</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">Olivier Giroux</div>
+                        <div class="text-xs text-slate-500">GPU 架构师</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">Wishwesh Gandhi</div>
+                        <div class="text-xs text-slate-500">互连架构</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">Michael Parker</div>
+                        <div class="text-xs text-slate-500">内存子系统</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">Ivan Tanasic</div>
+                        <div class="text-xs text-slate-500">同步机制</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">Raghuram L</div>
+                        <div class="text-xs text-slate-500">DMA 控制器</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">Manan Patel</div>
+                        <div class="text-xs text-slate-500">MMU 设计</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">Mark Hummel</div>
+                        <div class="text-xs text-slate-500">系统架构</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-blue-300">A. Minkin</div>
+                        <div class="text-xs text-slate-500">网络协议</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patent Family -->
+            <div class="patent-card rounded-xl p-6">
+                <h3 class="font-semibold text-blue-300 mb-4">同族专利关系</h3>
+                <div class="highlight-box mb-4">
+                    <strong class="text-blue-300">同族说明:</strong> <span class="text-slate-300">EP3529706B1 与 US12105960B2 是同一技术方案在不同专利局的授权。EP3529706B1 由欧洲专利局 (EPO) 授权,保护范围覆盖欧洲成员国;US12105960B2 由美国专利商标局 (USPTO) 授权,保护范围覆盖美国。两者技术方案完全相同。</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div class="glass-card rounded-lg p-4">
+                        <div class="font-semibold text-blue-400 mb-2">美国同族</div>
+                        <div class="text-slate-400">US12105960B2</div>
+                        <div class="text-xs text-slate-500 mt-1">授权日期: 2024-10-01</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-4 border-2 border-blue-500/30">
+                        <div class="font-semibold text-blue-400 mb-2">欧洲同族 (本报告)</div>
+                        <div class="text-slate-400">EP3529706B1</div>
+                        <div class="text-xs text-slate-500 mt-1">授权状态: 已授权</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-4">
+                        <div class="font-semibold text-blue-400 mb-2">中国同族</div>
+                        <div class="text-slate-400">CN116777725A</div>
+                        <div class="text-xs text-slate-500 mt-1">公开状态</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== PROBLEM BACKGROUND ==================== -->
+        <section id="problem" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-amber-400">问题背景与技术挑战</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6">
+                <h3 class="font-semibold text-amber-300 mb-4">传统远程内存操作的局限性</h3>
+                <div class="space-y-4 text-sm text-slate-300">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">挑战 1: 独立的同步消息增加延迟</strong>
+                        <p class="mt-2 text-slate-400">传统方法中,远程内存操作需要分离的同步消息、确认 (acknowledgements) 和原子更新步骤。例如,RDMA 写操作完成后,需要额外的原子操作来更新同步标志,消费者再轮询该标志。这增加了 2-3 次额外的互连事务,在低性能互连 (如跨节点 InfiniBand) 上延迟显著。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">挑战 2: 互连流量冗余</strong>
+                        <p class="mt-2 text-slate-400">每次远程写操作后跟随独立的同步更新,导致互连流量翻倍。在多处理器系统中,当多个处理单元频繁执行远程内存操作时,冗余的同步消息会消耗大量互连带宽,成为性能瓶颈。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">挑战 3: 缺乏硬件级操作排序</strong>
+                        <p class="mt-2 text-slate-400">传统方案依赖软件确保数据写入在同步更新之前完成。这需要额外的内存围栏或屏障操作,增加了软件复杂性和执行延迟。硬件层面缺乏保证 store 和 sync 操作排序的机制。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">挑战 4: 同步更新无法合并</strong>
+                        <p class="mt-2 text-slate-400">当多个处理单元向同一个同步对象发送更新时,传统方案需要逐个处理这些更新,每个更新都是一次独立的原子操作。这导致同步对象成为热点,串行化访问进一步增加延迟。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1 Background</a>,
+                    <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2 Background</a>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5 mt-4">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>为什么这个问题在多节点 GPU 训练中尤为关键?</h4>
+                <p class="text-sm text-slate-300">
+                    在大规模分布式 LLM 训练中,梯度同步通过 NCCL over InfiniBand/RDMA 执行。每次梯度 AllReduce 完成后,需要更新同步标志通知下一轮训练开始。传统方案中,这需要额外的 RDMA 原子操作和轮询。EP3529706B1/US12105960B2 通过自同步操作将梯度写入和同步更新合并为一次 RDMA 事务,显著降低多节点训练的通信延迟。
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== OVERALL ARCHITECTURE ==================== -->
+        <section id="architecture" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-sitemap text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-green-400">总体架构概览</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-green-300 mb-4">自同步远程内存操作架构</h3>
+                <div class="architecture-diagram rounded-xl p-6 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
+                        <div>
+                            <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-microchip text-green-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-green-300 text-sm">源处理器 (Source)</div>
+                            <div class="text-xs text-slate-400 mt-1">生成 store + sync</div>
+                            <div class="text-xs text-slate-500">合并为单一操作</div>
+                        </div>
+                        <div>
+                            <div class="w-16 h-16 bg-violet-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-exchange-alt text-violet-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-violet-300 text-sm">互连网络</div>
+                            <div class="text-xs text-slate-400 mt-1">传输合并操作</div>
+                            <div class="text-xs text-slate-500">减少互连流量</div>
+                        </div>
+                        <div>
+                            <div class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-code-branch text-blue-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-blue-300 text-sm">一致性点 (Hub)</div>
+                            <div class="text-xs text-slate-400 mt-1">分离合并操作</div>
+                            <div class="text-xs text-slate-500">store 先于 sync</div>
+                        </div>
+                        <div>
+                            <div class="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-database text-amber-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-amber-300 text-sm">目标内存</div>
+                            <div class="text-xs text-slate-400 mt-1">接收数据写入</div>
+                            <div class="text-xs text-slate-500">同步对象更新</div>
+                        </div>
+                        <div>
+                            <div class="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-eye text-cyan-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-cyan-300 text-sm">目标处理器 (Dest)</div>
+                            <div class="text-xs text-slate-400 mt-1">轮询同步对象</div>
+                            <div class="text-xs text-slate-500">数据就绪后消费</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <strong class="text-green-300">核心设计理念:</strong> 将远程 store 操作和同步元数据合并为单一操作单元,在传输中减少互连流量。在接近目标的"一致性点",hub 组件将合并操作分离,强制排序 (store 先于 sync)。多个同步更新可以被合并为单次原子更新,进一步优化带宽。目标处理器通过轮询同步对象并在达到目标值后加载数据。
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="patent-card rounded-xl p-5">
+                    <h4 class="font-semibold text-red-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>传统方案 (分离操作)</h4>
+                    <div class="space-y-2 text-sm text-slate-400">
+                        <p>• 步骤 1: 远程 store 操作 (写入数据)</p>
+                        <p>• 步骤 2: 独立同步消息 (更新标志)</p>
+                        <p>• 步骤 3: 确认消息 (ack)</p>
+                        <p>• 步骤 4: 原子更新 (同步对象)</p>
+                        <p class="text-red-400 font-semibold">互连事务: 4 次</p>
+                        <p class="text-red-400 font-semibold">延迟: 高 (多轮往返)</p>
+                    </div>
+                </div>
+                <div class="patent-card rounded-xl p-5">
+                    <h4 class="font-semibold text-green-300 mb-3"><i class="fas fa-compress mr-2"></i>本专利方案 (自同步)</h4>
+                    <div class="space-y-2 text-sm text-slate-400">
+                        <p>• 步骤 1: 合并操作 (store + sync 元数据)</p>
+                        <p>• 步骤 2: 单次传输到一致性点</p>
+                        <p>• 步骤 3: Hub 自动分离并排序</p>
+                        <p>• 步骤 4: 同步更新可合并</p>
+                        <p class="text-green-400 font-semibold">互连事务: 1-2 次 (节省 50-75%)</p>
+                        <p class="text-green-400 font-semibold">延迟: 低 (单次往返)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== MERGE MECHANISM ==================== -->
+        <section id="merge" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-violet-500 to-violet-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-compress-arrows-alt text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-violet-400">操作合并机制 (Merge)</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-violet-300 mb-4">Store + Sync 合并流程</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    处理单元生成远程内存操作时,将 store 操作和同步操作<strong class="text-violet-400">合并 (merge)</strong> 为单一操作单元。合并后的操作包含:
+                </p>
+
+                <div class="overflow-x-auto">
+                    <table class="comparison-table w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">字段</th>
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">类型</th>
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">作用</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-green-400">Store Payload</td>
+                                <td class="px-4 py-3">Data</td>
+                                <td class="px-4 py-3">要写入远程内存的数据</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-green-400">Store Address</td>
+                                <td class="px-4 py-3">Virtual/Physical</td>
+                                <td class="px-4 py-3">数据存储的目标地址</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-green-400">Sync Object Address</td>
+                                <td class="px-4 py-3">Virtual/Physical</td>
+                                <td class="px-4 py-3">同步对象的地址 (如信号量、屏障)</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-green-400">Sync Update Value</td>
+                                <td class="px-4 py-3">N-bit</td>
+                                <td class="px-4 py-3">同步对象的更新值 (如递增量、目标值)</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-green-400">Operation Type</td>
+                                <td class="px-4 py-3">Enum</td>
+                                <td class="px-4 py-3">标识为自同步操作 (vs 标准操作)</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-green-400">Coalesce ID</td>
+                                <td class="px-4 py-3">N-bit</td>
+                                <td class="px-4 py-3">用于合并多个同步更新的标识符</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 highlight-box">
+                    <strong class="text-violet-300">关键创新:</strong> <span class="text-slate-300">合并操作在源处理器端生成,通过互连网络作为单一事务传输。这消除了传统方案中独立的同步消息,将互连流量减少 50-75%。合并操作在接近目标的一致性点被分离,确保 store 在 sync 之前执行。</span>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1</a>,
+                    <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2</a>
+                </div>
+            </div>
+
+            <div class="patent-card rounded-xl p-6">
+                <h3 class="font-semibold text-violet-300 mb-4">合并操作的代码示例</h3>
+                <div class="code-block p-4">
+                    <span class="text-slate-500">// 传统方案: 分离的 store 和 sync</span><br>
+                    <span class="text-red-400">rdma_write</span><span class="text-slate-300">(remote_addr, data);</span><br>
+                    <span class="text-red-400">rdma_atomic_add</span><span class="text-slate-300">(sync_addr, 1);  <span class="text-slate-500">// 独立的同步更新</span></span><br>
+                    <span class="text-slate-300"></span><br>
+                    <span class="text-slate-500">// 本专利方案: 自同步合并操作</span><br>
+                    <span class="text-green-400">self_sync_remote_write</span><span class="text-slate-300">(remote_addr, data, sync_addr, sync_value);</span><br>
+                    <span class="text-slate-500">// 硬件自动合并 store + sync 为单一事务</span><br>
+                    <span class="text-slate-500">// 在一致性点自动分离并排序</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== POINT OF CONSISTENCY ==================== -->
+        <section id="split" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-code-branch text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-blue-400">一致性点分离 (Point of Consistency Split)</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-blue-300 mb-4">Hub 组件的分离逻辑</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    在接近目标处理器的<strong class="text-blue-400">"一致性点 (point of consistency)"</strong>,一个 hub 组件负责将合并的操作分离为独立的 store 和 sync 操作,并强制排序。
+                </p>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">阶段 1: 接收合并操作</strong>
+                        <p class="mt-2 text-slate-400">Hub 接收到来自互连网络的合并操作,解析操作类型、store payload、store 地址、同步对象地址和同步更新值。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">阶段 2: 分离为独立操作</strong>
+                        <p class="mt-2 text-slate-400">Hub 将合并操作分离为两个独立的内部操作:(1) store 操作: 将数据写入目标内存地址;(2) sync 操作: 更新同步对象。这两个操作在 hub 内部被标记为有序对。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">阶段 3: 强制排序 (Store 先于 Sync)</strong>
+                        <p class="mt-2 text-slate-400">Hub <strong class="text-slate-300">"将 store 操作序列排在同步更新之前"</strong>。这通过内部队列和依赖检查实现:sync 操作被阻塞,直到 store 操作完成并被确认。这确保了消费者在同步对象更新后能看到完整的数据。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">阶段 4: 执行与确认</strong>
+                        <p class="mt-2 text-slate-400">Store 操作完成后,hub 执行 sync 操作 (可能与其他 sync 更新合并)。完成后,目标处理器可以通过轮询同步对象感知操作完成。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>为什么一致性点接近目标很重要?</h4>
+                <p class="text-sm text-slate-300">
+                    一致性点越接近目标处理器,store 和 sync 操作之间的排序保证越强。如果一致性点在源端,store 和 sync 可能在互连中经历不同的路由延迟,导致到达目标的顺序不确定。将一致性点放在目标端 (或接近目标的 hub),可以确保 store 在 sync 之前到达目标内存,消费者在 sync 更新后一定能看到数据。
+                </p>
+            </div>
+
+            <div class="mt-4 text-xs text-slate-500">
+                来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1</a>,
+                <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2</a>
+            </div>
+        </section>
+
+        <!-- ==================== MMU INTEGRATION ==================== -->
+        <section id="mmu" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-memory text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-emerald-400">MMU 集成与地址转换</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-emerald-300 mb-4">MMU 在远程内存操作中的角色</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    专利中描述了 <strong class="text-emerald-400">"MMU 320 包含一组页表条目 (PTEs),用于将虚拟地址映射到物理地址"</strong>。MMU 负责地址转换并将操作转发到高速 hub。
+                </p>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">虚拟地址到物理地址转换</strong>
+                        <p class="mt-2 text-slate-400">当处理单元发起自同步远程内存操作时,操作中包含的是虚拟地址。MMU 查找页表条目 (PTE),将虚拟地址转换为目标物理地址。这支持远程内存访问的统一虚拟寻址 (UVA)。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">转发到高速 Hub</strong>
+                        <p class="mt-2 text-slate-400">地址转换完成后,MMU 将操作转发到适当的高速 hub (可能是本地 L2 缓存、互连 hub 或网络接口)。Hub 负责后续的合并操作分离和排序。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">PTE 中的远程内存标记</strong>
+                        <p class="mt-2 text-slate-400">专利暗示 PTE 可能包含标记,指示该页面是否支持远程内存操作和自同步语义。这允许 MMU 在地址转换时识别操作类型并路由到正确的处理路径。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1</a>,
+                    <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2</a>
+                </div>
+            </div>
+
+            <div class="patent-card rounded-xl p-6">
+                <h3 class="font-semibold text-emerald-300 mb-4">MMU 与 DMA 控制器的协同</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    专利中的序列图 (FIG. 7) 展示了 DMA 控制器、MMU 和 hub 之间的详细交互:
+                </p>
+                <div class="code-block p-4">
+                    <span class="text-slate-500">// DMA 发起自同步远程写操作</span><br>
+                    <span class="text-slate-300">DMA Engine:</span><br>
+                    <span class="text-slate-300">  1. 生成合并操作 (store + sync 元数据)</span><br>
+                    <span class="text-slate-300">  2. 发送虚拟地址到 MMU</span><br>
+                    <span class="text-slate-300"></span><br>
+                    <span class="text-slate-300">MMU:</span><br>
+                    <span class="text-slate-300">  3. 查找 PTE,转换为物理地址</span><br>
+                    <span class="text-slate-300">  4. 转发操作到 hub</span><br>
+                    <span class="text-slate-300"></span><br>
+                    <span class="text-slate-300">Hub (一致性点):</span><br>
+                    <span class="text-slate-300">  5. 分离合并操作</span><br>
+                    <span class="text-slate-300">  6. 执行 store (写入目标物理地址)</span><br>
+                    <span class="text-slate-300">  7. 执行 sync (更新同步对象)</span><br>
+                    <span class="text-slate-300">  8. 返回完成确认</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== COALESCE ==================== -->
+        <section id="coalesce" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-layer-group text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-cyan-400">同步更新合并 (Update Coalescing)</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-cyan-300 mb-4">合并机制详解</h3>
+                <div class="highlight-box mb-4">
+                    <strong class="text-cyan-300">核心创新:</strong> <span class="text-slate-300">专利指出 <strong class="text-cyan-400">"对同一对象的多个同步更新可以被合并 (coalesced) 为单次原子更新"</strong>。这消除了传统方案中逐个处理同步更新的串行化瓶颈。</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="patent-card rounded-lg p-4">
+                        <h4 class="font-semibold text-red-300 mb-3">传统方案 (逐个处理)</h4>
+                        <div class="space-y-2 text-sm text-slate-400">
+                            <p>• 8 个处理单元向同一同步对象发送更新</p>
+                            <p>• 8 次独立的原子操作</p>
+                            <p>• 每次原子操作需要互连事务</p>
+                            <p>• 串行化访问同步对象</p>
+                            <p class="text-red-400 font-semibold">互连事务: 8 次</p>
+                            <p class="text-red-400 font-semibold">延迟: 8 × 原子操作延迟</p>
+                        </div>
+                    </div>
+                    <div class="patent-card rounded-lg p-4">
+                        <h4 class="font-semibold text-green-300 mb-3">本专利方案 (合并处理)</h4>
+                        <div class="space-y-2 text-sm text-slate-400">
+                            <p>• 8 个处理单元向同一同步对象发送更新</p>
+                            <p>• Hub 合并为 <strong class="text-green-400">1 次</strong>原子操作</p>
+                            <p>• Coalesce ID 标识可合并的更新</p>
+                            <p>• 单次原子更新完成所有计数</p>
+                            <p class="text-green-400 font-semibold">互连事务: 1 次 (节省 87.5%)</p>
+                            <p class="text-green-400 font-semibold">延迟: 1 × 原子操作延迟</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="patent-card rounded-xl p-6">
+                <h3 class="font-semibold text-cyan-300 mb-4">合并的条件与实现</h3>
+                <ul class="list-disc list-inside text-sm text-slate-400 space-y-2">
+                    <li><strong class="text-slate-300">相同同步对象:</strong> 只有指向同一同步对象地址的更新才能被合并</li>
+                    <li><strong class="text-slate-300">Coalesce ID:</strong> 合并操作中包含 Coalesce ID,hub 使用该 ID 识别可合并的更新组</li>
+                    <li><strong class="text-slate-300">时间窗口:</strong> Hub 在特定时间窗口内收集同一 Coalesce ID 的更新,然后执行合并后的原子操作</li>
+                    <li><strong class="text-slate-300">合并逻辑:</strong> 合并可以是简单的累加 (如 8 个 +1 合并为 +8),也可以是更复杂的聚合 (如设置最大值)</li>
+                    <li><strong class="text-slate-300">原子性保证:</strong> 合并后的原子操作保证所有被合并的更新在逻辑上同时生效,消费者看到最终的聚合值</li>
+                </ul>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1</a>,
+                    <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== DEMOTION ==================== -->
+        <section id="demotion" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-arrow-down text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-amber-400">操作降级机制 (Demotion)</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-amber-300 mb-4">何时触发降级?</h3>
+                <div class="highlight-box mb-4">
+                    <strong class="text-amber-300">降级条件:</strong> <span class="text-slate-300">专利指出,如果 store 操作和同步操作针对<strong class="text-red-400">"不同的虚拟内存页面 (different virtual memory pages)"</strong>,该操作将被降级 (demoted) 为标准的非同步类型。</span>
+                </div>
+
+                <div class="tech-box mb-4">
+                    <strong class="text-emerald-300">为什么需要降级?</strong>
+                    <p class="mt-2 text-slate-400">当 store 和 sync 针对不同内存页面时,它们可能经过不同的 MMU 转换路径、到达不同的物理内存控制器。在这种情况下,hub 无法保证 store 和 sync 的排序,因此必须降级为标准操作,由软件层确保正确的同步顺序。</p>
+                </div>
+
+                <div class="code-block p-4">
+                    <span class="text-slate-500">// 正常情况: store 和 sync 在同一页面 → 自同步</span><br>
+                    <span class="text-green-400">self_sync_write</span><span class="text-slate-300">(page_A_addr, data, page_A_addr + offset, sync_value)</span><br>
+                    <span class="text-slate-500">// → Hub 可以分离并排序,保持自同步语义</span><br>
+                    <span class="text-slate-300"></span><br>
+                    <span class="text-slate-500">// 降级情况: store 和 sync 在不同页面 → 降级为标准操作</span><br>
+                    <span class="text-amber-400">self_sync_write</span><span class="text-slate-300">(page_A_addr, data, page_B_addr, sync_value)</span><br>
+                    <span class="text-slate-500">// → Hub 检测到不同页面,降级为标准 rdma_write</span><br>
+                    <span class="text-slate-500">// → 软件需要额外的内存围栏确保排序</span>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>降级机制的设计智慧</h4>
+                <p class="text-sm text-slate-300">
+                    降级机制体现了该专利的务实设计:不试图在所有场景下强制自同步语义,而是在无法保证排序时优雅地降级。这避免了复杂的全局排序协议,同时保证了正确性。软件层可以通过将数据和同步对象分配到同一内存页面来避免降级,从而获得自同步的性能优势。
+                </p>
+            </div>
+
+            <div class="mt-4 text-xs text-slate-500">
+                来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1</a>,
+                <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2</a>
+            </div>
+        </section>
+
+        <!-- ==================== GPUDIRECT RDMA ==================== -->
+        <section id="gpudirect" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-network-wired text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-indigo-400">与 GPUDirect RDMA 的关联</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-indigo-300 mb-4">GPUDirect RDMA 架构基础</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    GPUDirect RDMA 是 NVIDIA 与 Mellanox 联合研发的技术,实现 GPU 显存与 RDMA 网卡之间的直接 DMA 传输,无需 CPU 介入。该技术是 EP3529706B1/US12105960B2 自同步远程内存操作的重要应用场景。
+                </p>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">PCI BAR 映射与地址可见性</strong>
+                        <p class="mt-2 text-slate-400">GPU 通过 PCI BAR 从 BIOS/OS 请求物理地址窗口,将其绑定到部分 VRAM。同一 Root Complex 上的 RDMA 网卡通过访问该 BAR 到达 GPU 物理地址。这为 RDMA 网卡提供了直接访问 GPU 显存的路径。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">地址转换与内存锁定 (Pinning)</strong>
+                        <p class="mt-2 text-slate-400">NVIDIA 内核驱动使用 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-green-400 font-mono">nvidia_p2p_get_pages()</code> 验证 GPU 虚拟地址 (如来自 cudaMalloc),将其转换为绑定到 BAR 的物理地址,并存储到 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-green-400 font-mono">nvidia_p2p_page_table</code>。该锁定页表被传递给 RDMA 驱动以配置其 DMA 引擎。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">统一虚拟寻址 (UVA)</strong>
+                        <p class="mt-2 text-slate-400">CUDA 将应用程序的虚拟地址空间划分为 CUDA 管理的 (GPU、CPU、FREE) 和 OS 管理的区域。这种布局允许驱动快速识别有效的 GPU 地址,避免错误映射 CPU 内存。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://cloud.tencent.com/developer/article/2624449" target="_blank" class="ref-link">GPUDirect RDMA 解析</a>,
+                    <a href="https://zhuanlan.zhihu.com/p/1893960203378094213" target="_blank" class="ref-link">GPUDirect RDMA 演进</a>
+                </div>
+            </div>
+
+            <div class="patent-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-indigo-300 mb-4">自同步操作在 GPUDirect RDMA 中的应用</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    EP3529706B1/US12105960B2 的自同步远程内存操作可以直接应用于 GPUDirect RDMA 场景:
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="patent-card rounded-lg p-4">
+                        <h4 class="font-semibold text-green-300 mb-3">多节点 GPU 梯度同步</h4>
+                        <p class="text-sm text-slate-400">在分布式 LLM 训练中,梯度通过 NCCL over InfiniBand/RDMA 在节点间同步。自同步操作将梯度写入和同步标志更新合并为一次 RDMA 事务,减少 AllReduce 后的同步延迟。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-300 mb-3">GPU 显存直接 RDMA 访问</h4>
+                        <p class="text-sm text-slate-400">RDMA 网卡直接访问 GPU 显存 (VRAM),无需 CPU staging buffer。自同步操作确保数据写入 GPU 显存后,同步标志自动更新,通知 GPU kernel 开始计算。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4">
+                        <h4 class="font-semibold text-violet-300 mb-3">零拷贝 (Zero-Copy) 优化</h4>
+                        <p class="text-sm text-slate-400">GPUDirect RDMA 1.0 引入了共享主机缓冲区,GPUDirect Async (CUDA 8.0) 进一步优化了控制路径。自同步操作进一步减少了控制路径的 CPU 参与,实现真正的 GPU-centric 网络。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4">
+                        <h4 class="font-semibold text-amber-300 mb-3">同步机制</h4>
+                        <p class="text-sm text-slate-400">开发者可以使用 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-green-400 font-mono">cuPointerSetAttribute</code> 与 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-green-400 font-mono">CU_POINTER_ATTRIBUTE_SYNC_MEMOPS</code> 标志确保内存操作与 RDMA 引擎同步。自同步操作在硬件层面提供了更强的排序保证。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>对 NCCL over InfiniBand 的影响</h4>
+                <p class="text-sm text-slate-300">
+                    NCCL over InfiniBand 是多节点 LLM 训练的核心通信路径。传统方案中,每次 RDMA 写操作后需要独立的原子操作更新同步标志。EP3529706B1/US12105960B2 通过自同步操作将这两步合并,减少 NCCL AllReduce 的尾部延迟 (tail latency)。对于万亿参数模型的跨节点训练,这可能带来显著的吞吐量提升。
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== CLAIMS ==================== -->
+        <section id="claims" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-red-500 to-red-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-gavel text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-red-400">核心权利要求解读</h2>
+            </div>
+
+            <div class="patent-card rounded-xl p-6">
+                <p class="text-sm text-slate-300 mb-4">
+                    根据专利公开文本,EP3529706B1 的核心权利要求涵盖以下技术方案 (与美国同族 US12105960B2 一致):
+                </p>
+
+                <div class="space-y-4">
+                    <div class="patent-card rounded-lg p-4 border-l-4 border-green-500">
+                        <h4 class="font-semibold text-green-300 mb-2">权利要求 1: 自同步远程内存操作方法</h4>
+                        <p class="text-sm text-slate-400">一种在多处理器系统中执行自同步远程内存操作的方法,包括:由处理单元生成 store 操作和同步操作;将 store 操作和同步操作合并为单一操作单元;通过互连网络传输合并操作;在接近目标处理器的一致性点,由 hub 组件将合并操作分离为独立的 store 和同步操作;以及强制 store 操作在同步更新之前执行。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4 border-l-4 border-blue-500">
+                        <h4 class="font-semibold text-blue-300 mb-2">权利要求 2: 操作合并与传输优化</h4>
+                        <p class="text-sm text-slate-400">一种操作合并方法,包括:将远程 store 数据和同步元数据组合为单一事务;通过互连网络传输该单一事务,减少互连流量;以及在目标端分离事务并恢复独立的 store 和同步操作。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4 border-l-4 border-violet-500">
+                        <h4 class="font-semibold text-violet-300 mb-2">权利要求 3: 同步更新合并</h4>
+                        <p class="text-sm text-slate-400">一种同步更新合并方法,包括:接收指向同一同步对象的多个同步更新;使用 Coalesce ID 识别可合并的更新组;在时间窗口内收集更新;以及将多个更新合并为单次原子更新。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4 border-l-4 border-amber-500">
+                        <h4 class="font-semibold text-amber-300 mb-2">权利要求 4: MMU 集成与地址转换</h4>
+                        <p class="text-sm text-slate-400">一种 MMU 集成方法,包括:MMU 包含页表条目 (PTEs) 用于将虚拟地址映射到物理地址;支持远程内存访问的统一虚拟寻址 (UVA);以及将转换后的操作转发到高速 hub。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4 border-l-4 border-cyan-500">
+                        <h4 class="font-semibold text-cyan-300 mb-2">权利要求 5: 操作降级机制</h4>
+                        <p class="text-sm text-slate-400">一种操作降级方法,包括:检测 store 操作和同步操作是否针对不同的虚拟内存页面;如果针对不同页面,将自同步操作降级为标准的非同步类型;以及由软件层确保正确的同步顺序。</p>
+                    </div>
+                    <div class="patent-card rounded-lg p-4 border-l-4 border-pink-500">
+                        <h4 class="font-semibold text-pink-300 mb-2">权利要求 6: 目标轮询与数据加载</h4>
+                        <p class="text-sm text-slate-400">一种目标端同步方法,包括:目标处理器轮询同步对象;当同步对象达到目标值时,确认数据已就绪;以及从远程内存加载数据。该方法支持异步通信模型,消费者在数据就绪后立即开始处理。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1 Claims</a>,
+                    <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2 Claims</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== IMPACT ANALYSIS ==================== -->
+        <section id="impact" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-pink-400">影响分析与未来展望</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-tachometer-alt text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对 RDMA 通信延迟的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">该专利将 RDMA 写操作后的同步延迟从 4 次互连事务减少到 1-2 次,节省 50-75%。在 InfiniBand 跨节点场景中,这可能降低尾部延迟 (tail latency) 数百纳秒,对 NCCL AllReduce 性能有直接影响。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-network-wired text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对 NCCL over InfiniBand 的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">自同步操作为 NCCL over InfiniBand 提供了硬件级优化基础。通过合并梯度写入和同步更新,NCCL 可以减少 AllReduce 后的同步开销,提升多节点训练的吞吐量。未来 NCCL 版本可能直接利用该专利的自同步机制。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-brain text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对大规模 LLM 训练的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">在万亿参数模型的跨节点训练中,梯度同步是主要的通信瓶颈。自同步操作减少每次梯度 AllReduce 的同步延迟,对于 1000+ GPU 的训练集群,累积的延迟节省可能达到秒级,显著缩短训练时间。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-microchip text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对 GPU 架构设计的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">该专利揭示了 NVIDIA GPU 架构中 MMU、DMA 控制器和互连 hub 的协同设计思路。自同步机制可以作为现有 RDMA 栈的"附加层"实现,无需重新设计网络协议。这种设计可能被集成到 Hopper、Blackwell 及后续架构中。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-layer-group text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">更新合并的带宽优化</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">同步更新合并机制将多处理器的原子操作从 O(N) 减少到 O(1)。在大规模并行场景中 (如 72-GPU GB200 NVL72),这可能显著减少同步对象的热点竞争,提升整体系统的并发性能。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-shield-alt text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">欧洲专利护城河</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">EP3529706B1 由 NVIDIA GPU 架构核心团队 (Olivier Giroux 等) 发明,保护了 NVIDIA 在自同步远程内存操作的核心技术,覆盖欧洲市场。竞争对手在欧洲市场需要开发替代的同步方案或获得授权,构成了重要的专利壁垒。结合美国同族 US12105960B2,形成了跨大西洋的专利保护网。</p>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="font-semibold text-pink-300 mb-4 flex items-center gap-2"><i class="fas fa-lightbulb"></i> 总结</h3>
+                <div class="space-y-3 text-sm text-slate-300">
+                    <p>EP3529706B1 是 NVIDIA 在多处理器系统远程内存访问领域的核心欧洲专利 (美国同族 US12105960B2),通过自同步操作将 store 和 sync 合并为单一事务,在一致性点分离并强制排序,将互连流量减少 50-75%,显著降低 RDMA 通信延迟。该专利与 MMU 深度集成,支持统一虚拟寻址和远程内存访问的地址转换。</p>
+                    <p>在 GPUDirect RDMA 和 NCCL over InfiniBand 场景中,该专利的自同步机制可以直接应用于多节点 LLM 训练的梯度同步,减少跨节点通信的尾部延迟。更新合并机制进一步优化了同步对象的热点竞争,将 O(N) 的原子操作减少到 O(1)。</p>
+                    <p>对于竞争对手,EP3529706B1 与 US12105960B2 共同构成了自同步远程内存操作的跨大西洋专利壁垒。对于学术界和开源社区,该专利揭示了 NVIDIA GPU 远程内存同步机制的底层原理,有助于优化分布式训练框架和集合通信库。</p>
+                </div>
+                <div class="mt-6 pt-4 border-t border-slate-700 text-xs text-slate-500">
+                    本报告基于以下来源:
+                    <a href="https://patents.google.com/patent/EP3529706B1/en" target="_blank" class="ref-link">EP3529706B1</a>,
+                    <a href="https://patents.google.com/patent/US12105960B2/en" target="_blank" class="ref-link">US12105960B2</a>,
+                    <a href="https://cloud.tencent.com/developer/article/2624449" target="_blank" class="ref-link">GPUDirect RDMA 解析</a>,
+                    <a href="https://zhuanlan.zhihu.com/p/1893960203378094213" target="_blank" class="ref-link">GPUDirect RDMA 演进</a>,
+                    <a href="https://docs.nvidia.com/nvidia-mlnx-en-documentation-v5-8-5-1-1-2-lts.pdf" target="_blank" class="ref-link">NVIDIA MLNX_EN Documentation</a>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-card border-t border-slate-700 mt-12">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-sm text-slate-400">
+                    <i class="fas fa-globe mr-2"></i>EP3529706B1 专利深度解读 | 2026-05-07 | 美国同族: US12105960B2
+                </div>
+                <div class="text-xs text-slate-500">
+                    所有技术解读基于可验证的专利原文 | 每个技术点提供 reference 链接
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Navigation tab switching
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                const sectionId = this.dataset.section;
+                const section = document.getElementById(sectionId);
+                if (section) {
+                    const navHeight = document.querySelector('nav').offsetHeight;
+                    const headerHeight = document.querySelector('header').offsetHeight;
+                    const offset = headerHeight + navHeight + 20;
+                    const top = section.getBoundingClientRect().top + window.pageYOffset - offset;
+                    window.scrollTo({ top, behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Update active tab on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const navHeight = document.querySelector('nav').offsetHeight;
+            const headerHeight = document.querySelector('header').offsetHeight;
+            const offset = headerHeight + navHeight + 100;
+
+            let currentSection = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - offset;
+                if (window.pageYOffset >= sectionTop) {
+                    currentSection = section.getAttribute('id');
+                }
+            });
+
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.section === currentSection) {
+                    tab.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

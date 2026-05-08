@@ -236,22 +236,56 @@
                         </div>
                     </div>
 
-                    <div class="code-block mt-4">
-                        <div class="text-slate-300 space-y-1">
-                            <div class="text-amber-400">// 传统 MoE 通信流程 (软件中介)</div>
-                            <div></div>
-                            <div>// Dispatch 阶段:</div>
-                            <div>// 1. 计算门控 (GPU kernel) -> 每个 token 的 top-K expert</div>
-                            <div>// 2. 收集路由元数据 (all-gather) -> 每个 GPU 知道发送目标</div>
-                            <div>// 3. 为每个 expert 预分配 buffer (CPU 参与)</div>
-                            <div>// 4. 打包 token 数据 -> 软件循环 per-target</div>
-                            <div>// 5. 调用 NCCL all-to-all -> 数据传输</div>
-                            <div>// 6. 忙等待轮询 -> 等待所有数据到达</div>
-                            <div>// 7. 开始 expert 计算</div>
-                            <div></div>
-                            <div>// 问题: 步骤 2-6 均为软件中介开销</div>
-                            <div>// 步骤 6 的忙等待消耗 GPU 资源</div>
-                            <div>// 步骤 3-4 的 per-target 循环在 token 多时严重拖慢</div>
+                    <div class="tech-diagram mt-4">
+                        <h5 class="text-sm font-semibold text-slate-300 mb-4">传统 MoE 通信流程 (软件中介)</h5>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <div class="text-xs font-semibold text-amber-400 mb-3 flex items-center gap-2"><i class="fas fa-arrow-right"></i> Dispatch 阶段</div>
+                                <div class="space-y-3">
+                                    <div class="workflow-step">
+                                        <div class="step-number">1</div>
+                                        <p class="text-xs text-slate-300"><strong>计算门控</strong> (GPU kernel) — 每个 token 的 top-K expert</p>
+                                    </div>
+                                    <div class="workflow-step">
+                                        <div class="step-number">2</div>
+                                        <p class="text-xs text-slate-300"><strong>收集路由元数据</strong> (all-gather) — 每个 GPU 知道发送目标</p>
+                                    </div>
+                                    <div class="workflow-step">
+                                        <div class="step-number">3</div>
+                                        <p class="text-xs text-slate-300"><strong>预分配 expert buffer</strong> (CPU 参与)</p>
+                                    </div>
+                                    <div class="workflow-step">
+                                        <div class="step-number">4</div>
+                                        <p class="text-xs text-slate-300"><strong>打包 token 数据</strong> — 软件循环 per-target</p>
+                                    </div>
+                                    <div class="workflow-step">
+                                        <div class="step-number">5</div>
+                                        <p class="text-xs text-slate-300"><strong>调用 NCCL all-to-all</strong> — 数据传输</p>
+                                    </div>
+                                    <div class="workflow-step">
+                                        <div class="step-number">6</div>
+                                        <p class="text-xs text-slate-300"><strong>忙等待轮询</strong> — 等待所有数据到达</p>
+                                    </div>
+                                    <div class="workflow-step">
+                                        <div class="step-number">7</div>
+                                        <p class="text-xs text-slate-300"><strong>开始 expert 计算</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs font-semibold text-red-400 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 问题诊断</div>
+                                <div class="space-y-2">
+                                    <div class="bg-red-500/10 border border-red-500/20 rounded p-2">
+                                        <p class="text-xs text-slate-300"><i class="fas fa-times-circle text-red-400 mr-1"></i>步骤 2-6 均为<strong>软件中介开销</strong></p>
+                                    </div>
+                                    <div class="bg-red-500/10 border border-red-500/20 rounded p-2">
+                                        <p class="text-xs text-slate-300"><i class="fas fa-times-circle text-red-400 mr-1"></i>步骤 6 的<strong>忙等待消耗 GPU 资源</strong></p>
+                                    </div>
+                                    <div class="bg-red-500/10 border border-red-500/20 rounded p-2">
+                                        <p class="text-xs text-slate-300"><i class="fas fa-times-circle text-red-400 mr-1"></i>步骤 3-4 的 <strong>per-target 循环</strong>在 token 多时严重拖慢</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -361,28 +395,41 @@
                     <div class="tech-diagram mb-4">
                         <h4 class="text-sm font-medium text-amber-300 mb-3">st.rowsp 指令格式</h4>
 
-                        <div class="code-block">
-                            <div class="text-slate-300 space-y-1">
-                                <div class="text-amber-400">// st.rowsp 指令格式</div>
-                                <div class="text-amber-400">// st.rowsp[.nop] [value], [row_id].[row_offset].[malloc_id]</div>
-                                <div></div>
-                                <div>// 指令字段解析:</div>
-                                <div></div>
-                                <div>// +----------+-----------+------------+</div>
-                                <div>// |  RowID   | RowOffset | MallocID   |</div>
-                                <div>// +----------+-----------+------------+</div>
-                                <div>//    ^            ^            ^</div>
-                                <div>//    |            |            |</div>
-                                <div>//    |            |            +-- 目标 GPU + 内存区域标识</div>
-                                <div>//    |            |               (由 rowspMalloc 预分配)</div>
-                                <div>//    |            +-- 包内偏移位置 (字节)</div>
-                                <div>//    |               (标识数据包内的具体位置)</div>
-                                <div>//    +-- 全局排序标识</div>
-                                <div>//       (确保同一 row 内的有序写入)</div>
-                                <div></div>
-                                <div>// .nop 后缀:</div>
-                                <div>//   标记非关键路径数据 (combine 阶段)</div>
-                                <div>//   接收端不为此数据触发依赖事件</div>
+                        <div class="bg-slate-900/60 rounded-lg p-4 border border-slate-600/30">
+                            <div class="text-xs font-mono text-slate-400 mb-3">st.rowsp[.nop] [value], [row_id].[row_offset].[malloc_id]</div>
+                            <div class="flex items-stretch gap-1 mb-4">
+                                <div class="flex-1 bg-violet-500/20 border-2 border-violet-500/50 rounded-lg p-3 text-center">
+                                    <div class="text-xs font-semibold text-violet-300 mb-1"><i class="fas fa-sort-numeric-down mr-1"></i>RowID</div>
+                                    <div class="text-xs text-slate-400">全局排序标识</div>
+                                </div>
+                                <div class="flex items-center text-slate-500"><i class="fas fa-plus"></i></div>
+                                <div class="flex-1 bg-blue-500/20 border-2 border-blue-500/50 rounded-lg p-3 text-center">
+                                    <div class="text-xs font-semibold text-blue-300 mb-1"><i class="fas fa-arrows-alt-h mr-1"></i>RowOffset</div>
+                                    <div class="text-xs text-slate-400">包内偏移位置</div>
+                                </div>
+                                <div class="flex items-center text-slate-500"><i class="fas fa-plus"></i></div>
+                                <div class="flex-1 bg-green-500/20 border-2 border-green-500/50 rounded-lg p-3 text-center">
+                                    <div class="text-xs font-semibold text-green-300 mb-1"><i class="fas fa-fingerprint mr-1"></i>MallocID</div>
+                                    <div class="text-xs text-slate-400">目标 GPU + 内存区域</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="bg-violet-500/10 border border-violet-500/20 rounded p-2">
+                                    <div class="text-xs font-semibold text-violet-400 mb-1">RowID</div>
+                                    <p class="text-xs text-slate-400">确保同一 row 内的有序写入，用于包合并时的去重和排序</p>
+                                </div>
+                                <div class="bg-blue-500/10 border border-blue-500/20 rounded p-2">
+                                    <div class="text-xs font-semibold text-blue-400 mb-1">RowOffset</div>
+                                    <p class="text-xs text-slate-400">包内偏移位置 (字节)，标识数据包内的具体位置</p>
+                                </div>
+                                <div class="bg-green-500/10 border border-green-500/20 rounded p-2">
+                                    <div class="text-xs font-semibold text-green-400 mb-1">MallocID</div>
+                                    <p class="text-xs text-slate-400">由 rowspMalloc 预分配，发送时不需要知道物理地址</p>
+                                </div>
+                            </div>
+                            <div class="mt-3 bg-amber-500/10 border border-amber-500/20 rounded p-2 flex items-start gap-2">
+                                <i class="fas fa-info-circle text-amber-400 mt-0.5"></i>
+                                <div class="text-xs text-slate-300"><strong>.nop 后缀:</strong> 标记非关键路径数据 (combine 阶段)，接收端不为此数据触发依赖事件</div>
                             </div>
                         </div>
 
@@ -408,24 +455,58 @@
                             <code class="text-amber-300">rowspMalloc</code> 是 MoE-Hub 提供的 MMIO API，用于预先分配 expert 输入 buffer。调用后返回一个 MallocID，该 ID 编码了目标 GPU 和内存区域信息。后续 st.rowsp 指令使用此 MallocID，硬件自动解析为物理地址。
                         </p>
 
-                        <div class="code-block mt-3">
-                            <div class="text-slate-300 space-y-1">
-                                <div class="text-amber-400">// rowspMalloc 使用示例</div>
-                                <div></div>
-                                <div>// 为每个 expert 预分配输入 buffer</div>
-                                <div>for each expert_e:</div>
-                                <div>    malloc_id = rowspMalloc(  // MMIO 调用</div>
-                                <div>        target_gpu = expert_e.gpu,  // 目标 GPU</div>
-                                <div>        size = expert_e.buffer_size  // buffer 大小</div>
-                                <div>    )</div>
-                                <div>    expert_e.malloc_id = malloc_id</div>
-                                <div></div>
-                                <div>// 发送 token 时只需使用 MallocID</div>
-                                <div>for each token t:</div>
-                                <div>    target_expert = gate(t)  // 门控网络选择</div>
-                                <div>    st.rowsp token_data, [row_id].[offset].[target_expert.malloc_id]</div>
-                                <div></div>
-                                <div>// 无需查找物理地址！硬件自动完成</div>
+                        <div class="tech-diagram mt-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Phase 1: Pre-allocation -->
+                                <div class="bg-slate-800/60 rounded-lg p-4 border border-amber-500/20">
+                                    <div class="text-sm font-semibold text-amber-400 mb-3 flex items-center gap-2"><i class="fas fa-database"></i> 阶段 1: 预分配</div>
+                                    <div class="space-y-3">
+                                        <div class="workflow-step">
+                                            <div class="step-number">1</div>
+                                            <p class="text-xs text-slate-300"><code class="text-amber-300">rowspMalloc</code> MMIO 调用，为每个 expert 预分配输入 buffer</p>
+                                        </div>
+                                        <div class="workflow-step">
+                                            <div class="step-number">2</div>
+                                            <p class="text-xs text-slate-300">传入 <code class="text-blue-300">target_gpu</code> + <code class="text-green-300">buffer_size</code></p>
+                                        </div>
+                                        <div class="workflow-step">
+                                            <div class="step-number">3</div>
+                                            <p class="text-xs text-slate-300">返回 <code class="text-amber-300">malloc_id</code>，存入 expert 记录</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 bg-slate-900/50 rounded p-2 font-mono text-xs text-slate-300">
+                                        <div><span class="text-violet-400">for each</span> expert_e:</div>
+                                        <div class="ml-4">malloc_id = <span class="text-amber-400">rowspMalloc</span>(</div>
+                                        <div class="ml-8">target_gpu = <span class="text-blue-400">expert_e.gpu</span>,</div>
+                                        <div class="ml-8">size = <span class="text-green-400">expert_e.buffer_size</span></div>
+                                        <div class="ml-4">)</div>
+                                    </div>
+                                </div>
+                                <!-- Phase 2: Token Sending -->
+                                <div class="bg-slate-800/60 rounded-lg p-4 border border-green-500/20">
+                                    <div class="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-paper-plane"></i> 阶段 2: 发送 Token</div>
+                                    <div class="space-y-3">
+                                        <div class="workflow-step">
+                                            <div class="step-number">1</div>
+                                            <p class="text-xs text-slate-300">门控网络 <code class="text-amber-300">gate(t)</code> 选择目标 expert</p>
+                                        </div>
+                                        <div class="workflow-step">
+                                            <div class="step-number">2</div>
+                                            <p class="text-xs text-slate-300">发射 <code class="text-green-300">st.rowsp</code> 指令，使用 malloc_id</p>
+                                        </div>
+                                        <div class="workflow-step">
+                                            <div class="step-number">3</div>
+                                            <p class="text-xs text-slate-300"><strong>无需查找物理地址</strong> — 硬件自动完成！</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 bg-slate-900/50 rounded p-2 font-mono text-xs text-slate-300">
+                                        <div><span class="text-violet-400">for each</span> token t:</div>
+                                        <div class="ml-4">target_expert = <span class="text-amber-400">gate</span>(t)</div>
+                                        <div class="ml-4"><span class="text-green-400">st.rowsp</span> token_data,</div>
+                                        <div class="ml-8">[row_id].[offset].</div>
+                                        <div class="ml-8"><span class="text-amber-400">target_expert.malloc_id</span></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -458,18 +539,28 @@
                                 <p class="text-xs text-slate-400 leading-relaxed mb-3">
                                     RAT 是一个 <strong>16-bank 双端口 SRAM</strong> 缓存，存储 (MallocID, RowID) 到 LocalRowID 的映射。当 st.rowsp 指令到达时，AAU 查找 RAT 获取 LocalRowID，然后结合 RowOffset 计算物理地址。
                                 </p>
-                                <div class="code-block">
-                                    <div class="text-slate-300 space-y-1">
-                                        <div class="text-green-400">// RAT 条目结构</div>
-                                        <div class="text-green-400">// 键: (MallocID, RowID)</div>
-                                        <div class="text-green-400">// 值: LocalRowID</div>
-                                        <div></div>
-                                        <div>// RAT 查找:</div>
-                                        <div>// input:  MallocID + RowID</div>
-                                        <div>// output: LocalRowID (本地行标识)</div>
-                                        <div></div>
-                                        <div>// 物理地址计算:</div>
-                                        <div>// Addr = BaseAddr + LocalRowID * RowSize + RowOffset</div>
+                                <div class="bg-slate-900/60 rounded-lg p-4 border border-green-500/20">
+                                    <div class="text-xs font-semibold text-green-400 mb-3">RAT 条目结构 (Key-Value 映射)</div>
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="flex-1 bg-amber-500/20 border border-amber-500/40 rounded p-2 text-center">
+                                            <div class="text-xs font-semibold text-amber-300">Key</div>
+                                            <div class="text-xs text-slate-300 font-mono mt-1">(MallocID, RowID)</div>
+                                        </div>
+                                        <div class="text-green-400 text-lg"><i class="fas fa-arrow-right"></i></div>
+                                        <div class="flex-1 bg-green-500/20 border border-green-500/40 rounded p-2 text-center">
+                                            <div class="text-xs font-semibold text-green-300">Value</div>
+                                            <div class="text-xs text-slate-300 font-mono mt-1">LocalRowID</div>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2 text-xs text-slate-400">
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-search text-blue-400 mt-0.5"></i>
+                                            <span><strong>查找:</strong> input (MallocID + RowID) → output LocalRowID</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-calculator text-violet-400 mt-0.5"></i>
+                                            <span><strong>地址计算:</strong> <code class="text-slate-300">Addr = BaseAddr + LocalRowID × RowSize + RowOffset</code></span>
+                                        </div>
                                     </div>
                                 </div>
                                 <p class="text-xs text-slate-500 mt-2">RAT 是 AAU 中最大的硬件组件，占 MoE-Hub 面积的绝大部分。</p>
@@ -480,21 +571,40 @@
                                 <p class="text-xs text-slate-400 leading-relaxed mb-3">
                                     APT 跟踪每个内存区域的下一个可用行 (row)。使用 <strong>原子指针</strong> (atomic pointer) 实现并发分配：多个 st.rowsp 指令可以同时请求地址分配而不会冲突。
                                 </p>
-                                <div class="code-block">
-                                    <div class="text-slate-300 space-y-1">
-                                        <div class="text-blue-400">// APT 条目结构</div>
-                                        <div class="text-blue-400">// 键: MallocID</div>
-                                        <div class="text-blue-400">// 值: next_row_ptr (原子指针)</div>
-                                        <div></div>
-                                        <div>// 分配流程:</div>
-                                        <div>// 1. 原子读取 next_row_ptr</div>
-                                        <div>// 2. next_row_ptr++ (原子递增)</div>
-                                        <div>// 3. 更新 APT 和 RAT</div>
-                                        <div>// 4. 返回分配的 LocalRowID</div>
-                                        <div></div>
-                                        <div>// FIFO 淘汰策略:</div>
-                                        <div>// 当 RAT 满时，淘汰最早的条目</div>
-                                        <div>// (FIFO queue 管理)</div>
+                                <div class="bg-slate-900/60 rounded-lg p-4 border border-blue-500/20">
+                                    <div class="text-xs font-semibold text-blue-400 mb-3">APT 条目结构 (原子指针分配)</div>
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="flex-1 bg-blue-500/20 border border-blue-500/40 rounded p-2 text-center">
+                                            <div class="text-xs font-semibold text-blue-300">Key</div>
+                                            <div class="text-xs text-slate-300 font-mono mt-1">MallocID</div>
+                                        </div>
+                                        <div class="text-blue-400 text-lg"><i class="fas fa-arrow-right"></i></div>
+                                        <div class="flex-1 bg-cyan-500/20 border border-cyan-500/40 rounded p-2 text-center">
+                                            <div class="text-xs font-semibold text-cyan-300">Value</div>
+                                            <div class="text-xs text-slate-300 font-mono mt-1">next_row_ptr (atomic)</div>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2 text-xs text-slate-400">
+                                        <div class="flex items-start gap-2">
+                                            <span class="bg-blue-500/20 text-blue-300 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0 text-xs">1</span>
+                                            <span>原子读取 <code class="text-slate-300">next_row_ptr</code></span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <span class="bg-blue-500/20 text-blue-300 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0 text-xs">2</span>
+                                            <span><code class="text-slate-300">next_row_ptr++</code> (原子递增)</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <span class="bg-blue-500/20 text-blue-300 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0 text-xs">3</span>
+                                            <span>更新 APT 和 RAT 映射</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <span class="bg-blue-500/20 text-blue-300 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0 text-xs">4</span>
+                                            <span>返回分配的 LocalRowID</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 bg-cyan-500/10 border border-cyan-500/20 rounded p-2 flex items-start gap-2">
+                                        <i class="fas fa-recycle text-cyan-400 mt-0.5"></i>
+                                        <span><strong>FIFO 淘汰:</strong> RAT 满时淘汰最早条目</span>
                                     </div>
                                 </div>
                             </div>
@@ -583,23 +693,69 @@
                             在 MoE 场景中，单个 token 数据通常远小于一个缓存行（64 字节）。如果不合并，每个 token 都会产生一个独立网络包，导致大量包头部开销和低带宽利用率。
                         </p>
 
-                        <div class="code-block mt-3">
-                            <div class="text-slate-300 space-y-1">
-                                <div class="text-amber-400">// 包合并机制</div>
-                                <div></div>
-                                <div>// 未合并 (传统方案):</div>
-                                <div>// token_1 (16 bytes) -> 网络包 (64B header + 16B data = 80B)</div>
-                                <div>// token_2 (16 bytes) -> 网络包 (64B header + 16B data = 80B)</div>
-                                <div>// token_3 (16 bytes) -> 网络包 (64B header + 16B data = 80B)</div>
-                                <div>// 总带宽: 240B (其中 192B 为头部开销, 利用率 20%)</div>
-                                <div></div>
-                                <div>// RPM 合并后:</div>
-                                <div>// token_1 + token_2 + token_3 (合并为 1 个缓存行)</div>
-                                <div>// -> 网络包 (64B header + 64B data = 128B)</div>
-                                <div>// 总带宽: 128B (其中 64B 为数据, 利用率 50%+)</div>
-                                <div></div>
-                                <div>// 合并条件: 匹配 (RowID, RowOffset) 元组</div>
-                                <div>// 只有同一 Row 且偏移连续的写入才能合并</div>
+                        <div class="tech-diagram mt-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Before: Unmerged -->
+                                <div class="bg-red-500/5 border border-red-500/20 rounded-lg p-4">
+                                    <div class="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2"><i class="fas fa-times-circle"></i> 未合并 (传统方案)</div>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <div class="bg-slate-800/60 rounded px-2 py-1 text-xs font-mono text-slate-300">token_1</div>
+                                            <span class="text-xs text-slate-500">16B</span>
+                                            <div class="flex-1 bg-red-500/20 border border-red-500/30 rounded h-6 flex items-center overflow-hidden">
+                                                <div class="bg-red-500/30 h-full" style="width: 20%"></div>
+                                                <div class="bg-slate-700/50 h-full" style="width: 80%"></div>
+                                            </div>
+                                            <span class="text-xs text-red-400">80B</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <div class="bg-slate-800/60 rounded px-2 py-1 text-xs font-mono text-slate-300">token_2</div>
+                                            <span class="text-xs text-slate-500">16B</span>
+                                            <div class="flex-1 bg-red-500/20 border border-red-500/30 rounded h-6 flex items-center overflow-hidden">
+                                                <div class="bg-red-500/30 h-full" style="width: 20%"></div>
+                                                <div class="bg-slate-700/50 h-full" style="width: 80%"></div>
+                                            </div>
+                                            <span class="text-xs text-red-400">80B</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <div class="bg-slate-800/60 rounded px-2 py-1 text-xs font-mono text-slate-300">token_3</div>
+                                            <span class="text-xs text-slate-500">16B</span>
+                                            <div class="flex-1 bg-red-500/20 border border-red-500/30 rounded h-6 flex items-center overflow-hidden">
+                                                <div class="bg-red-500/30 h-full" style="width: 20%"></div>
+                                                <div class="bg-slate-700/50 h-full" style="width: 80%"></div>
+                                            </div>
+                                            <span class="text-xs text-red-400">80B</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 bg-red-500/10 rounded p-2 text-center">
+                                        <div class="text-xs text-slate-400">总带宽: <span class="text-red-400 font-bold">240B</span></div>
+                                        <div class="text-xs text-slate-500">头部开销 192B · 利用率 <span class="text-red-400">20%</span></div>
+                                    </div>
+                                </div>
+                                <!-- After: Merged -->
+                                <div class="bg-green-500/5 border border-green-500/20 rounded-lg p-4">
+                                    <div class="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-check-circle"></i> RPM 合并后</div>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <div class="bg-green-500/20 border border-green-500/30 rounded px-2 py-1 text-xs font-mono text-green-300 flex-1">
+                                                token_1 + token_2 + token_3
+                                            </div>
+                                            <span class="text-xs text-green-400">128B</span>
+                                        </div>
+                                        <div class="bg-green-500/20 border border-green-500/30 rounded h-10 flex items-center overflow-hidden">
+                                            <div class="bg-green-500/40 h-full flex items-center justify-center text-xs text-green-300 font-semibold" style="width: 50%">64B 数据</div>
+                                            <div class="bg-slate-700/50 h-full flex items-center justify-center text-xs text-slate-400" style="width: 50%">64B 头部</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 bg-green-500/10 rounded p-2 text-center">
+                                        <div class="text-xs text-slate-400">总带宽: <span class="text-green-400 font-bold">128B</span></div>
+                                        <div class="text-xs text-slate-500">数据 64B · 利用率 <span class="text-green-400">50%+</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3 bg-amber-500/10 border border-amber-500/20 rounded p-2 flex items-start gap-2">
+                                <i class="fas fa-info-circle text-amber-400 mt-0.5"></i>
+                                <div class="text-xs text-slate-300"><strong>合并条件:</strong> 匹配 (RowID, RowOffset) 元组 — 只有同一 Row 且偏移连续的写入才能合并</div>
                             </div>
                         </div>
                     </div>
@@ -632,18 +788,45 @@
                                 <p class="text-xs text-slate-400 leading-relaxed">
                                     DAM 使用 <strong>CAM (Content-Addressable Memory)</strong> 结构的依赖表来跟踪每个 expert 的数据到达状态。CAM 允许通过内容（而非地址）快速查找条目，适合动态 token 路由的不可预测模式。
                                 </p>
-                                <div class="code-block mt-2">
-                                    <div class="text-slate-300 space-y-1">
-                                        <div class="text-cyan-400">// CAM 依赖表</div>
-                                        <div>// 每个条目跟踪一个 expert 的数据到达</div>
-                                        <div></div>
-                                        <div>// 条目结构:</div>
-                                        <div>// {</div>
-                                        <div>//     MallocID:    expert 标识</div>
-                                        <div>//     RowCount:    期望的 row 数量</div>
-                                        <div>//     ArrivedCnt:  已到达的 row 数量</div>
-                                        <div>//     Status:      PENDING / READY / DONE</div>
-                                        <div>// }</div>
+                                <div class="bg-slate-900/60 rounded-lg p-4 border border-cyan-500/20">
+                                    <div class="text-xs font-semibold text-cyan-400 mb-3 flex items-center gap-2"><i class="fas fa-memory"></i> CAM 依赖表结构</div>
+                                    <p class="text-xs text-slate-400 mb-3">每个条目跟踪一个 expert 的数据到达状态</p>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-xs">
+                                            <thead>
+                                                <tr class="border-b border-cyan-500/30">
+                                                    <th class="py-1.5 px-2 text-left text-cyan-300 font-semibold">字段</th>
+                                                    <th class="py-1.5 px-2 text-left text-cyan-300 font-semibold">类型</th>
+                                                    <th class="py-1.5 px-2 text-left text-cyan-300 font-semibold">说明</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="text-slate-300">
+                                                <tr class="border-b border-slate-700/50">
+                                                    <td class="py-1.5 px-2 font-mono text-amber-300">MallocID</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">标识符</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">expert 标识</td>
+                                                </tr>
+                                                <tr class="border-b border-slate-700/50">
+                                                    <td class="py-1.5 px-2 font-mono text-blue-300">RowCount</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">计数器</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">期望的 row 数量</td>
+                                                </tr>
+                                                <tr class="border-b border-slate-700/50">
+                                                    <td class="py-1.5 px-2 font-mono text-green-300">ArrivedCnt</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">计数器</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">已到达的 row 数量</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-1.5 px-2 font-mono text-purple-300">Status</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">枚举</td>
+                                                    <td class="py-1.5 px-2 text-slate-400">
+                                                        <span class="bg-yellow-500/20 text-yellow-300 px-1 rounded text-xs">PENDING</span>
+                                                        <span class="bg-green-500/20 text-green-300 px-1 rounded text-xs">READY</span>
+                                                        <span class="bg-slate-500/20 text-slate-300 px-1 rounded text-xs">DONE</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -653,16 +836,51 @@
                                 <p class="text-xs text-slate-400 leading-relaxed">
                                     TB (Token Block) 状态计数器跟踪每个 token block 的数据到达进度。当所有期望的 token 数据到达后，DAM 自动触发对应 expert 的计算 kernel。
                                 </p>
-                                <div class="code-block mt-2">
-                                    <div class="text-slate-300 space-y-1">
-                                        <div class="text-green-400">// TB 状态计数器</div>
-                                        <div>// 跟踪每个 expert 的 token block 到达</div>
-                                        <div></div>
-                                        <div>// 当 ArrivedCnt == RowCount 时:</div>
-                                        <div>//   1. 设置 Status = READY</div>
-                                        <div>//   2. 触发事件通知 GPU</div>
-                                        <div>//   3. 启动 expert 计算 kernel</div>
-                                        <div>//   4. 不再需要软件轮询!</div>
+                                <div class="bg-slate-900/60 rounded-lg p-4 border border-green-500/20">
+                                    <div class="text-xs font-semibold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-calculator"></i> TB 状态计数器</div>
+                                    <p class="text-xs text-slate-400 mb-3">跟踪每个 expert 的 token block 到达</p>
+                                    <div class="bg-slate-800/50 rounded-lg p-3 mb-3">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="text-xs text-slate-400">ArrivedCnt</div>
+                                            <div class="flex items-center gap-1">
+                                                <div class="w-3 h-3 bg-green-500/60 rounded"></div>
+                                                <div class="w-3 h-3 bg-green-500/60 rounded"></div>
+                                                <div class="w-3 h-3 bg-green-500/60 rounded"></div>
+                                                <div class="w-3 h-3 bg-slate-600 rounded"></div>
+                                                <div class="w-3 h-3 bg-slate-600 rounded"></div>
+                                            </div>
+                                            <div class="text-xs text-green-400 font-mono">3 / 5</div>
+                                        </div>
+                                        <div class="w-full bg-slate-700 rounded-full h-2">
+                                            <div class="bg-green-500 h-2 rounded-full transition-all" style="width: 60%"></div>
+                                        </div>
+                                        <div class="flex items-center justify-between mt-1">
+                                            <span class="text-xs text-slate-500">0</span>
+                                            <span class="text-xs text-slate-500">RowCount</span>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2 text-xs text-slate-400">
+                                        <div class="bg-green-500/10 border border-green-500/20 rounded p-2">
+                                            <div class="text-xs font-semibold text-green-400 mb-1">触发条件: <code class="text-green-300">ArrivedCnt == RowCount</code></div>
+                                            <div class="space-y-1 mt-2">
+                                                <div class="flex items-start gap-2">
+                                                    <span class="text-green-400"><i class="fas fa-check"></i></span>
+                                                    <span>设置 Status = <span class="text-green-300">READY</span></span>
+                                                </div>
+                                                <div class="flex items-start gap-2">
+                                                    <span class="text-green-400"><i class="fas fa-check"></i></span>
+                                                    <span>触发事件通知 GPU</span>
+                                                </div>
+                                                <div class="flex items-start gap-2">
+                                                    <span class="text-green-400"><i class="fas fa-check"></i></span>
+                                                    <span>启动 expert 计算 kernel</span>
+                                                </div>
+                                                <div class="flex items-start gap-2">
+                                                    <span class="text-green-400"><i class="fas fa-check"></i></span>
+                                                    <span class="text-green-300 font-semibold">不再需要软件轮询!</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -701,20 +919,58 @@
                         <p class="text-sm text-slate-400 leading-relaxed">
                             DAM 还包含全局完成检测逻辑，用于跟踪整个 MoE 层的完成状态。当所有 expert 的计算都完成后，DAM 通知 combine 阶段可以开始。这消除了软件层对整个层完成状态的轮询需求。
                         </p>
-                        <div class="code-block mt-3">
-                            <div class="text-slate-300 space-y-1">
-                                <div class="text-amber-400">// 全局完成检测</div>
-                                <div></div>
-                                <div>// 跟踪所有 expert 的状态:</div>
-                                <div>// total_experts = 所有 expert 数量</div>
-                                <div>// completed_experts = 已完成计算的 expert 数量</div>
-                                <div></div>
-                                <div>// 每完成一个 expert:</div>
-                                <div>//   completed_experts++</div>
-                                <div>//   if completed_experts == total_experts:</div>
-                                <div>//       trigger_combine_phase()  // 自动触发 combine</div>
-                                <div></div>
-                                <div>// 不需要 CPU 或 GPU kernel 检查!</div>
+                        <div class="tech-diagram mt-3">
+                            <div class="text-sm font-semibold text-amber-400 mb-3 flex items-center gap-2"><i class="fas fa-flag-checkered"></i> 全局完成检测逻辑</div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Counter -->
+                                <div class="bg-slate-800/60 rounded-lg p-4 text-center">
+                                    <div class="text-xs text-slate-400 mb-2">Expert 完成计数器</div>
+                                    <div class="flex items-center justify-center gap-3 mb-3">
+                                        <div class="bg-slate-900/80 rounded-lg p-3 border border-amber-500/30">
+                                            <div class="text-2xl font-bold text-amber-400" id="completedCounter">0</div>
+                                            <div class="text-xs text-slate-500">completed</div>
+                                        </div>
+                                        <div class="text-slate-500 text-lg">/</div>
+                                        <div class="bg-slate-900/80 rounded-lg p-3 border border-slate-500/30">
+                                            <div class="text-2xl font-bold text-slate-300">N</div>
+                                            <div class="text-xs text-slate-500">total</div>
+                                        </div>
+                                    </div>
+                                    <div class="w-full bg-slate-700 rounded-full h-2">
+                                        <div class="bg-amber-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <!-- Increment Logic -->
+                                <div class="bg-slate-800/60 rounded-lg p-4">
+                                    <div class="text-xs font-semibold text-green-400 mb-2">Increment 逻辑</div>
+                                    <div class="space-y-2">
+                                        <div class="workflow-step">
+                                            <div class="step-number">1</div>
+                                            <p class="text-xs text-slate-300">Expert 计算完成</p>
+                                        </div>
+                                        <div class="workflow-step">
+                                            <div class="step-number">2</div>
+                                            <p class="text-xs text-slate-300"><code class="text-amber-300">completed_experts++</code></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Auto-Trigger -->
+                                <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                                    <div class="text-xs font-semibold text-green-400 mb-2">自动触发条件</div>
+                                    <div class="bg-slate-900/60 rounded p-3 mb-3">
+                                        <div class="text-xs font-mono text-green-300 text-center">completed == total</div>
+                                    </div>
+                                    <div class="space-y-2 text-xs text-slate-300">
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-bolt text-yellow-400 mt-0.5"></i>
+                                            <span>自动触发 <code class="text-amber-300">combine_phase</code></span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-ban text-slate-400 mt-0.5"></i>
+                                            <span>无需 CPU/GPU kernel 检查</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -768,18 +1024,56 @@
                             Combine 阶段将 expert 处理后的输出发送回原始生产者 GPU。与 dispatch 不同，combine 阶段的目标地址已知（反向于 dispatch），且部分数据（如 padding）可以使用 <code class="text-amber-300">.nop</code> 后缀标记为非关键路径。
                         </p>
 
-                        <div class="code-block mt-3">
-                            <div class="text-slate-300 space-y-1">
-                                <div class="text-amber-400">// Combine 阶段 st.rowsp 使用</div>
-                                <div></div>
-                                <div>// 关键路径数据 (需要依赖跟踪):</div>
-                                <div>st.rowsp expert_output, [row_id].[offset].[malloc_id]</div>
-                                <div></div>
-                                <div>// 非关键路径数据 (如 padding，不需要依赖跟踪):</div>
-                                <div>st.rowsp.nop padding_data, [row_id].[offset].[malloc_id]</div>
-                                <div></div>
-                                <div>// .nop 后缀告诉 DAM 不为此数据触发依赖事件</div>
-                                <div>// 避免无意义的数据触发，减少不必要的等待</div>
+                        <div class="tech-diagram mt-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Critical Path -->
+                                <div class="bg-green-500/5 border border-green-500/30 rounded-lg p-4">
+                                    <div class="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-route"></i> 关键路径数据</div>
+                                    <div class="bg-slate-900/60 rounded p-3 mb-3 font-mono text-xs">
+                                        <div><span class="text-green-400">st.rowsp</span> <span class="text-slate-300">expert_output</span>,</div>
+                                        <div class="ml-4">[<span class="text-violet-400">row_id</span>].[<span class="text-blue-400">offset</span>].[<span class="text-amber-400">malloc_id</span>]</div>
+                                    </div>
+                                    <div class="space-y-2 text-xs text-slate-400">
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-check-circle text-green-400 mt-0.5"></i>
+                                            <span>需要依赖跟踪</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-check-circle text-green-400 mt-0.5"></i>
+                                            <span>DAM 会计数并触发事件</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-check-circle text-green-400 mt-0.5"></i>
+                                            <span>实际 expert 输出数据</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Non-Critical Path (.nop) -->
+                                <div class="bg-slate-500/5 border border-slate-500/30 rounded-lg p-4">
+                                    <div class="text-sm font-semibold text-slate-400 mb-3 flex items-center gap-2"><i class="fas fa-minus-circle"></i> 非关键路径数据 (.nop)</div>
+                                    <div class="bg-slate-900/60 rounded p-3 mb-3 font-mono text-xs">
+                                        <div><span class="text-slate-400">st.rowsp.nop</span> <span class="text-slate-300">padding_data</span>,</div>
+                                        <div class="ml-4">[<span class="text-violet-400">row_id</span>].[<span class="text-blue-400">offset</span>].[<span class="text-amber-400">malloc_id</span>]</div>
+                                    </div>
+                                    <div class="space-y-2 text-xs text-slate-400">
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-ban text-slate-400 mt-0.5"></i>
+                                            <span><strong>不</strong>需要依赖跟踪</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-ban text-slate-400 mt-0.5"></i>
+                                            <span>DAM 忽略，不触发事件</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-ban text-slate-400 mt-0.5"></i>
+                                            <span>Padding / 对齐数据</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3 bg-amber-500/10 border border-amber-500/20 rounded p-2 flex items-start gap-2">
+                                <i class="fas fa-info-circle text-amber-400 mt-0.5"></i>
+                                <div class="text-xs text-slate-300"><strong>.nop 后缀</strong> 告诉 DAM 不为此数据触发依赖事件 — 避免无意义的触发，减少不必要的等待</div>
                             </div>
                         </div>
 
@@ -1183,28 +1477,101 @@
 
                     <div class="tech-diagram">
                         <h4 class="text-sm font-medium text-amber-300 mb-3">MoE-Hub 在 MoE 技术生态中的位置</h4>
-                        <div class="code-block">
-                            <div class="text-slate-300 space-y-1">
-                                <div class="text-amber-400">// MoE 计算通信优化技术栈</div>
-                                <div></div>
-                                <div>// 应用层:</div>
-                                <div>//   Mixtral, Qwen-MoE, DeepSeek-MoE, Phi-MoE ...</div>
-                                <div></div>
-                                <div>// 框架层:</div>
-                                <div>//   Megatron-TE, FasterMoE, Tutel, Comet, CCFuser</div>
-                                <div></div>
-                                <div>// 通信库层:</div>
-                                <div>//   NCCL, RCCL, DeepEP, NVSHMEM</div>
-                                <div></div>
-                                <div>// 计算通信重叠层:</div>
-                                <div>//   FlashOverlap (信号驱动) | T3 (Track & Trigger)</div>
-                                <div>//   C3 (DMA 卸载)          | MoE-Hub (硬件加速)  &lt;-- 本文</div>
-                                <div></div>
-                                <div>// 硬件层:</div>
-                                <div>//   GPU Hub: RPM + AAU + DAM (MoE-Hub 模块)</div>
-                                <div>//   新指令: st.rowsp / st.rowsp.nop</div>
-                                <div>//   新 API: rowspMalloc (MMIO)</div>
-                                <div>//   网络: NVLink / NVSwitch / Infinity Fabric</div>
+                        <div class="arch-grid" style="grid-template-columns: 1fr;">
+                            <!-- Layer 1: Application -->
+                            <div class="bg-violet-500/10 border border-violet-500/30 rounded-lg p-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 bg-violet-500/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-layer-group text-violet-400"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-xs font-semibold text-violet-300">应用层 Application</div>
+                                        <div class="text-xs text-slate-400 mt-1">Mixtral, Qwen-MoE, DeepSeek-MoE, Phi-MoE ...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-center text-slate-600"><i class="fas fa-arrow-down"></i></div>
+                            <!-- Layer 2: Framework -->
+                            <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 bg-blue-500/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-cubes text-blue-400"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-xs font-semibold text-blue-300">框架层 Framework</div>
+                                        <div class="text-xs text-slate-400 mt-1">Megatron-TE, FasterMoE, Tutel, Comet, CCFuser</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-center text-slate-600"><i class="fas fa-arrow-down"></i></div>
+                            <!-- Layer 3: Communication Library -->
+                            <div class="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 bg-cyan-500/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-network-wired text-cyan-400"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-xs font-semibold text-cyan-300">通信库层 Communication Library</div>
+                                        <div class="text-xs text-slate-400 mt-1">NCCL, RCCL, DeepEP, NVSHMEM</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-center text-slate-600"><i class="fas fa-arrow-down"></i></div>
+                            <!-- Layer 4: Overlap Layer (highlighted) -->
+                            <div class="bg-amber-500/15 border-2 border-amber-500/40 rounded-lg p-4 relative">
+                                <div class="absolute -top-2 -right-2 bg-amber-500 text-slate-900 text-xs font-bold px-2 py-0.5 rounded-full">本文</div>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-8 h-8 bg-amber-500/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-exchange-alt text-amber-400"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-xs font-semibold text-amber-300">计算通信重叠层 Overlap</div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                    <div class="bg-slate-800/50 rounded p-2 text-center">
+                                        <div class="text-xs text-slate-300 font-semibold">FlashOverlap</div>
+                                        <div class="text-xs text-slate-500">信号驱动</div>
+                                    </div>
+                                    <div class="bg-slate-800/50 rounded p-2 text-center">
+                                        <div class="text-xs text-slate-300 font-semibold">T3</div>
+                                        <div class="text-xs text-slate-500">Track & Trigger</div>
+                                    </div>
+                                    <div class="bg-slate-800/50 rounded p-2 text-center">
+                                        <div class="text-xs text-slate-300 font-semibold">C3</div>
+                                        <div class="text-xs text-slate-500">DMA 卸载</div>
+                                    </div>
+                                    <div class="bg-amber-500/20 border border-amber-500/30 rounded p-2 text-center">
+                                        <div class="text-xs text-amber-300 font-semibold">MoE-Hub</div>
+                                        <div class="text-xs text-amber-500">硬件加速</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-center text-slate-600"><i class="fas fa-arrow-down"></i></div>
+                            <!-- Layer 5: Hardware -->
+                            <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 bg-red-500/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-microchip text-red-400"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-xs font-semibold text-red-300">硬件层 Hardware</div>
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                                            <div class="bg-slate-800/40 rounded p-2">
+                                                <div class="text-xs text-slate-300"><i class="fas fa-server text-red-400 mr-1"></i>GPU Hub</div>
+                                                <div class="text-xs text-slate-500">RPM + AAU + DAM</div>
+                                            </div>
+                                            <div class="bg-slate-800/40 rounded p-2">
+                                                <div class="text-xs text-slate-300"><i class="fas fa-terminal text-green-400 mr-1"></i>新指令</div>
+                                                <div class="text-xs text-slate-500">st.rowsp / st.rowsp.nop</div>
+                                            </div>
+                                            <div class="bg-slate-800/40 rounded p-2">
+                                                <div class="text-xs text-slate-300"><i class="fas fa-ethernet text-blue-400 mr-1"></i>网络</div>
+                                                <div class="text-xs text-slate-500">NVLink / NVSwitch</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

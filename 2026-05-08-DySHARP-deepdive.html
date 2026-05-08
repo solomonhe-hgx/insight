@@ -440,21 +440,54 @@
                     <div class="text-center mb-4">
                         <div class="font-bold text-green-300 text-lg">动态多内存寻址机制</div>
                     </div>
-                    <div class="code-block p-4">
-                        <span class="text-slate-500">// 代数索引到布局索引的翻译流程</span><br>
-                        <span class="text-slate-300">Token 代数索引 (Algebraic Index): [expert_id, token_offset_in_expert]</span><br>
-                        <span class="text-slate-300">     |</span><br>
-                        <span class="text-slate-300">     v</span><br>
-                        <span class="text-slate-300">[硬件内存管理器] -- 查询片上转换表 (On-chip Translation Table)</span><br>
-                        <span class="text-slate-300">     |</span><br>
-                        <span class="text-slate-300">     +-- Cache Hit: 直接返回布局索引 (Layout Index)</span><br>
-                        <span class="text-slate-300">     +-- Cache Miss: 计算映射,更新缓存</span><br>
-                        <span class="text-slate-300">     |</span><br>
-                        <span class="text-slate-300">     v</span><br>
-                        <span class="text-slate-300">布局索引 (Layout Index): [GPU_id, memory_address_within_GPU]</span><br>
-                        <span class="text-slate-300">     |</span><br>
-                        <span class="text-slate-300">     v</span><br>
-                        <span class="text-slate-300">NVLink 交换机路由到目标 GPU 的指定内存地址</span>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-2 items-center text-center">
+                        <!-- Stage 1: Algebraic Index -->
+                        <div class="bg-amber-500/20 rounded-lg p-4 border border-amber-500/40">
+                            <div class="w-12 h-12 bg-amber-500/30 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                <i class="fas fa-hashtag text-amber-400 text-xl"></i>
+                            </div>
+                            <div class="font-semibold text-amber-300 text-sm">代数索引</div>
+                            <div class="text-xs text-slate-400 mt-1 font-mono">[expert_id, offset]</div>
+                        </div>
+                        <!-- Arrow 1 -->
+                        <div class="flex justify-center">
+                            <i class="fas fa-arrow-right text-slate-500 text-lg"></i>
+                        </div>
+                        <!-- Stage 2: Hardware Memory Manager -->
+                        <div class="bg-blue-500/20 rounded-lg p-4 border border-blue-500/40">
+                            <div class="w-12 h-12 bg-blue-500/30 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                <i class="fas fa-microchip text-blue-400 text-xl"></i>
+                            </div>
+                            <div class="font-semibold text-blue-300 text-sm">硬件内存管理器</div>
+                            <div class="grid grid-cols-2 gap-1 mt-2 text-xs">
+                                <div class="bg-green-500/20 rounded px-2 py-1 text-green-400"><i class="fas fa-check mr-1"></i>Hit</div>
+                                <div class="bg-red-500/20 rounded px-2 py-1 text-red-400"><i class="fas fa-times mr-1"></i>Miss</div>
+                            </div>
+                        </div>
+                        <!-- Arrow 2 -->
+                        <div class="flex justify-center">
+                            <i class="fas fa-arrow-right text-slate-500 text-lg"></i>
+                        </div>
+                        <!-- Stage 3: Layout Index + NVLink -->
+                        <div class="grid grid-rows-2 gap-2">
+                            <div class="bg-green-500/20 rounded-lg p-3 border border-green-500/40">
+                                <div class="w-10 h-10 bg-green-500/30 rounded-lg flex items-center justify-center mx-auto mb-1">
+                                    <i class="fas fa-map-marker-alt text-green-400"></i>
+                                </div>
+                                <div class="font-semibold text-green-300 text-xs">布局索引</div>
+                                <div class="text-xs text-slate-400 font-mono">[GPU_id, addr]</div>
+                            </div>
+                            <div class="bg-purple-500/20 rounded-lg p-3 border border-purple-500/40">
+                                <div class="w-10 h-10 bg-purple-500/30 rounded-lg flex items-center justify-center mx-auto mb-1">
+                                    <i class="fas fa-route text-purple-400"></i>
+                                </div>
+                                <div class="font-semibold text-purple-300 text-xs">NVLink 路由</div>
+                                <div class="text-xs text-slate-400">目标 GPU 内存</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-500 text-center">
+                        <i class="fas fa-info-circle mr-1"></i>代数索引通过片上转换表与缓存翻译为布局索引,由 NVLink 交换机路由到目标 GPU
                     </div>
                 </div>
 
@@ -513,18 +546,64 @@
                             <strong class="text-emerald-300">多播机制</strong>
                             <p class="mt-2 text-slate-400">在 dispatch 阶段,当一个 token 需要被发送到多个 expert GPU (top-k routing) 时,DySHARP 交换机执行<strong class="text-slate-300">硬件级多播 (hardware multicast)</strong>。交换机从源 GPU 接收一次数据,然后在交换机内部复制并同时发送到 k 个目标 GPU。这避免了源 GPU 发送 k 次相同数据的冗余。</p>
                         </div>
-                        <div class="code-block p-4 mt-4">
-                            <span class="text-slate-500">// 多播分组格式</span><br>
-                            <span class="text-green-400">[Header]</span><br>
-                            <span class="text-slate-300">  src_gpu_id       : 8 bits</span><br>
-                            <span class="text-slate-300">  multicast_count    : 4 bits  (目标 GPU 数量 k)</span><br>
-                            <span class="text-slate-300">  token_payload_size : 16 bits</span><br>
-                            <span class="text-green-400">[Compact Target List]</span><br>
-                            <span class="text-slate-300">  target_gpu_ids[]   : k x 8 bits</span><br>
-                            <span class="text-slate-300">  compact_addresses[]: k x N bits  (紧凑目标地址)</span><br>
-                            <span class="text-green-400">[Token Payload]</span><br>
-                            <span class="text-slate-300">  token_data         : variable</span><br>
-                            <span class="text-slate-500">// 一个地址 + 紧凑目标列表,交换机内部复制</span>
+                        <div class="mt-4">
+                            <!-- Packet Structure Diagram -->
+                            <div class="bg-slate-900/80 rounded-lg border border-slate-700 overflow-hidden">
+                                <!-- Header Section -->
+                                <div class="border-b border-slate-700">
+                                    <div class="bg-green-500/10 px-4 py-2 flex items-center justify-between">
+                                        <span class="text-green-400 font-semibold text-sm"><i class="fas fa-heading mr-2"></i>Header</span>
+                                        <span class="text-xs text-slate-500">28 bits total</span>
+                                    </div>
+                                    <div class="px-4 py-3 grid grid-cols-3 gap-3">
+                                        <div class="bg-blue-500/20 rounded-lg p-2 text-center border border-blue-500/30">
+                                            <div class="text-xs text-blue-300 font-semibold">src_gpu_id</div>
+                                            <div class="text-xs text-blue-400 font-mono mt-1">8 bits</div>
+                                        </div>
+                                        <div class="bg-amber-500/20 rounded-lg p-2 text-center border border-amber-500/30">
+                                            <div class="text-xs text-amber-300 font-semibold">multicast_count</div>
+                                            <div class="text-xs text-amber-400 font-mono mt-1">4 bits</div>
+                                        </div>
+                                        <div class="bg-purple-500/20 rounded-lg p-2 text-center border border-purple-500/30">
+                                            <div class="text-xs text-purple-300 font-semibold">token_payload_size</div>
+                                            <div class="text-xs text-purple-400 font-mono mt-1">16 bits</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Compact Target List Section -->
+                                <div class="border-b border-slate-700">
+                                    <div class="bg-amber-500/10 px-4 py-2 flex items-center justify-between">
+                                        <span class="text-amber-400 font-semibold text-sm"><i class="fas fa-list mr-2"></i>Compact Target List</span>
+                                        <span class="text-xs text-slate-500">k x (8+N) bits</span>
+                                    </div>
+                                    <div class="px-4 py-3 grid grid-cols-2 gap-3">
+                                        <div class="bg-cyan-500/20 rounded-lg p-3 text-center border border-cyan-500/30">
+                                            <div class="text-xs text-cyan-300 font-semibold">target_gpu_ids[]</div>
+                                            <div class="text-xs text-cyan-400 font-mono mt-1">k x 8 bits</div>
+                                        </div>
+                                        <div class="bg-teal-500/20 rounded-lg p-3 text-center border border-teal-500/30">
+                                            <div class="text-xs text-teal-300 font-semibold">compact_addresses[]</div>
+                                            <div class="text-xs text-teal-400 font-mono mt-1">k x N bits</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Token Payload Section -->
+                                <div>
+                                    <div class="bg-red-500/10 px-4 py-2 flex items-center justify-between">
+                                        <span class="text-red-400 font-semibold text-sm"><i class="fas fa-cube mr-2"></i>Token Payload</span>
+                                        <span class="text-xs text-slate-500">variable size</span>
+                                    </div>
+                                    <div class="px-4 py-4">
+                                        <div class="bg-red-500/15 rounded-lg p-3 text-center border border-red-500/30 border-dashed">
+                                            <div class="text-xs text-red-300 font-semibold">token_data</div>
+                                            <div class="text-xs text-red-400 font-mono mt-1">variable</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-slate-500 text-center">
+                                <i class="fas fa-info-circle mr-1"></i>一个地址 + 紧凑目标列表,交换机内部复制分发到多个目标 GPU
+                            </div>
                         </div>
                     </div>
 
@@ -535,12 +614,69 @@
                             <strong class="text-emerald-300">归约机制</strong>
                             <p class="mt-2 text-slate-400">在 combine 阶段,来自多个 expert GPU 的同一 token 的部分结果需要在交换机中执行<strong class="text-slate-300">求和归约 (sum reduction)</strong>。DySHARP 交换机支持在交换机内部直接对 partial results 进行元素级求和,然后将归约后的完整结果发送回源 GPU。这避免了源 GPU 接收多个 partial results 后在本地进行归约的额外开销。</p>
                         </div>
-                        <div class="code-block p-4 mt-4">
-                            <span class="text-slate-500">// 归约过程示意</span><br>
-                            <span class="text-slate-300">GPU_0 [partial_result for token_A] ─┐</span><br>
-                            <span class="text-slate-300">GPU_1 [partial_result for token_A] ─┤→ [交换机内求和] → GPU_src[token_A] = Σ partial</span><br>
-                            <span class="text-slate-300">GPU_2 [partial_result for token_A] ─┘</span><br>
-                            <span class="text-slate-500">// 交换机直接完成 sum reduction,无需 GPU 二次处理</span>
+                        <div class="mt-4">
+                            <!-- Reduction Flow Diagram -->
+                            <div class="bg-slate-900/80 rounded-lg border border-slate-700 p-5">
+                                <!-- GPU Sources Row -->
+                                <div class="grid grid-cols-3 gap-4 mb-4">
+                                    <div class="bg-blue-500/15 rounded-lg p-3 border border-blue-500/30 text-center">
+                                        <div class="w-10 h-10 bg-blue-500/30 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-server text-blue-400"></i>
+                                        </div>
+                                        <div class="font-semibold text-blue-300 text-sm">GPU_0</div>
+                                        <div class="text-xs text-slate-400 mt-1 font-mono">partial_result[token_A]</div>
+                                    </div>
+                                    <div class="bg-blue-500/15 rounded-lg p-3 border border-blue-500/30 text-center">
+                                        <div class="w-10 h-10 bg-blue-500/30 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-server text-blue-400"></i>
+                                        </div>
+                                        <div class="font-semibold text-blue-300 text-sm">GPU_1</div>
+                                        <div class="text-xs text-slate-400 mt-1 font-mono">partial_result[token_A]</div>
+                                    </div>
+                                    <div class="bg-blue-500/15 rounded-lg p-3 border border-blue-500/30 text-center">
+                                        <div class="w-10 h-10 bg-blue-500/30 rounded-lg flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-server text-blue-400"></i>
+                                        </div>
+                                        <div class="font-semibold text-blue-300 text-sm">GPU_2</div>
+                                        <div class="text-xs text-slate-400 mt-1 font-mono">partial_result[token_A]</div>
+                                    </div>
+                                </div>
+                                <!-- Converging Arrows -->
+                                <div class="flex justify-center mb-4">
+                                    <div class="grid grid-cols-3 gap-4 w-full max-w-md">
+                                        <div class="flex justify-center"><i class="fas fa-arrow-down text-slate-500"></i></div>
+                                        <div class="flex justify-center"><i class="fas fa-arrow-down text-slate-500"></i></div>
+                                        <div class="flex justify-center"><i class="fas fa-arrow-down text-slate-500"></i></div>
+                                    </div>
+                                </div>
+                                <!-- Switch Reduction Box -->
+                                <div class="flex justify-center mb-4">
+                                    <div class="bg-amber-500/20 rounded-xl p-4 border border-amber-500/40 text-center">
+                                        <div class="w-14 h-14 bg-amber-500/30 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-calculator text-amber-400 text-xl"></i>
+                                        </div>
+                                        <div class="font-semibold text-amber-300">交换机内求和</div>
+                                        <div class="text-xs text-slate-400 mt-1">Sum Reduction in Switch</div>
+                                    </div>
+                                </div>
+                                <!-- Result Arrow -->
+                                <div class="flex justify-center mb-4">
+                                    <i class="fas fa-arrow-down text-green-500 text-lg"></i>
+                                </div>
+                                <!-- Result Box -->
+                                <div class="flex justify-center">
+                                    <div class="bg-green-500/20 rounded-xl p-4 border border-green-500/40 text-center max-w-sm">
+                                        <div class="w-14 h-14 bg-green-500/30 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                                        </div>
+                                        <div class="font-semibold text-green-300">GPU_src[token_A] = Σ partial</div>
+                                        <div class="text-xs text-slate-400 mt-1">归约结果返回源 GPU</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-slate-500 text-center">
+                                <i class="fas fa-info-circle mr-1"></i>交换机直接完成 sum reduction,无需 GPU 二次处理
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -677,21 +813,103 @@
                     </div>
                 </div>
 
-                <div class="code-block p-4 mt-4">
-                    <span class="text-slate-500">// DySHARP 调度伪代码示意</span><br>
-                    <span class="text-green-400">function</span> <span class="text-slate-300">schedule_moe_layer(tokens, expert_mapping):</span><br>
-                    <span class="text-slate-300">    <span class="text-slate-500"># Step 1: 解析 token-to-expert 映射,更新地址翻译表</span></span><br>
-                    <span class="text-slate-300">    update_translation_table(expert_mapping)</span><br>
-                    <span class="text-slate-300">    <span class="text-slate-500"># Step 2: 按目标 GPU 分组 token (compact target list)</span></span><br>
-                    <span class="text-slate-300">    groups = group_by_targets(tokens)</span><br>
-                    <span class="text-slate-300">    <span class="text-slate-500"># Step 3: 并发启动 dispatch + combine 管线</span></span><br>
-                    <span class="text-slate-300">    dispatch_pipe = launch_dispatch(groups)  <span class="text-slate-500"># 交换机多播</span></span><br>
-                    <span class="text-slate-300">    <span class="text-slate-500"># Step 4: 当第一批 token 到达 expert GPU,启动 compute</span></span><br>
-                    <span class="text-slate-300">    on_token_arrival(dispatch_pipe, compute_experts)</span><br>
-                    <span class="text-slate-300">    <span class="text-slate-500"># Step 5: 计算完成后,启动 combine 管线 (交换机归约)</span></span>
-<br>
-                    <span class="text-slate-300">    combine_pipe = launch_combine(compute_experts)  <span class="text-slate-500"># 交换机归约</span></span><br>
-                    <span class="text-slate-300">    <span class="text-slate-500"># 双向流量在时间上重叠,平衡带宽利用率</span></span>
+                <div class="mt-4">
+                    <!-- Scheduling Workflow Diagram -->
+                    <div class="bg-slate-900/80 rounded-lg border border-slate-700 p-5">
+                        <div class="flex items-center gap-2 mb-5">
+                            <i class="fas fa-calendar-alt text-cyan-400"></i>
+                            <span class="font-semibold text-cyan-300">DySHARP 调度工作流</span>
+                            <span class="text-xs text-slate-500 ml-auto">schedule_moe_layer(tokens, expert_mapping)</span>
+                        </div>
+                        <!-- Step 1 -->
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 bg-blue-500/30 rounded-full flex items-center justify-center shrink-0 border border-blue-500/50">
+                                <span class="text-blue-300 font-bold text-sm">1</span>
+                            </div>
+                            <div class="flex-1 bg-blue-500/10 rounded-lg p-3 border border-blue-500/30">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-table text-blue-400"></i>
+                                    <span class="font-semibold text-blue-300 text-sm">Update Translation Table</span>
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">解析 token-to-expert 映射,更新地址翻译表</div>
+                                <div class="text-xs text-blue-400/70 font-mono mt-1">update_translation_table(expert_mapping)</div>
+                            </div>
+                        </div>
+                        <!-- Arrow -->
+                        <div class="flex justify-center my-1"><i class="fas fa-arrow-down text-slate-600"></i></div>
+                        <!-- Step 2 -->
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 bg-amber-500/30 rounded-full flex items-center justify-center shrink-0 border border-amber-500/50">
+                                <span class="text-amber-300 font-bold text-sm">2</span>
+                            </div>
+                            <div class="flex-1 bg-amber-500/10 rounded-lg p-3 border border-amber-500/30">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-object-group text-amber-400"></i>
+                                    <span class="font-semibold text-amber-300 text-sm">Group Tokens by Target</span>
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">按目标 GPU 分组 token,构建 compact target list</div>
+                                <div class="text-xs text-amber-400/70 font-mono mt-1">groups = group_by_targets(tokens)</div>
+                            </div>
+                        </div>
+                        <!-- Arrow -->
+                        <div class="flex justify-center my-1"><i class="fas fa-arrow-down text-slate-600"></i></div>
+                        <!-- Step 3 -->
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 bg-red-500/30 rounded-full flex items-center justify-center shrink-0 border border-red-500/50">
+                                <span class="text-red-300 font-bold text-sm">3</span>
+                            </div>
+                            <div class="flex-1 bg-red-500/10 rounded-lg p-3 border border-red-500/30">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-paper-plane text-red-400"></i>
+                                    <span class="font-semibold text-red-300 text-sm">Launch Dispatch Pipeline</span>
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">启动 dispatch 管线,交换机多播分发 token</div>
+                                <div class="text-xs text-red-400/70 font-mono mt-1">dispatch_pipe = launch_dispatch(groups)  # 交换机多播</div>
+                            </div>
+                        </div>
+                        <!-- Arrow -->
+                        <div class="flex justify-center my-1"><i class="fas fa-arrow-down text-slate-600"></i></div>
+                        <!-- Step 4 -->
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 bg-green-500/30 rounded-full flex items-center justify-center shrink-0 border border-green-500/50">
+                                <span class="text-green-300 font-bold text-sm">4</span>
+                            </div>
+                            <div class="flex-1 bg-green-500/10 rounded-lg p-3 border border-green-500/30">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-calculator text-green-400"></i>
+                                    <span class="font-semibold text-green-300 text-sm">On Token Arrival, Trigger Compute</span>
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">当第一批 token 到达 expert GPU,立即启动 expert 计算</div>
+                                <div class="text-xs text-green-400/70 font-mono mt-1">on_token_arrival(dispatch_pipe, compute_experts)</div>
+                            </div>
+                        </div>
+                        <!-- Arrow -->
+                        <div class="flex justify-center my-1"><i class="fas fa-arrow-down text-slate-600"></i></div>
+                        <!-- Step 5 -->
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 bg-purple-500/30 rounded-full flex items-center justify-center shrink-0 border border-purple-500/50">
+                                <span class="text-purple-300 font-bold text-sm">5</span>
+                            </div>
+                            <div class="flex-1 bg-purple-500/10 rounded-lg p-3 border border-purple-500/30">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-object-group text-purple-400"></i>
+                                    <span class="font-semibold text-purple-300 text-sm">Launch Combine Pipeline</span>
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">计算完成后启动 combine 管线,交换机归约 partial results</div>
+                                <div class="text-xs text-purple-400/70 font-mono mt-1">combine_pipe = launch_combine(compute_experts)  # 交换机归约</div>
+                            </div>
+                        </div>
+                        <!-- Summary Box -->
+                        <div class="mt-4 pt-3 border-t border-slate-700">
+                            <div class="bg-emerald-500/15 rounded-lg p-3 border border-emerald-500/30 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <i class="fas fa-arrows-alt-h text-emerald-400"></i>
+                                    <span class="font-semibold text-emerald-300">双向流量重叠</span>
+                                    <span class="text-xs text-slate-400">— dispatch 与 combine 在时间上并发,平衡双向带宽利用率</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="mt-4 text-xs text-slate-500">
                     来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 7: Communication-Aware Scheduling</a>

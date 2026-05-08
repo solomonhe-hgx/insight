@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DySHARP: Accelerating MoE with Dynamic In-Switch Computing — 论文深度解读</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); min-height: 100vh; color: #e2e8f0; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; border-bottom: 3px solid transparent; }
+        .nav-tab:hover { background: rgba(148, 163, 184, 0.1); }
+        .nav-tab.active { border-bottom-color: #8b5cf6; background: rgba(139, 92, 246, 0.1); }
+        .paper-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); transition: all 0.2s ease; }
+        .paper-card:hover { border-color: rgba(139, 92, 246, 0.4); box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; transition: all 0.2s; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .highlight-box { border-left: 4px solid #8b5cf6; background: rgba(139, 92, 246, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .tech-box { border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.08); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .insight-box { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.08); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .code-block { background: #0d1117; border: 1px solid #30363d; border-radius: 0.5rem; font-family: 'Fira Code', monospace; font-size: 0.85rem; overflow-x: auto; }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .comparison-table th { background: rgba(139, 92, 246, 0.2); }
+        .comparison-table tr:hover { background: rgba(148, 163, 184, 0.05); }
+        .trend-card { background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(30, 41, 59, 0.5) 100%); border: 1px solid rgba(139, 92, 246, 0.3); }
+        .architecture-diagram { background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(30, 41, 59, 0.8) 100%); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .metric-card { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(30, 41, 59, 0.5) 100%); border: 1px solid rgba(59, 130, 246, 0.3); }
+        h3 { font-size: 1.125rem; }
+        h4 { font-size: 1rem; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-bolt text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">DySHARP: 动态交换机内计算加速 MoE 论文深度解读</h1>
+                        <p class="text-xs text-slate-400">Accelerating MoE with Dynamic In-Switch Computing on Multi-GPUs — arXiv:2605.05607</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <div class="glass-card px-4 py-2 rounded-lg border border-emerald-500/20">
+                        <div class="text-xs text-slate-400">论文 ID</div>
+                        <div class="text-sm font-bold text-emerald-400 font-mono">arXiv:2605.05607</div>
+                    </div>
+                    <div class="glass-card px-4 py-2 rounded-lg border border-green-500/20">
+                        <div class="text-xs text-slate-400">解读日期</div>
+                        <div class="text-sm font-bold text-green-400">2026-05-08</div>
+                    </div>
+                    <div class="glass-card px-4 py-2 rounded-lg border border-amber-500/20">
+                        <div class="text-xs text-slate-400">机构</div>
+                        <div class="text-sm font-bold text-amber-400">上海交通大学 &amp; 华为</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="sticky top-[72px] z-40 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-1 overflow-x-auto py-2 text-sm">
+                <div class="nav-tab active px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="overview"><i class="fas fa-info-circle mr-2"></i>论文概览</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="motivation"><i class="fas fa-exclamation-triangle mr-2"></i>研究动机</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="challenges"><i class="fas fa-exchange-alt mr-2"></i>通信挑战</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="architecture"><i class="fas fa-sitemap mr-2"></i>DySHARP 架构</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="addressing"><i class="fas fa-memory mr-2"></i>动态寻址</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="multicast"><i class="fas fa-broadcast-tower mr-2"></i>多播与归约</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="fusion"><i class="fas fa-layer-group mr-2"></i>内核融合</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="scheduling"><i class="fas fa-calendar-alt mr-2"></i>通信感知调度</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="performance"><i class="fas fa-tachometer-alt mr-2"></i>性能评估</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="overhead"><i class="fas fa-ruler mr-2"></i>硬件开销</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="findings"><i class="fas fa-lightbulb mr-2"></i>关键发现</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="impact"><i class="fas fa-chart-line mr-2"></i>影响分析</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 pb-12 mt-6 space-y-8">
+
+        <!-- ==================== OVERVIEW ==================== -->
+        <section id="overview" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-info-circle text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-blue-400">论文概览</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">论文标题</div>
+                    <div class="font-semibold text-white text-sm">Accelerating MoE with Dynamic In-Switch Computing on Multi-GPUs</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">作者团队</div>
+                    <div class="font-semibold text-emerald-400">Qijun Zhang, Chen Zhang, Zhuoshan Zhou, Haibo Wang 等</div>
+                    <div class="text-xs text-slate-500 mt-1">12 位作者</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">发表日期</div>
+                    <div class="font-semibold text-green-400">2026-05-07</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="text-sm text-slate-400 mb-1">研究机构</div>
+                    <div class="font-semibold text-amber-400">上海交通大学 / 华为</div>
+                    <div class="text-xs text-slate-500 mt-1">联合研究</div>
+                </div>
+            </div>
+
+            <!-- Authors -->
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-blue-300 mb-4">作者团队</h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Qijun Zhang</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Chen Zhang</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Zhuoshan Zhou</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Haibo Wang</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Zhe Zhou</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Zhipeng Tu</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Guangyu Sun</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Zhiyao Xie</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Yijia Diao</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Zhigang Ji</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Jingwen Leng</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Guanghui He</div>
+                        <div class="text-xs text-slate-500">华为</div>
+                    </div>
+                    <div class="glass-card rounded-lg p-3 text-center">
+                        <div class="font-semibold text-emerald-300">Minyi Guo</div>
+                        <div class="text-xs text-slate-500">上海交通大学</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="paper-card rounded-xl p-6">
+                <h3 class="font-semibold text-blue-300 mb-3">摘要</h3>
+                <p class="text-sm text-slate-300 leading-relaxed">
+                    Mixture-of-Experts (MoE) 模型已成为构建大规模语言模型的主流范式,但其 expert 并行化引入了大量<strong class="text-emerald-400">动态且不规则的 GPU 间通信</strong>。现有的交换机方案 (如 NVSwitch) 和通信协议 (如 NCCL) 针对静态通信模式设计,无法有效处理 MoE 中 dispatch/combine 阶段的<strong class="text-emerald-400">变化目标 (varying targets) 和非对称寻址 (asymmetric addressing)</strong>,导致冗余数据传输和严重的带宽浪费。本文提出 <strong class="text-emerald-400">DySHARP</strong> (Dynamic Switch-based Hardware Accelerated Routing and Processing)——一个<strong class="text-emerald-400">动态交换机内计算框架</strong>,通过扩展静态交换机能力以支持不规则工作负载,将通信原语与通信感知调度深度融合。DySHARP 设计了动态多内存寻址 (NVLS 扩展)、交换机多播/归约指令、以及以 token 为中心的内核融合管线,在 32-GPU GH200 系统仿真中实现了近半流量削减和最高 4.25x 的 MoE 层加速,硬件开销仅占 NVSwitch 芯片面积的 0.1% 以下。
+                </p>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== MOTIVATION ==================== -->
+        <section id="motivation" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-amber-400">研究动机</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6">
+                <h3 class="font-semibold text-amber-300 mb-4">MoE Expert 并行的 GPU 间通信瓶颈</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    MoE 模型通过稀疏激活 (每个 token 仅路由到少数 experts) 实现了计算效率的大幅提升。然而,这种稀疏性也带来了独特的通信挑战:
+                </p>
+
+                <div class="space-y-4 text-sm text-slate-300">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">动机 1: MoE Expert 并行化的跨 GPU 通信瓶颈</strong>
+                        <p class="mt-2 text-slate-400">当 MoE 模型的 experts 分布在多个 GPU 上时,每个 token 需要通过 all-to-all 通信被 dispatch 到正确的 expert GPU,计算后再通过 all-to-all 通信将结果 combine 回原始 GPU。这种跨 GPU 的 dispatch/combine 通信量极大,成为 MoE 训练和推理的主要瓶颈。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">动机 2: 动态通信与不规则模式</strong>
+                        <p class="mt-2 text-slate-400">MoE 的 routing 是动态的——每个 token 根据 gating 网络的结果被分配到不同的 experts。这导致每个 token 的目标 GPU 集合不同 (varying targets),通信模式在不同 mini-batch 甚至不同 step 之间剧烈变化。传统的静态通信协议无法有效处理这种不规则性。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">动机 3: 静态协议的局限性</strong>
+                        <p class="mt-2 text-slate-400">现有的交换机方案 (如 NVSwitch) 和通信库 (如 NCCL) 针对静态的、可预测的通信模式进行了优化。它们使用预定义的广播域、固定的路由表和静态的内存映射。面对 MoE 的动态 routing,这些方案需要退化为多次独立传输,导致严重的冗余数据传输和带宽浪费。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Introduction</a>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5 mt-4">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>为什么这篇论文值得关注?</h4>
+                <p class="text-sm text-slate-300">
+                    MoE 已经成为万亿参数 LLM (如 DeepSeek-V3、Mixtral、Qwen-MoE) 的核心架构。随着模型规模持续扩大,MoE 的通信开销占比不断上升——在大规模训练中,通信时间可能占总时间的 40% 以上。DySHARP 是首个从<strong class="text-amber-400">硬件-架构-运行时协同设计</strong>角度系统性解决 MoE 动态通信问题的工作。它不是简单地优化软件层面的通信库,而是扩展了交换机硬件本身的能力,使其能够原生支持动态、不规则的通信模式。这种"让交换机变智能"的思路代表了未来 GPU 互连架构的重要方向。
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== MOE COMMUNICATION CHALLENGES ==================== -->
+        <section id="challenges" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-rose-500 to-rose-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exchange-alt text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-rose-400">MoE 通信挑战</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-rose-300 mb-4">Dispatch / Combine 两阶段通信模型</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    MoE 层的 forward pass 包含两个核心通信阶段,它们各自面临独特的挑战:
+                </p>
+
+                <div class="architecture-diagram rounded-xl p-6 mb-6">
+                    <div class="text-center mb-4">
+                        <div class="font-bold text-emerald-300 text-lg">MoE Forward Pass 通信流程</div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-center">
+                        <div class="bg-blue-500/20 rounded-lg p-4">
+                            <i class="fas fa-database text-blue-400 text-2xl mb-2"></i>
+                            <div class="font-semibold text-blue-300 text-sm">输入 Tokens</div>
+                            <div class="text-xs text-slate-400 mt-1">分布式存储在各 GPU</div>
+                        </div>
+                        <div class="bg-amber-500/20 rounded-lg p-4">
+                            <i class="fas fa-compass text-amber-400 text-2xl mb-2"></i>
+                            <div class="font-semibold text-amber-300 text-sm">Gating 决策</div>
+                            <div class="text-xs text-slate-400 mt-1">每个 token 选择 experts</div>
+                        </div>
+                        <div class="bg-red-500/20 rounded-lg p-4">
+                            <i class="fas fa-paper-plane text-red-400 text-2xl mb-2"></i>
+                            <div class="font-semibold text-red-300 text-sm">Dispatch 阶段</div>
+                            <div class="text-xs text-slate-400 mt-1">Token 发送到对应 Expert GPU</div>
+                        </div>
+                        <div class="bg-green-500/20 rounded-lg p-4">
+                            <i class="fas fa-calculator text-green-400 text-2xl mb-2"></i>
+                            <div class="font-semibold text-green-300 text-sm">Expert 计算</div>
+                            <div class="text-xs text-slate-400 mt-1">各 GPU 上 FFN 前向传播</div>
+                        </div>
+                        <div class="bg-purple-500/20 rounded-lg p-4">
+                            <i class="fas fa-object-group text-purple-400 text-2xl mb-2"></i>
+                            <div class="font-semibold text-purple-300 text-sm">Combine 阶段</div>
+                            <div class="text-xs text-slate-400 mt-1">结果汇总回原始 GPU</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-paper-plane mr-2"></i>Dispatch 阶段: 变化目标 (Varying Targets)</strong>
+                        <p class="mt-2 text-slate-400">每个 token 根据 gating 网络的 softmax 输出,被路由到 top-k 个 experts (k 通常为 1-8)。由于 experts 分布在不同的 GPU 上,同一个 GPU 上的不同 token 可能需要发送到完全不同的目标 GPU 集合。这种<strong class="text-slate-300">varying targets</strong> 特性意味着每个 token 的通信目标都是动态变化的,无法用静态路由表预定义。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-random mr-2"></i>非对称寻址 (Asymmetric Addressing)</strong>
+                        <p class="mt-2 text-slate-400">在 dispatch 阶段,GPU A 需要将 token 发送到 GPU B 的特定 expert 位置,但在 combine 阶段,GPU B 需要将计算结果返回到 GPU A 的不同位置 (对应原始 token 的存储位置)。两个阶段的内存地址映射完全不对称——dispatch 的目标地址在 expert GPU 上,combine 的目标地址在源 GPU 上。这种<strong class="text-slate-300">asymmetric addressing</strong> 使得静态的内存映射方案完全失效。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-copy mr-2"></i>冗余数据传输</strong>
+                        <p class="mt-2 text-slate-400">现有方案 (如 NCCL all-to-all) 无法识别哪些 token 去往同一个目标 GPU,因此需要为每个 token 独立传输完整的地址信息和元数据。在极端情况下,多个 token 去往同一 GPU 时,仍然需要分别传输,造成严重的<strong class="text-slate-300">冗余数据传输</strong>。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 2: MoE Communication Challenges</a>
+                </div>
+            </div>
+
+            <div class="paper-card rounded-xl p-6">
+                <h3 class="font-semibold text-rose-300 mb-4">为什么现有交换机方案失败?</h3>
+                <div class="highlight-box mb-4">
+                    <strong class="text-rose-300">核心问题:</strong> <span class="text-slate-300">现有的交换机解决方案 (如 NVSwitch) 失败的根本原因是 "<strong class="text-rose-400">varying targets and asymmetric addressing</strong>"——即每个 token 的目标 GPU 集合动态变化,且 dispatch/combine 两阶段的地址映射完全不对称。静态交换机无法适应这种动态性和非对称性。</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="comparison-table w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="px-4 py-3 text-left text-rose-300 font-semibold">现有方案</th>
+                                <th class="px-4 py-3 text-left text-rose-300 font-semibold">处理 MoE 动态通信的方式</th>
+                                <th class="px-4 py-3 text-left text-rose-300 font-semibold">根本缺陷</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">NCCL All-to-All</td>
+                                <td class="px-4 py-3 text-slate-400">每个 GPU 向所有其他 GPU 发送数据块</td>
+                                <td class="px-4 py-3 text-red-400">无视 varying targets,传输全量数据,大量冗余</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">NVSwitch 静态组播</td>
+                                <td class="px-4 py-3 text-slate-400">预定义多播组,固定目标集合</td>
+                                <td class="px-4 py-3 text-red-400">无法适应动态变化的目标 GPU 集合</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">软件层 Token 打包</td>
+                                <td class="px-4 py-3 text-slate-400">在 GPU 内核中合并去往同一 GPU 的 token</td>
+                                <td class="px-4 py-3 text-red-400">增加内核开销,无法解决 asymmetric addressing</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== DYSHARP ARCHITECTURE ==================== -->
+        <section id="architecture" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-sitemap text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-emerald-400">DySHARP 架构</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-emerald-300 mb-4">DySHARP = Dynamic Switch-based Hardware Accelerated Routing and Processing</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    DySHARP 是一个<strong class="text-emerald-400">动态交换机内计算框架</strong>,通过扩展静态交换机 (如 NVSwitch) 的能力,使其原生支持 MoE 等不规则工作负载。它将通信原语与通信感知调度深度融合,在交换机层面实现动态路由、多播、归约和内存寻址。
+                </p>
+
+                <div class="architecture-diagram rounded-xl p-6 mb-6">
+                    <div class="text-center mb-4">
+                        <div class="font-bold text-emerald-300 text-lg">DySHARP 四层架构设计</div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="bg-purple-500/15 rounded-lg p-4 border border-purple-500/30">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-500/30 rounded-lg flex items-center justify-center shrink-0">
+                                    <i class="fas fa-calendar-alt text-purple-400"></i>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-purple-300">第 4 层: 通信感知调度 (Communication-Aware Scheduling)</div>
+                                    <div class="text-xs text-slate-400">并发执行管线,平衡双向网络流量,动态处理不规则通信模式</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-blue-500/15 rounded-lg p-4 border border-blue-500/30">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-500/30 rounded-lg flex items-center justify-center shrink-0">
+                                    <i class="fas fa-layer-group text-blue-400"></i>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-blue-300">第 3 层: Token-Centric 内核融合</div>
+                                    <div class="text-xs text-slate-400">深度融合 dispatch-computation-combine 管线,降低数据移动开销</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-amber-500/15 rounded-lg p-4 border border-amber-500/30">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-amber-500/30 rounded-lg flex items-center justify-center shrink-0">
+                                    <i class="fas fa-broadcast-tower text-amber-400"></i>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-amber-300">第 2 层: 交换机多播与归约</div>
+                                    <div class="text-xs text-slate-400">dispatch 阶段多播分发,combine 阶段部分结果求和归约</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-green-500/15 rounded-lg p-4 border border-green-500/30">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-green-500/30 rounded-lg flex items-center justify-center shrink-0">
+                                    <i class="fas fa-memory text-green-400"></i>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-green-300">第 1 层: 动态多内存寻址 (Dynamic Multimem Addressing)</div>
+                                    <div class="text-xs text-slate-400">NVLS 动态扩展,代数索引到布局索引的翻译,片上表和缓存</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">核心设计理念: 扩展静态交换机能力</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 不是构建全新的交换机,而是在现有静态交换机 (如 NVSwitch) 的基础上,添加对不规则工作负载的支持。这包括: (1) 动态内存寻址能力,支持运行时变化的目标地址映射; (2) 交换机内计算能力,支持多播和归约操作; (3) 紧凑的分组格式,减少元数据开销。这种渐进式设计确保了与现有硬件的兼容性,同时将硬件开销控制在极低水平 (NVSwitch die area 的 0.1% 以下)。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">通信原语与通信感知调度的融合</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 的另一个关键设计是将底层通信原语 (多播、归约、寻址) 与上层的通信感知调度协同设计。调度器不仅决定何时发送数据,还了解底层硬件的能力,从而做出更优的调度决策。例如,调度器可以并发执行 dispatch 和 combine 管线,利用双向网络的对称性平衡流量。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 3: DySHARP Architecture Overview</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== DYNAMIC MULTIMEM ADDRESSING ==================== -->
+        <section id="addressing" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-memory text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-green-400">动态多内存寻址</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-green-300 mb-4">NVLS 的动态扩展</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    DySHARP 对 NVIDIA 的 NVLS (NVLink Switch) 进行了动态扩展,使其能够支持 MoE 所需的运行时变化的地址映射。这一扩展涉及 ISA (指令集架构)、微架构和运行时三个层面的协同设计。
+                </p>
+
+                <div class="architecture-diagram rounded-xl p-6 mb-6">
+                    <div class="text-center mb-4">
+                        <div class="font-bold text-green-300 text-lg">动态多内存寻址机制</div>
+                    </div>
+                    <div class="code-block p-4">
+                        <span class="text-slate-500">// 代数索引到布局索引的翻译流程</span><br>
+                        <span class="text-slate-300">Token 代数索引 (Algebraic Index): [expert_id, token_offset_in_expert]</span><br>
+                        <span class="text-slate-300">     |</span><br>
+                        <span class="text-slate-300">     v</span><br>
+                        <span class="text-slate-300">[硬件内存管理器] -- 查询片上转换表 (On-chip Translation Table)</span><br>
+                        <span class="text-slate-300">     |</span><br>
+                        <span class="text-slate-300">     +-- Cache Hit: 直接返回布局索引 (Layout Index)</span><br>
+                        <span class="text-slate-300">     +-- Cache Miss: 计算映射,更新缓存</span><br>
+                        <span class="text-slate-300">     |</span><br>
+                        <span class="text-slate-300">     v</span><br>
+                        <span class="text-slate-300">布局索引 (Layout Index): [GPU_id, memory_address_within_GPU]</span><br>
+                        <span class="text-slate-300">     |</span><br>
+                        <span class="text-slate-300">     v</span><br>
+                        <span class="text-slate-300">NVLink 交换机路由到目标 GPU 的指定内存地址</span>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-cogs mr-2"></i>ISA / 微架构 / 运行时协同设计</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 在三个层面进行了协同设计:</p>
+                        <ul class="mt-2 text-slate-400 list-disc list-inside space-y-1">
+                            <li><strong class="text-slate-300">ISA 层:</strong> 新增指令支持动态地址翻译,允许在运行时指定代数索引 (expert_id, offset) 而非固定的物理地址</li>
+                            <li><strong class="text-slate-300">微架构层:</strong> 在交换机内部部署片上转换表和缓存,实现低延迟的地址翻译</li>
+                            <li><strong class="text-slate-300">运行时层:</strong> 动态更新转换表,反映每个 mini-batch 的最新 token-to-expert 映射关系</li>
+                        </ul>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-table mr-2"></i>紧凑寻址: 代数索引到布局索引的翻译</strong>
+                        <p class="mt-2 text-slate-400">关键创新在于使用<strong class="text-slate-300">代数索引 (algebraic index)</strong> 而非完整的物理地址。代数索引仅包含 expert_id 和 token 在 expert 内的偏移量,非常紧凑。硬件内存管理器通过查询<strong class="text-slate-300">片上转换表 (on-chip translation table)</strong> 和缓存,将代数索引翻译为实际的布局索引 (GPU_id + GPU 内内存地址)。这种紧凑寻址大幅降低了每个 token 的元数据开销。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-bolt mr-2"></i>片上转换表与缓存</strong>
+                        <p class="mt-2 text-slate-400">转换表存储在交换机芯片的 SRAM 中,支持快速查找。缓存层 (类似 TLB) 存储最近使用的映射关系,命中时可实现单周期翻译。由于 MoE 的 token-to-expert 映射在同一个 mini-batch 内相对稳定,缓存命中率很高。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 4: Dynamic Multimem Addressing</a>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>紧凑寻址的意义</h4>
+                <p class="text-sm text-slate-300">
+                    紧凑寻址 (compact addressing) 的设计维持了更高的有效载荷效率 (payload efficiency)。传统的物理地址方案需要为每个 token 携带完整的 GPU ID 和内存地址 (可能 8-12 字节),而代数索引方案只需携带 expert_id 和偏移量 (2-4 字节)。在高吞吐的 MoE 通信中,这意味着每个数据包的 payload 占比显著提升,交换机带宽被更有效地利用。
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== SWITCH MULTICAST & REDUCTION ==================== -->
+        <section id="multicast" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-broadcast-tower text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-amber-400">交换机多播与归约</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-amber-300 mb-4">Dispatch 多播 + Combine 归约</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    DySHARP 在交换机层面实现了两个关键的原语操作,分别对应 MoE 的 dispatch 和 combine 阶段:
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Multicast -->
+                    <div class="paper-card rounded-xl p-5">
+                        <h4 class="font-semibold text-red-300 mb-3"><i class="fas fa-paper-plane mr-2"></i>Dispatch 阶段: 多播分发</h4>
+                        <div class="tech-box">
+                            <strong class="text-emerald-300">多播机制</strong>
+                            <p class="mt-2 text-slate-400">在 dispatch 阶段,当一个 token 需要被发送到多个 expert GPU (top-k routing) 时,DySHARP 交换机执行<strong class="text-slate-300">硬件级多播 (hardware multicast)</strong>。交换机从源 GPU 接收一次数据,然后在交换机内部复制并同时发送到 k 个目标 GPU。这避免了源 GPU 发送 k 次相同数据的冗余。</p>
+                        </div>
+                        <div class="code-block p-4 mt-4">
+                            <span class="text-slate-500">// 多播分组格式</span><br>
+                            <span class="text-green-400">[Header]</span><br>
+                            <span class="text-slate-300">  src_gpu_id       : 8 bits</span><br>
+                            <span class="text-slate-300">  multicast_count    : 4 bits  (目标 GPU 数量 k)</span><br>
+                            <span class="text-slate-300">  token_payload_size : 16 bits</span><br>
+                            <span class="text-green-400">[Compact Target List]</span><br>
+                            <span class="text-slate-300">  target_gpu_ids[]   : k x 8 bits</span><br>
+                            <span class="text-slate-300">  compact_addresses[]: k x N bits  (紧凑目标地址)</span><br>
+                            <span class="text-green-400">[Token Payload]</span><br>
+                            <span class="text-slate-300">  token_data         : variable</span><br>
+                            <span class="text-slate-500">// 一个地址 + 紧凑目标列表,交换机内部复制</span>
+                        </div>
+                    </div>
+
+                    <!-- Reduction -->
+                    <div class="paper-card rounded-xl p-5">
+                        <h4 class="font-semibold text-purple-300 mb-3"><i class="fas fa-object-group mr-2"></i>Combine 阶段: 部分结果归约</h4>
+                        <div class="tech-box">
+                            <strong class="text-emerald-300">归约机制</strong>
+                            <p class="mt-2 text-slate-400">在 combine 阶段,来自多个 expert GPU 的同一 token 的部分结果需要在交换机中执行<strong class="text-slate-300">求和归约 (sum reduction)</strong>。DySHARP 交换机支持在交换机内部直接对 partial results 进行元素级求和,然后将归约后的完整结果发送回源 GPU。这避免了源 GPU 接收多个 partial results 后在本地进行归约的额外开销。</p>
+                        </div>
+                        <div class="code-block p-4 mt-4">
+                            <span class="text-slate-500">// 归约过程示意</span><br>
+                            <span class="text-slate-300">GPU_0 [partial_result for token_A] ─┐</span><br>
+                            <span class="text-slate-300">GPU_1 [partial_result for token_A] ─┤→ [交换机内求和] → GPU_src[token_A] = Σ partial</span><br>
+                            <span class="text-slate-300">GPU_2 [partial_result for token_A] ─┘</span><br>
+                            <span class="text-slate-500">// 交换机直接完成 sum reduction,无需 GPU 二次处理</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">自定义多播与归约指令</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 定义了专用的交换机指令,支持多播和归约操作。这些指令被集成到交换机的控制平面中,可以通过 GPU 侧的驱动直接调用。指令格式经过优化,使用极少的元数据即可表达复杂的通信模式。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">分组携带一个地址 + 紧凑目标列表</strong>
+                        <p class="mt-2 text-slate-400">关键设计: 每个分组仅携带<strong class="text-slate-300">一个源地址和紧凑的目标 GPU 列表</strong>,而不是为每个目标单独打包。交换机解析分组后,根据紧凑目标列表在内部复制数据并路由到多个目标。这大幅减少了网络上的元数据流量,提高了有效载荷占比。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 5: Switch Multicast & Reduction</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TOKEN-CENTRIC KERNEL FUSION ==================== -->
+        <section id="fusion" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-layer-group text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-blue-400">以 Token 为中心的内核融合</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-blue-300 mb-4">深度融合 Dispatch-Computation-Combine 管线</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    DySHARP 不仅优化了通信层面,还重新设计了 GPU 内核的执行模式,实现了 dispatch、expert 计算和 combine 三阶段的<strong class="text-blue-400">深度融合 (deep fusion)</strong>。
+                </p>
+
+                <div class="architecture-diagram rounded-xl p-6 mb-6">
+                    <div class="text-center mb-4">
+                        <div class="font-bold text-blue-300 text-lg">以 Token 为中心的融合管线</div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="bg-red-500/15 rounded-lg p-5 border border-red-500/30">
+                            <div class="w-14 h-14 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-paper-plane text-red-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-red-300 mb-2">Dispatch</div>
+                            <div class="text-xs text-slate-400">交换机多播分发 token 到 expert GPU</div>
+                            <div class="text-xs text-slate-500 mt-1">硬件级地址翻译</div>
+                        </div>
+                        <div class="bg-green-500/15 rounded-lg p-5 border border-green-500/30">
+                            <div class="w-14 h-14 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-calculator text-green-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-green-300 mb-2">Computation</div>
+                            <div class="text-xs text-slate-400">Expert GPU 上的 FFN 前向传播</div>
+                            <div class="text-xs text-slate-500 mt-1">token 到达即计算</div>
+                        </div>
+                        <div class="bg-purple-500/15 rounded-lg p-5 border border-purple-500/30">
+                            <div class="w-14 h-14 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-object-group text-purple-400 text-2xl"></i>
+                            </div>
+                            <div class="font-semibold text-purple-300 mb-2">Combine</div>
+                            <div class="text-xs text-slate-400">交换机内归约 partial results</div>
+                            <div class="text-xs text-slate-500 mt-1">求和后返回源 GPU</div>
+                        </div>
+                    </div>
+                    <div class="text-center mt-4">
+                        <div class="inline-flex items-center gap-2 bg-blue-500/20 rounded-full px-6 py-2">
+                            <i class="fas fa-arrows-alt-h text-blue-400"></i>
+                            <span class="text-blue-300 text-sm font-semibold">Token-Centric Pipeline: 数据流不间断,消除中间存储</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">深度管线融合</strong>
+                        <p class="mt-2 text-slate-400">传统 MoE 实现中,dispatch、computation 和 combine 是三个独立的阶段,每个阶段完成后需要将中间结果写回显存,下一阶段再从显存读取。DySHARP 将这三个阶段融合为一个连续的管线:token 到达 expert GPU 后直接开始计算,计算结果立即进入 combine 管线。这种融合消除了中间显存读写,大幅降低了延迟。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">双向流量平衡</strong>
+                        <p class="mt-2 text-slate-400">在 MoE 中,dispatch 阶段的流量方向 (源 GPU -> expert GPU) 与 combine 阶段的方向 (expert GPU -> 源 GPU) 相反。DySHARP 通过并发执行 dispatch 和 combine 管线,使双向流量在时间上重叠,从而<strong class="text-slate-300">平衡了双向网络流量 (balances directional traffic reductions)</strong>。这避免了单向流量饱和导致的带宽浪费。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">数据移动减少带来真实执行收益</strong>
+                        <p class="mt-2 text-slate-400">单纯减少网络流量不一定转化为加速——如果 GPU 侧的数据重组开销很大,节省的网络时间可能被抵消。DySHARP 的 token-centric 设计确保了减少的数据移动确实转化为端到端的执行时间减少:紧凑寻址减少了元数据解析时间,交换机内归约减少了 GPU 侧的后处理时间。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 6: Token-Centric Kernel Fusion</a>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>为什么"减少流量"本身不够?</h4>
+                <p class="text-sm text-slate-300">
+                    论文的一个重要发现是:<strong class="text-amber-400">仅减少流量本身不足以带来加速</strong>,因为单向带宽会变成不平衡状态 (directional bandwidth becomes unbalanced)。dispatch 阶段减少流量后,如果 combine 阶段仍然使用传统方式,网络的一个方向可能空闲而另一个方向过载。DySHARP 的解决方案是并发执行管线,使双向流量在时间上平衡——这是一个关键的系统设计洞察。
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== COMMUNICATION-AWARE SCHEDULING ==================== -->
+        <section id="scheduling" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-calendar-alt text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-cyan-400">通信感知调度</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-cyan-300 mb-4">并发执行平衡双向网络流量</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    DySHARP 的调度器是系统设计的"大脑"——它了解底层硬件的所有能力,并据此做出最优的调度决策,处理动态通信与不规则模式。
+                </p>
+
+                <div class="space-y-4">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-sync-alt mr-2"></i>并发执行: 平衡双向网络流量</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 调度器的核心策略是<strong class="text-slate-300">并发执行 dispatch 和 combine 管线</strong>。当第一批 token 完成 dispatch 并到达 expert GPU 后,调度器立即启动 combine 管线,而不是等待所有 dispatch 完成后才开始 combine。这种并发执行使 dispatch 流量 (GPU -> expert) 和 combine 流量 (expert -> GPU) 在网络中同时存在,从而平衡了双向带宽利用率。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-wave-square mr-2"></i>处理动态通信与不规则模式</strong>
+                        <p class="mt-2 text-slate-400">MoE 的通信模式在每个 mini-batch 甚至每个 step 都不同 (因为 gating 决策是动态的)。DySHARP 调度器能够:</p>
+                        <ul class="mt-2 text-slate-400 list-disc list-inside space-y-1">
+                            <li>动态解析每个 token 的目标 GPU 集合 (varying targets)</li>
+                            <li>根据当前 token 分布调整 dispatch/combine 的并发度</li>
+                            <li>利用交换机的多播/归约能力,在运行时决定最优的数据传输策略</li>
+                            <li>处理极端不均匀的 token 分布 (某些 expert 被大量 token 选中,某些几乎没有)</li>
+                        </ul>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300"><i class="fas fa-sliders-h mr-2"></i>调度策略与硬件能力协同</strong>
+                        <p class="mt-2 text-slate-400">调度器不是独立于硬件的软件层——它与 DySHARP 的硬件能力深度协同。调度器了解交换机的多播能力、归约能力、以及动态寻址表的容量限制,并据此调整调度决策。这种协同设计使得调度器能够最大化利用硬件加速,而不是被硬件限制所束缚。</p>
+                    </div>
+                </div>
+
+                <div class="code-block p-4 mt-4">
+                    <span class="text-slate-500">// DySHARP 调度伪代码示意</span><br>
+                    <span class="text-green-400">function</span> <span class="text-slate-300">schedule_moe_layer(tokens, expert_mapping):</span><br>
+                    <span class="text-slate-300">    <span class="text-slate-500"># Step 1: 解析 token-to-expert 映射,更新地址翻译表</span></span><br>
+                    <span class="text-slate-300">    update_translation_table(expert_mapping)</span><br>
+                    <span class="text-slate-300">    <span class="text-slate-500"># Step 2: 按目标 GPU 分组 token (compact target list)</span></span><br>
+                    <span class="text-slate-300">    groups = group_by_targets(tokens)</span><br>
+                    <span class="text-slate-300">    <span class="text-slate-500"># Step 3: 并发启动 dispatch + combine 管线</span></span><br>
+                    <span class="text-slate-300">    dispatch_pipe = launch_dispatch(groups)  <span class="text-slate-500"># 交换机多播</span></span><br>
+                    <span class="text-slate-300">    <span class="text-slate-500"># Step 4: 当第一批 token 到达 expert GPU,启动 compute</span></span><br>
+                    <span class="text-slate-300">    on_token_arrival(dispatch_pipe, compute_experts)</span><br>
+                    <span class="text-slate-300">    <span class="text-slate-500"># Step 5: 计算完成后,启动 combine 管线 (交换机归约)</span></span>
+<br>
+                    <span class="text-slate-300">    combine_pipe = launch_combine(compute_experts)  <span class="text-slate-500"># 交换机归约</span></span><br>
+                    <span class="text-slate-300">    <span class="text-slate-500"># 双向流量在时间上重叠,平衡带宽利用率</span></span>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 7: Communication-Aware Scheduling</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== PERFORMANCE EVALUATION ==================== -->
+        <section id="performance" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-red-500 to-red-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-tachometer-alt text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-red-400">性能评估</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-red-300 mb-4">实验设置: 32-GPU GH200 系统仿真</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="metric-card rounded-xl p-5">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class="fas fa-server text-blue-400 text-xl"></i>
+                            <h4 class="font-semibold text-blue-300">硬件平台</h4>
+                        </div>
+                        <div class="text-sm text-slate-400 space-y-1">
+                            <p>GPU: NVIDIA GH200 (Grace Hopper Superchip)</p>
+                            <p>规模: 32 GPU</p>
+                            <p>互连: NVLink + NVSwitch</p>
+                            <p>评估方式: 系统仿真 (cycle-accurate simulation)</p>
+                        </div>
+                    </div>
+                    <div class="metric-card rounded-xl p-5">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class="fas fa-brain text-blue-400 text-xl"></i>
+                            <h4 class="font-semibold text-blue-300">工作负载</h4>
+                        </div>
+                        <div class="text-sm text-slate-400 space-y-1">
+                            <p>模型: DeepSeek-V3 变体</p>
+                            <p>架构: Mixture-of-Experts (MoE)</p>
+                            <p>测试场景: 不同序列长度、token 分布、GPU 数量</p>
+                            <p>对比基线: 优化通信库、静态交换机方案</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-red-300 mb-4">关键性能指标</h3>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                    <div class="glass-card rounded-xl p-5 text-center">
+                        <div class="text-3xl font-bold text-emerald-400">~50%</div>
+                        <div class="text-xs text-slate-400 mt-2">流量削减</div>
+                        <div class="text-xs text-slate-500">Traffic Volume</div>
+                    </div>
+                    <div class="glass-card rounded-xl p-5 text-center">
+                        <div class="text-3xl font-bold text-blue-400">1.79x</div>
+                        <div class="text-xs text-slate-400 mt-2">vs 领先基线</div>
+                        <div class="text-xs text-slate-500">Speedup</div>
+                    </div>
+                    <div class="glass-card rounded-xl p-5 text-center">
+                        <div class="text-3xl font-bold text-amber-400">1.93x</div>
+                        <div class="text-xs text-slate-400 mt-2">vs 优化通信库</div>
+                        <div class="text-xs text-slate-500">Geometric Mean</div>
+                    </div>
+                    <div class="glass-card rounded-xl p-5 text-center">
+                        <div class="text-3xl font-bold text-purple-400">3.38x</div>
+                        <div class="text-xs text-slate-400 mt-2">vs 静态交换机变通</div>
+                        <div class="text-xs text-slate-500">Geometric Mean</div>
+                    </div>
+                    <div class="glass-card rounded-xl p-5 text-center">
+                        <div class="text-3xl font-bold text-rose-400">4.25x</div>
+                        <div class="text-xs text-slate-400 mt-2">MoE 层加速</div>
+                        <div class="text-xs text-slate-500">Geometric Mean</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Comparison Table -->
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-red-300 mb-4">与基线方案的详细对比</h3>
+                <div class="overflow-x-auto">
+                    <table class="comparison-table w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="px-4 py-3 text-left text-red-300 font-semibold">对比维度</th>
+                                <th class="px-4 py-3 text-left text-emerald-400 font-semibold">DySHARP</th>
+                                <th class="px-4 py-3 text-left text-blue-400 font-semibold">优化通信库 (NCCL)</th>
+                                <th class="px-4 py-3 text-left text-amber-400 font-semibold">静态交换机变通</th>
+                                <th class="px-4 py-3 text-left text-slate-400 font-semibold">领先基线</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">流量体积</td>
+                                <td class="px-4 py-3 text-emerald-400 font-semibold">削减 ~50%</td>
+                                <td class="px-4 py-3 text-slate-400">全量传输</td>
+                                <td class="px-4 py-3 text-slate-400">冗余传输</td>
+                                <td class="px-4 py-3 text-slate-400">全量传输</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">加速比 (几何平均)</td>
+                                <td class="px-4 py-3 text-emerald-400 font-semibold">1.93x / 3.38x / 4.25x</td>
+                                <td class="px-4 py-3 text-slate-400">1.0x (基线)</td>
+                                <td class="px-4 py-3 text-slate-400">0.57x</td>
+                                <td class="px-4 py-3 text-slate-400">0.56x</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">动态路由支持</td>
+                                <td class="px-4 py-3 text-emerald-400 font-semibold"><i class="fas fa-check mr-1"></i> 原生支持</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> 需软件适配</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> 静态预定义</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> 软件层打包</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">交换机内归约</td>
+                                <td class="px-4 py-3 text-emerald-400 font-semibold"><i class="fas fa-check mr-1"></i> 硬件级</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> GPU 侧执行</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> 不支持</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> GPU 侧执行</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">双向流量平衡</td>
+                                <td class="px-4 py-3 text-emerald-400 font-semibold"><i class="fas fa-check mr-1"></i> 并发管线</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> 顺序执行</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-times mr-1 text-red-400"></i> 顺序执行</td>
+                                <td class="px-4 py-3 text-slate-400"><i class="fas fa-minus mr-1 text-amber-400"></i> 部分重叠</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-300">硬件开销</td>
+                                <td class="px-4 py-3 text-emerald-400 font-semibold">< 0.1% NVSwitch die</td>
+                                <td class="px-4 py-3 text-slate-400">无 (纯软件)</td>
+                                <td class="px-4 py-3 text-slate-400">无</td>
+                                <td class="px-4 py-3 text-slate-400">无</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 8: Performance Evaluation</a>
+                </div>
+            </div>
+
+            <div class="paper-card rounded-xl p-6">
+                <h3 class="font-semibold text-red-300 mb-4">加速比解读</h3>
+                <div class="space-y-4 text-sm text-slate-300">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">1.79x vs 领先基线:</strong> <span class="text-slate-300">与当前最优的 MoE 通信优化方案相比,DySHARP 实现了 1.79 倍的端到端加速。这包括了最先进的软件层 token 打包和通信调度优化。</span>
+                    </div>
+                    <div class="highlight-box">
+                        <strong class="text-amber-300">1.93x 几何平均 vs 优化通信库:</strong> <span class="text-slate-300">与 NCCL 等优化通信库相比,DySHARP 的几何平均加速为 1.93x。这个加速来自交换机内多播/归约消除的冗余传输,以及紧凑寻址降低的元数据开销。</span>
+                    </div>
+                    <div class="highlight-box">
+                        <strong class="text-purple-300">3.38x 几何平均 vs 静态交换机变通方案:</strong> <span class="text-slate-300">与使用静态交换机 (如 NVSwitch) 的变通方案相比,DySHARP 的几何平均加速达到 3.38x。这反映了动态寻址和多播/归约对静态方案的根本性优势。</span>
+                    </div>
+                    <div class="highlight-box">
+                        <strong class="text-rose-300">4.25x 几何平均 MoE 层加速:</strong> <span class="text-slate-300">仅看 MoE 层 (dispatch + expert computation + combine),DySHARP 的几何平均加速高达 4.25x。这个数据最能体现 DySHARP 架构对 MoE 通信瓶颈的直接优化效果。</span>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 8: Performance Evaluation</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== HARDWARE OVERHEAD ==================== -->
+        <section id="overhead" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-ruler text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-teal-400">硬件开销分析</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6 mb-6">
+                <h3 class="font-semibold text-teal-300 mb-4">极低的硬件面积开销</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    DySHARP 的硬件扩展极其精简——它不需要在交换机芯片上添加大量的逻辑单元,而是通过巧妙的 ISA 扩展和紧凑的数据结构设计实现功能。
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-card rounded-xl p-6">
+                        <div class="text-center">
+                            <div class="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+                                <div>
+                                    <div class="text-3xl font-bold text-emerald-400">&lt; 0.1%</div>
+                                    <div class="text-xs text-slate-400">NVSwitch</div>
+                                </div>
+                            </div>
+                            <h4 class="font-semibold text-emerald-300 mb-2">NVSwitch 芯片面积</h4>
+                            <p class="text-sm text-slate-400">DySHARP 的硬件扩展 (地址翻译表、缓存、多播/归约逻辑) 仅占 NVSwitch 芯片总面积的 <strong class="text-emerald-400">0.1% 以下</strong>。考虑到 NVSwitch 本身的面积约为 2000 mm² (估算),DySHARP 的扩展面积不到 2 mm²。</p>
+                        </div>
+                    </div>
+                    <div class="glass-card rounded-xl p-6">
+                        <div class="text-center">
+                            <div class="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
+                                <div>
+                                    <div class="text-3xl font-bold text-blue-400">~0.024%</div>
+                                    <div class="text-xs text-slate-400">H100 GPU</div>
+                                </div>
+                            </div>
+                            <h4 class="font-semibold text-blue-300 mb-2">H100 GPU 芯片面积</h4>
+                            <p class="text-sm text-slate-400">相对于 H100 GPU 的芯片面积 (约 814 mm²),DySHARP 的开销仅约为 <strong class="text-blue-400">0.024%</strong>,约 0.2 mm²。这是一个极小的面积代价,几乎可以忽略不计。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tech-box mt-6">
+                    <strong class="text-emerald-300">开销来源分析</strong>
+                    <p class="mt-2 text-slate-400">DySHARP 的硬件开销主要来自以下组件:</p>
+                    <ul class="mt-2 text-slate-400 list-disc list-inside space-y-1">
+                        <li><strong class="text-slate-300">片上地址转换表 (Translation Table):</strong> SRAM 存储,大小与 expert 数量和 GPU 数量成正比</li>
+                        <li><strong class="text-slate-300">转换缓存 (Translation Cache):</strong> 类似 TLB 的小容量缓存,存储热映射条目</li>
+                        <li><strong class="text-slate-300">多播复制逻辑 (Multicast Replication Logic):</strong> 交换机内部的数据复制单元,根据紧凑目标列表生成多个输出副本</li>
+                        <li><strong class="text-slate-300">归约单元 (Reduction Unit):</strong> 交换机内的元素级求和电路,支持浮点加法归约</li>
+                    </ul>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607 Section 9: Hardware Overhead</a>
+                </div>
+            </div>
+
+            <div class="insight-box rounded-xl p-5">
+                <h4 class="font-semibold text-amber-300 mb-2"><i class="fas fa-lightbulb mr-2"></i>极小开销换取巨大收益</h4>
+                <p class="text-sm text-slate-300">
+                    DySHARP 最令人印象深刻的设计权衡之一是:以极小的硬件面积代价 (< 0.1% NVSwitch die),换取了 MoE 通信 2-4x 的加速。这种"小硬件改动、大性能收益"的设计哲学是系统架构研究的典范。相比之下,许多其他硬件加速方案需要显著的面积和功耗开销才能获得类似量级的性能提升。
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== KEY FINDINGS ==================== -->
+        <section id="findings" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-lightbulb text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-amber-400">关键发现</h2>
+            </div>
+
+            <div class="paper-card rounded-xl p-6">
+                <div class="space-y-4 text-sm text-slate-300">
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">发现 1: 仅减少流量不够 —— 并发管线是必需的</strong>
+                        <p class="mt-2 text-slate-400">减少数据流量本身不足以带来加速,因为单向带宽会变得不平衡 (directional bandwidth becomes unbalanced)。dispatch 阶段减少流量后,如果 combine 阶段不进行并发优化,网络的一个方向可能空闲而另一个方向过载。<strong class="text-slate-300">并发执行 dispatch 和 combine 管线</strong>是平衡双向流量、充分利用网络带宽的必要条件。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">发现 2: 紧凑寻址维持更高的有效载荷效率</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 的紧凑寻址方案 (代数索引 + 片上翻译表) 相比传统的完整物理地址方案,维持了更高的 payload efficiency。每个数据包中,有效数据占比显著提升,交换机带宽被更有效地利用。这一设计在极端高吞吐的 MoE 通信中尤为重要。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">发现 3: 跨 GPU 数量/序列长度/token 分布的可扩展性</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 的性能优势在不同实验条件下保持一致:无论是增加 GPU 数量、变化序列长度,还是使用极度不均匀的 token 分布 (某些 expert 被大量选中,某些几乎空闲),DySHARP 都能保持显著的加速。这表明其设计具有良好的<strong class="text-slate-300">可扩展性和鲁棒性</strong>。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">发现 4: 可扩展到多节点集群</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 的设计不仅适用于单节点内的多 GPU 系统,还可以扩展到多节点集群 (multi-node clusters)。动态寻址和多播/归约的原语可以跨节点运行,使 DySHARP 能够处理更大规模的 MoE 训练和推理工作负载。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">发现 5: 交换机内计算是 MoE 通信的未来方向</strong>
+                        <p class="mt-2 text-slate-400">随着 MoE 模型规模的持续增长,通信开销占比将进一步上升。DySHARP 证明了在交换机层面执行计算 (多播、归约) 是一个有效且低开销的方向。这为未来的 GPU 互连架构设计提供了重要的启示:交换机不应仅仅是数据转发设备,而应该成为<strong class="text-slate-300">计算-通信协同的加速节点</strong>。</p>
+                    </div>
+                    <div class="tech-box">
+                        <strong class="text-emerald-300">发现 6: 硬件-软件协同设计的必要性</strong>
+                        <p class="mt-2 text-slate-400">DySHARP 的成功证明了单纯优化软件 (通信库) 或单纯优化硬件 (交换机) 都无法充分解决 MoE 的动态通信问题。只有当硬件扩展 (动态寻址、多播/归约) 与软件调度 (并发管线、通信感知) 协同设计时,才能实现最佳的性能效果。</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-slate-500">
+                    来源: <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== IMPACT ANALYSIS ==================== -->
+        <section id="impact" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-pink-400">影响分析</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-microchip text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对 GPU 互连架构的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">DySHARP 证明了在交换机层面添加少量逻辑 (地址翻译、多播、归约) 即可带来 MoE 通信 2-4x 的加速,硬件开销不到芯片面积的 0.1%。这一发现可能推动未来 GPU 互连芯片 (如下一代 NVSwitch) 在硬件层面原生支持动态通信原语,而非仅支持静态组播。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-brain text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对 MoE 大模型训练的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">对于 DeepSeek-V3、Mixtral、Qwen-MoE 等万亿参数 MoE 模型,DySHARP 提供的 4.25x MoE 层加速可以直接转化为训练时间的显著减少。在大规模训练中,通信通常占总时间的 40% 以上,MoE 层的加速效果将直接影响整体训练效率。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-project-diagram text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对通信库设计的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">DySHARP 展示了纯软件层优化 (如 NCCL) 在处理 MoE 动态通信时的根本局限性。这为通信库的设计指明了新方向:未来的通信库可能需要与底层硬件 (交换机) 紧密协同,暴露动态寻址和多播/归约能力给软件层调用。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-server text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对数据中心网络的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">DySHARP 的"智能交换机"思路可以扩展到更广泛的数据中心场景。当交换机能够执行简单的计算 (如归约、聚合) 时,可以大幅减少网络流量和端点处理开销。这一思路与 in-network computing 的研究方向高度一致。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-code-branch text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对开源社区的影响</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">DySHARP 为开源 MoE 框架 (如 DeepSpeed, Megatron-LM) 提供了明确的优化方向。虽然 DySHARP 需要硬件支持,但其调度策略和 token-centric 管线设计可以在软件层面部分实现,为没有定制硬件的用户提供渐进式优化路径。</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-rocket text-pink-400 text-xl"></i>
+                        <h3 class="font-semibold text-pink-300">对未来研究方向的启示</h3>
+                    </div>
+                    <p class="text-sm text-slate-300">DySHARP 开启了一系列值得探索的研究方向: (1) 动态寻址算法的进一步优化; (2) 交换机内更复杂的计算 (如非线性归约); (3) 与其他通信模式 (如张量并行) 的结合; (4) 在真实硬件上的实现和验证。这些都是系统研究领域的高价值课题。</p>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="font-semibold text-pink-300 mb-4 flex items-center gap-2"><i class="fas fa-lightbulb"></i> 总结</h3>
+                <div class="space-y-3 text-sm text-slate-300">
+                    <p>《Accelerating MoE with Dynamic In-Switch Computing on Multi-GPUs》是上海交通大学与华为联合研究的一项突破性工作,针对 MoE 模型中动态、不规则的 GPU 间通信瓶颈,提出了 <strong class="text-emerald-400">DySHARP</strong> (Dynamic Switch-based Hardware Accelerated Routing and Processing) 框架。该框架通过扩展静态交换机能力,在交换机层面实现动态寻址、多播分发、归约聚合,并结合 token-centric 内核融合和通信感知调度,实现了 MoE 通信的全面优化。</p>
+                    <p>论文的核心贡献包括:(1) 揭示了 MoE dispatch/combine 通信中的根本挑战——varying targets 和 asymmetric addressing;(2) 设计了动态多内存寻址方案,通过代数索引到布局索引的翻译实现紧凑寻址;(3) 实现了交换机内多播和归约硬件原语;(4) 提出了以 token 为中心的内核融合管线;(5) 设计了通信感知的并发调度策略。在 32-GPU GH200 系统仿真中,DySHARP 实现了近半流量削减和最高 4.25x 的 MoE 层加速,硬件开销仅占 NVSwitch 芯片面积的 0.1% 以下。</p>
+                    <p>这项工作的意义在于,它证明了"让交换机变智能"——以极小的硬件代价在交换机层面添加动态计算能力——是解决 MoE 通信瓶颈的有效途径。随着 MoE 模型在万亿参数 LLM 中的广泛应用,DySHARP 的架构理念和具体设计将对未来 GPU 互连架构、通信库设计、以及数据中心网络产生深远影响。</p>
+                </div>
+                <div class="mt-6 pt-4 border-t border-slate-700 text-xs text-slate-500">
+                    本报告基于以下来源:
+                    <a href="https://arxiv.org/abs/2605.05607" target="_blank" class="ref-link">arXiv:2605.05607</a>,
+                    <a href="https://arxiv.org/pdf/2605.05607" target="_blank" class="ref-link">PDF Version</a>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-card border-t border-slate-700 mt-12">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-sm text-slate-400">
+                    <i class="fas fa-bolt mr-2"></i>DySHARP 论文深度解读 | arXiv:2605.05607 | 2026-05-08
+                </div>
+                <div class="text-xs text-slate-500">
+                    所有技术解读基于可验证的论文原文 | 每个技术点提供 reference 链接
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Navigation tab switching
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                const sectionId = this.dataset.section;
+                const section = document.getElementById(sectionId);
+                if (section) {
+                    const navHeight = document.querySelector('nav').offsetHeight;
+                    const headerHeight = document.querySelector('header').offsetHeight;
+                    const offset = headerHeight + navHeight + 20;
+                    const top = section.getBoundingClientRect().top + window.pageYOffset - offset;
+                    window.scrollTo({ top, behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Update active tab on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const navHeight = document.querySelector('nav').offsetHeight;
+            const headerHeight = document.querySelector('header').offsetHeight;
+            const offset = headerHeight + navHeight + 100;
+
+            let currentSection = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - offset;
+                if (window.pageYOffset >= sectionTop) {
+                    currentSection = section.getAttribute('id');
+                }
+            });
+
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.section === currentSection) {
+                    tab.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

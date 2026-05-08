@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoE-Hub: MoE 重叠硬件加速通信深度解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .patent-card { transition: all 0.3s ease; }
+        .patent-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.5rem; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.8rem; overflow-x: auto; line-height: 1.6; }
+        .highlight-box { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .insight-box { border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .tech-diagram { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.75rem; padding: 1.5rem; }
+        .paper-badge { font-family: 'Fira Code', monospace; background: rgba(245, 158, 11, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        .metric-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); }
+        .impact-card { transition: all 0.3s ease; border: 1px solid rgba(148, 163, 184, 0.15); }
+        .impact-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4); border-color: rgba(245, 158, 11, 0.4); }
+        .arch-module { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 0.75rem; padding: 1.25rem; }
+        .arch-module:hover { border-color: rgba(245, 158, 11, 0.5); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; }
+        .nav-tab:hover { color: #f59e0b; }
+        .nav-tab.active { color: #f59e0b; border-bottom: 2px solid #f59e0b; }
+        .arch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+        .arch-flow-arrow { display: flex; align-items: center; justify-content: center; color: #f59e0b; font-size: 1.5rem; }
+        .workflow-step { position: relative; padding-left: 2.5rem; }
+        .workflow-step::before { content: ''; position: absolute; left: 0.75rem; top: 2rem; bottom: -1rem; width: 2px; background: rgba(245, 158, 11, 0.3); }
+        .workflow-step:last-child::before { display: none; }
+        .workflow-step .step-number { position: absolute; left: 0; top: 0; width: 1.5rem; height: 1.5rem; background: rgba(245, 158, 11, 0.2); border: 2px solid rgba(245, 158, 11, 0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #f59e0b; font-weight: bold; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <!-- Sticky Header -->
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-network-wired text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">MoE-Hub 论文深度解析</h1>
+                        <p class="text-xs text-slate-400">MoE 计算通信重叠硬件加速 | arXiv:2605.05888</p>
+                    </div>
+                </div>
+                <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-700/10 border border-amber-500/20">
+                    <div class="text-xs text-slate-400">最高端到端加速比</div>
+                    <div class="text-lg font-bold text-amber-400">1.98x</div>
+                </div>
+            </div>
+            <nav class="flex items-center gap-5 text-xs text-slate-400 overflow-x-auto pb-1">
+                <span class="nav-tab" onclick="scrollToSection('overview')">概览</span>
+                <span class="nav-tab" onclick="scrollToSection('motivation')">动机</span>
+                <span class="nav-tab" onclick="scrollToSection('challenges')">通信挑战</span>
+                <span class="nav-tab" onclick="scrollToSection('architecture')">架构</span>
+                <span class="nav-tab" onclick="scrollToSection('paradigm')">目的地无关范式</span>
+                <span class="nav-tab" onclick="scrollToSection('aau')">AAU</span>
+                <span class="nav-tab" onclick="scrollToSection('rpm')">RPM</span>
+                <span class="nav-tab" onclick="scrollToSection('dam')">DAM</span>
+                <span class="nav-tab" onclick="scrollToSection('workflow')">通信工作流</span>
+                <span class="nav-tab" onclick="scrollToSection('performance')">性能评估</span>
+                <span class="nav-tab" onclick="scrollToSection('overhead')">硬件开销</span>
+                <span class="nav-tab" onclick="scrollToSection('impact')">影响分析</span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <div class="glass-card rounded-xl p-6 mt-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="paper-badge">arXiv:2605.05888v1</span>
+                <h2 class="text-lg font-semibold text-amber-400">MoE-Hub: Taming Software Complexity for Seamless MoE Overlap with Hardware-Accelerated Communication on Multi-GPU Systems</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-amber-500/10 to-orange-700/10 border border-amber-500/20">
+                    <div class="text-sm text-slate-400 mb-1">作者</div>
+                    <div class="text-xs text-amber-400">Zhuoshan Zhou, Chen Zhang, Shuyi Zhang, Qijun Zhang, Haibo Wang, Zhe Zhou, Zhipeng Tu, Guangyu Sun, Yijia Diao, Zhigang Ji, Jingwen Leng, Guanghui He, Minyi Guo</div>
+                    <div class="text-xs text-slate-500 mt-1">上海交通大学、鹏城实验室、北京大学、之江实验室等</div>
+                </div>
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-amber-500/10 to-orange-700/10 border border-amber-500/20">
+                    <div class="text-sm text-slate-400 mb-1">发表信息</div>
+                    <div class="text-xs text-amber-400">arXiv:2605.05888v1, May 7, 2026</div>
+                    <div class="text-xs text-slate-500 mt-1">实验平台: 8x NVIDIA H800 GPU, 4x NVSwitch, 400 GB/s 带宽</div>
+                </div>
+            </div>
+
+            <div class="space-y-8">
+                <!-- Section 1: 论文概览 -->
+                <div id="overview" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-file-alt"></i> 论文概览</h3>
+
+                    <div class="highlight-box mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-bullseye mr-1"></i> 核心贡献</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            本文提出 <strong>MoE-Hub</strong>，一种在 GPU Hub 中构建的新型硬件加速通信架构，专门解决 MoE (Mixture of Experts) 模型在多 GPU 系统中的计算-通信重叠问题。核心创新包括：(1) <strong>目的地无关范式</strong> (Destination-Agnostic Paradigm)，通过新型 st.rowsp 指令实现 token 发送与目标地址解耦；(2) 三个专用硬件模块 —— <strong>AAU</strong> (地址分配单元)、<strong>RPM</strong> (运行时包管理器)、<strong>DAM</strong> (数据可用性管理器)，共同实现 token 数据的硬件级通信调度；(3) 用事件触发的 dispatch 替代软件忙等待轮询，消除软件中介开销。实验表明 MoE-Hub 在 8x H800 GPU 上实现了 <strong>1.40x-3.08x 每层加速</strong> 和 <strong>1.21x-1.98x 端到端加速</strong>，达到理论理想加速的 <strong>96.8%</strong>。
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">3.08x</div>
+                            <div class="text-xs text-slate-400">最高每层加速比</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">1.98x</div>
+                            <div class="text-xs text-slate-400">最高端到端加速比</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">96.8%</div>
+                            <div class="text-xs text-slate-400">理想加速达成率</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">0.06%</div>
+                            <div class="text-xs text-slate-400">H800 芯片面积占比</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">MoE 模型与通信瓶颈</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">Mixture of Experts (MoE) 架构通过稀疏激活策略显著扩大了模型容量，同时保持合理的计算成本。然而，MoE 的 <strong>动态 token 路由</strong> 特性在分布式推理/训练中引入了严重的 GPU 间通信挑战。每个 token 根据门控网络动态选择目标专家（可能位于不同 GPU），导致通信模式高度不规则且不可预测，传统通信库（如 NCCL）难以高效处理这种动态 All-to-All 通信。</p>
+                    </div>
+
+                    <div class="mt-2 text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2605.05888" target="_blank" class="ref-link">arXiv:2605.05888 原文</a> | <a href="https://arxiv.org/html/2605.05888v1" target="_blank" class="ref-link">HTML 版本</a></div>
+                </div>
+
+                <!-- Section 2: 研究动机 -->
+                <div id="motivation" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 研究动机</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-bolt mr-1"></i> MoE 通信瓶颈</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                MoE 推理/训练包含两个核心通信阶段：<strong>dispatch</strong>（将 token 从生产者 GPU 发送到拥有目标专家的消费 GPU）和 <strong>combine</strong>（将专家处理后的输出聚合回原始生产者 GPU）。这两个阶段都需要跨 GPU 的 All-to-All 通信。在 MoE 模型中，通信开销可占总延迟的 40% 以上，成为关键性能瓶颈。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-random mr-1"></i> 动态 Token 路由 vs 静态内存不匹配</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                MoE 的核心特征是每个 token 经过门控网络 (gate) <strong>动态</strong> 路由到 K 个专家（Top-K）。这导致：
+                            </p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 每个 token 的目标 GPU 是运行时决定的，编译时不可知</li>
+                                <li>• 不同 GPU 接收的 token 数量极不均衡（token imbalance）</li>
+                                <li>• 每个 expert 的输入 buffer 大小动态变化</li>
+                                <li>• 传统静态内存分配无法适应这种动态性</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-cog mr-1"></i> 软件中介开销</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                现有 MoE 通信系统（Megatron-TE, FasterMoE, Tutel, Comet, CCFuser）依赖软件层处理动态 token 路由和通信调度，引入多重开销：
+                            </p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• <strong>目标地址解析:</strong> 每个 token 需要查找目标 GPU 地址</li>
+                                <li>• <strong>忙等待轮询:</strong> 等待数据就绪的软件轮询消耗 GPU 周期</li>
+                                <li>• <strong>内核启动开销:</strong> 频繁的 kernel launch 造成 pipeline bubbles</li>
+                                <li>• <strong>软件同步:</strong> CPU-GPU 同步延迟（~1us RTT）</li>
+                                <li>• <strong>包合并开销:</strong> 软件层面的数据打包效率低下</li>
+                            </ul>
+                        </div>
+
+                        <div class="highlight-box">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-lightbulb mr-1"></i> 核心洞察</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed">
+                                将 MoE 通信中 <strong>重复、规律</strong> 的底层操作（地址分配、包管理、依赖跟踪）从软件层卸载到 GPU 硬件中，可以消除软件中介开销，同时保持对动态 token 路由的灵活性。关键是在硬件设计中找到 <strong>"规律中的规律"</strong>——尽管 token 目标是动态的，但通信的物理操作模式是可预测和可硬件化的。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: MoE 通信挑战 -->
+                <div id="challenges" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-project-diagram"></i> MoE 通信挑战</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2">Dispatch 阶段</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">生产者 GPU 将 token 发送到拥有目标专家的消费 GPU。</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 每个 token 有动态目标（门控网络决定）</li>
+                                <li>• 需要为每个目标 expert 分配输入 buffer</li>
+                                <li>• token 数量 per expert 不可预测</li>
+                                <li>• 传统方案：先 gather 路由信息，再发送数据</li>
+                            </ul>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2">Combine 阶段</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">消费 GPU 将 expert 处理后的 token 输出发送回原始生产者 GPU。</p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• 目标地址已知（反向于 dispatch）</li>
+                                <li>• 需要路由元数据来重建 token 原始顺序</li>
+                                <li>• 非关键路径数据可使用 .nop 后缀标记</li>
+                                <li>• 同样受 token imbalance 影响</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">Token 路由不规则性与 Pipeline Bubbles</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">MoE 的动态 token 路由导致以下关键挑战：</p>
+
+                        <div class="arch-grid">
+                            <div class="arch-module">
+                                <div class="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2"><i class="fas fa-times-circle"></i> Token Imbalance</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">不同 expert 接收的 token 数量方差可达 0.05（标准差）。某些 expert 可能接收大量 token 而另一些几乎为空，导致通信负载严重不均。</p>
+                            </div>
+                            <div class="arch-module">
+                                <div class="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2"><i class="fas fa-times-circle"></i> Pipeline Bubbles</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">软件层需要等待路由信息确定后才能开始数据传输，计算 kernel 与通信 kernel 之间存在等待间隙，形成 pipeline bubble，降低 GPU 利用率。</p>
+                            </div>
+                            <div class="arch-module">
+                                <div class="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2"><i class="fas fa-times-circle"></i> 地址解析延迟</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">每个 token 发送前需要在软件中查找目标 GPU 的基地址和偏移，增加 per-token 延迟，在大规模 MoE 模型中尤为显著。</p>
+                            </div>
+                            <div class="arch-module">
+                                <div class="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2"><i class="fas fa-times-circle"></i> 依赖管理开销</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">需要等待所有 token 到达后才能开始 expert 计算。软件轮询方式消耗大量 GPU cycle，且无法精确感知数据到达。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block mt-4">
+                        <div class="text-slate-300 space-y-1">
+                            <div class="text-amber-400">// 传统 MoE 通信流程 (软件中介)</div>
+                            <div></div>
+                            <div>// Dispatch 阶段:</div>
+                            <div>// 1. 计算门控 (GPU kernel) -> 每个 token 的 top-K expert</div>
+                            <div>// 2. 收集路由元数据 (all-gather) -> 每个 GPU 知道发送目标</div>
+                            <div>// 3. 为每个 expert 预分配 buffer (CPU 参与)</div>
+                            <div>// 4. 打包 token 数据 -> 软件循环 per-target</div>
+                            <div>// 5. 调用 NCCL all-to-all -> 数据传输</div>
+                            <div>// 6. 忙等待轮询 -> 等待所有数据到达</div>
+                            <div>// 7. 开始 expert 计算</div>
+                            <div></div>
+                            <div>// 问题: 步骤 2-6 均为软件中介开销</div>
+                            <div>// 步骤 6 的忙等待消耗 GPU 资源</div>
+                            <div>// 步骤 3-4 的 per-target 循环在 token 多时严重拖慢</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: MoE-Hub 架构 -->
+                <div id="architecture" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-microchip"></i> MoE-Hub 架构</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-5 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-3">GPU Hub 中的硬件加速通信架构</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">
+                            MoE-Hub 在 GPU 的 Hub（网络接口与内存控制器之间）中新增三个专用硬件模块，与 GPU 的现有通信基础设施协同工作。这些模块对软件透明，仅需一条新指令（st.rowsp）和一组 MMIO API。
+                        </p>
+
+                        <div class="tech-diagram mb-4">
+                            <div class="text-center text-sm font-semibold text-white mb-4">MoE-Hub GPU Hub 架构总览</div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Producer Side -->
+                                <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                                    <div class="text-sm font-bold text-red-400 mb-3 flex items-center gap-2"><i class="fas fa-upload"></i> 生产者侧 (Producer Side)</div>
+                                    <div class="space-y-3">
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-red-300 mb-1">RPM (运行时包管理器)</div>
+                                            <p class="text-xs text-slate-400">Remote Write Buffer Pool + 包合并 + 包调度</p>
+                                            <p class="text-xs text-slate-500 mt-1">Producer 侧核心模块</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-blue-300 mb-1">st.rowsp 指令</div>
+                                            <p class="text-xs text-slate-400">目的地无关的 store 指令</p>
+                                            <p class="text-xs text-slate-500 mt-1">RowID / RowOffset / MallocID</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Network -->
+                                <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex flex-col items-center justify-center">
+                                    <div class="text-sm font-bold text-amber-400 mb-3"><i class="fas fa-network-wired"></i> 网络互连</div>
+                                    <div class="text-center">
+                                        <div class="text-xs text-slate-400">NVLink / NVSwitch</div>
+                                        <div class="text-xs text-slate-500 mt-1">400 GB/s 带宽</div>
+                                        <div class="text-xs text-slate-500">~1us RTT</div>
+                                    </div>
+                                    <div class="mt-3 text-amber-400 text-2xl"><i class="fas fa-arrows-alt-h"></i></div>
+                                </div>
+
+                                <!-- Consumer Side -->
+                                <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                                    <div class="text-sm font-bold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-download"></i> 消费者侧 (Consumer Side)</div>
+                                    <div class="space-y-3">
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-green-300 mb-1">AAU (地址分配单元)</div>
+                                            <p class="text-xs text-slate-400">RAT + APT + FIFO 淘汰</p>
+                                            <p class="text-xs text-slate-500 mt-1">物理地址自动分配</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-cyan-300 mb-1">DAM (数据可用性管理器)</div>
+                                            <p class="text-xs text-slate-400">依赖表 (CAM) + TB 计数器</p>
+                                            <p class="text-xs text-slate-500 mt-1">事件触发 dispatch</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="highlight-box">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-key mr-1"></i> 设计哲学</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            MoE-Hub 采用 <strong>"目的地无关"</strong> (Destination-Agnostic) 设计理念：发送 token 时不需要知道目标地址，而是通过 MallocID 标识目标 expert，由硬件自动解析和分配地址。这一范式从根本上解耦了 <strong>"发送什么"</strong> 与 <strong>"发送到哪里"</strong>，消除了软件层的目标地址解析开销。
+                        </p>
+                    </div>
+
+                    <div class="insight-box mt-4">
+                        <h4 class="text-sm font-medium text-emerald-400 mb-2"><i class="fas fa-lightbulb mr-1"></i> 四个硬件模块协同工作</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div class="bg-slate-800/40 rounded p-3">
+                                <div class="text-xs font-semibold text-amber-400 mb-1">1. 目的地无关范式 (Core)</div>
+                                <p class="text-xs text-slate-400">st.rowsp 指令 + rowspMalloc API，实现发送与地址解耦</p>
+                            </div>
+                            <div class="bg-slate-800/40 rounded p-3">
+                                <div class="text-xs font-semibold text-green-400 mb-1">2. AAU (消费者侧)</div>
+                                <p class="text-xs text-slate-400">自动分配物理地址，管理内存布局</p>
+                            </div>
+                            <div class="bg-slate-800/40 rounded p-3">
+                                <div class="text-xs font-semibold text-red-400 mb-1">3. RPM (生产者侧)</div>
+                                <p class="text-xs text-slate-400">包合并、调度，优化网络传输</p>
+                            </div>
+                            <div class="bg-slate-800/40 rounded p-3">
+                                <div class="text-xs font-semibold text-cyan-400 mb-1">4. DAM (消费者侧)</div>
+                                <p class="text-xs text-slate-400">依赖跟踪，事件触发计算启动</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: 目的地无关范式 -->
+                <div id="paradigm" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-crosshairs"></i> 目的地无关范式 (Destination-Agnostic Paradigm)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">核心思想</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            传统的 store 指令需要指定完整的目标内存地址。MoE-Hub 提出 <strong>st.rowsp</strong> (Row Store Packet) 指令，发送数据时只需指定一个逻辑标识符（MallocID），而非物理地址。硬件负责将 MallocID 解析为实际的物理地址，实现发送与目标地址的完全解耦。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">st.rowsp 指令格式</h4>
+
+                        <div class="code-block">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// st.rowsp 指令格式</div>
+                                <div class="text-amber-400">// st.rowsp[.nop] [value], [row_id].[row_offset].[malloc_id]</div>
+                                <div></div>
+                                <div>// 指令字段解析:</div>
+                                <div></div>
+                                <div>// +----------+-----------+------------+</div>
+                                <div>// |  RowID   | RowOffset | MallocID   |</div>
+                                <div>// +----------+-----------+------------+</div>
+                                <div>//    ^            ^            ^</div>
+                                <div>//    |            |            |</div>
+                                <div>//    |            |            +-- 目标 GPU + 内存区域标识</div>
+                                <div>//    |            |               (由 rowspMalloc 预分配)</div>
+                                <div>//    |            +-- 包内偏移位置 (字节)</div>
+                                <div>//    |               (标识数据包内的具体位置)</div>
+                                <div>//    +-- 全局排序标识</div>
+                                <div>//       (确保同一 row 内的有序写入)</div>
+                                <div></div>
+                                <div>// .nop 后缀:</div>
+                                <div>//   标记非关键路径数据 (combine 阶段)</div>
+                                <div>//   接收端不为此数据触发依赖事件</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-violet-400 mb-1">RowID</div>
+                                <p class="text-xs text-slate-400">全局排序标识，确保同一行 (row) 内写入的全局顺序。用于包合并时的去重和排序。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-blue-400 mb-1">RowOffset</div>
+                                <p class="text-xs text-slate-400">包内偏移位置，标识数据包内的具体字节位置。用于精确定位写入位置。</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-green-400 mb-1">MallocID</div>
+                                <p class="text-xs text-slate-400">目标 GPU + 内存区域的逻辑标识符。由 rowspMalloc API 预先分配，发送时不需要知道物理地址。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">rowspMalloc API</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <code class="text-amber-300">rowspMalloc</code> 是 MoE-Hub 提供的 MMIO API，用于预先分配 expert 输入 buffer。调用后返回一个 MallocID，该 ID 编码了目标 GPU 和内存区域信息。后续 st.rowsp 指令使用此 MallocID，硬件自动解析为物理地址。
+                        </p>
+
+                        <div class="code-block mt-3">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// rowspMalloc 使用示例</div>
+                                <div></div>
+                                <div>// 为每个 expert 预分配输入 buffer</div>
+                                <div>for each expert_e:</div>
+                                <div>    malloc_id = rowspMalloc(  // MMIO 调用</div>
+                                <div>        target_gpu = expert_e.gpu,  // 目标 GPU</div>
+                                <div>        size = expert_e.buffer_size  // buffer 大小</div>
+                                <div>    )</div>
+                                <div>    expert_e.malloc_id = malloc_id</div>
+                                <div></div>
+                                <div>// 发送 token 时只需使用 MallocID</div>
+                                <div>for each token t:</div>
+                                <div>    target_expert = gate(t)  // 门控网络选择</div>
+                                <div>    st.rowsp token_data, [row_id].[offset].[target_expert.malloc_id]</div>
+                                <div></div>
+                                <div>// 无需查找物理地址！硬件自动完成</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="highlight-box mt-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-unlink mr-1"></i> 解耦的意义</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            目的地无关范式将 <strong>通信意图</strong>（发送 token 到哪个 expert）与 <strong>通信执行</strong>（写入哪个物理地址）解耦。发送方不需要知道：(1) 目标 GPU 的基地址；(2) expert 输入 buffer 的偏移；(3) 当前写入位置。这些信息全部由消费侧的 AAU 和 RPM 在硬件中处理。这消除了传统方案中每个 token 都需要查找目标地址的软件开销。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 6: 地址分配单元 AAU -->
+                <div id="aau" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-map-marker-alt"></i> 地址分配单元 AAU (Address Allocation Unit)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">功能概述</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            AAU 位于消费侧 GPU 的 Hub 中，负责自动为到达的 token 数据分配物理地址。它维护两个核心数据结构：<strong>RAT</strong> (Row Allocation Table) 和 <strong>APT</strong> (Allocation Pointer Table)，实现无软件参与的地址分配。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">AAU 内部结构</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2"><i class="fas fa-table mr-1"></i> RAT (Row Allocation Table)</h5>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-3">
+                                    RAT 是一个 <strong>16-bank 双端口 SRAM</strong> 缓存，存储 (MallocID, RowID) 到 LocalRowID 的映射。当 st.rowsp 指令到达时，AAU 查找 RAT 获取 LocalRowID，然后结合 RowOffset 计算物理地址。
+                                </p>
+                                <div class="code-block">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-green-400">// RAT 条目结构</div>
+                                        <div class="text-green-400">// 键: (MallocID, RowID)</div>
+                                        <div class="text-green-400">// 值: LocalRowID</div>
+                                        <div></div>
+                                        <div>// RAT 查找:</div>
+                                        <div>// input:  MallocID + RowID</div>
+                                        <div>// output: LocalRowID (本地行标识)</div>
+                                        <div></div>
+                                        <div>// 物理地址计算:</div>
+                                        <div>// Addr = BaseAddr + LocalRowID * RowSize + RowOffset</div>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-2">RAT 是 AAU 中最大的硬件组件，占 MoE-Hub 面积的绝大部分。</p>
+                            </div>
+
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-blue-400 mb-2"><i class="fas fa-pointer mr-1"></i> APT (Allocation Pointer Table)</h5>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-3">
+                                    APT 跟踪每个内存区域的下一个可用行 (row)。使用 <strong>原子指针</strong> (atomic pointer) 实现并发分配：多个 st.rowsp 指令可以同时请求地址分配而不会冲突。
+                                </p>
+                                <div class="code-block">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-blue-400">// APT 条目结构</div>
+                                        <div class="text-blue-400">// 键: MallocID</div>
+                                        <div class="text-blue-400">// 值: next_row_ptr (原子指针)</div>
+                                        <div></div>
+                                        <div>// 分配流程:</div>
+                                        <div>// 1. 原子读取 next_row_ptr</div>
+                                        <div>// 2. next_row_ptr++ (原子递增)</div>
+                                        <div>// 3. 更新 APT 和 RAT</div>
+                                        <div>// 4. 返回分配的 LocalRowID</div>
+                                        <div></div>
+                                        <div>// FIFO 淘汰策略:</div>
+                                        <div>// 当 RAT 满时，淘汰最早的条目</div>
+                                        <div>// (FIFO queue 管理)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">地址分配完整流程</h4>
+
+                        <div class="space-y-3 mt-3">
+                            <div class="workflow-step">
+                                <div class="step-number">1</div>
+                                <p class="text-sm text-slate-300"><strong>接收 st.rowsp 指令:</strong> 从网络收到带有 (RowID, RowOffset, MallocID) 的写入请求。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">2</div>
+                                <p class="text-sm text-slate-300"><strong>RAT 查找:</strong> 使用 (MallocID, RowID) 作为键查找 RAT。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">3</div>
+                                <p class="text-sm text-slate-300"><strong>RAT 未命中 (Miss):</strong> 如果 RAT 中没有对应条目，使用 APT 分配新的 LocalRowID。APT 对 MallocID 对应的区域原子递增 next_row_ptr，并将新映射 (MallocID, RowID) -> LocalRowID 插入 RAT。如果 RAT 已满，按 FIFO 策略淘汰最旧条目。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">4</div>
+                                <p class="text-sm text-slate-300"><strong>物理地址计算:</strong> <code class="text-amber-300">PhysicalAddr = BaseAddr + LocalRowID * RowSize + RowOffset</code></p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">5</div>
+                                <p class="text-sm text-slate-300"><strong>写入 HBM:</strong> 将数据写入计算得到的物理地址，通知 DAM 数据已到达。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insight-box mt-4">
+                        <h4 class="text-sm font-medium text-emerald-400 mb-2"><i class="fas fa-lightbulb mr-1"></i> AAU 的关键设计</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            AAU 的 <strong>16-bank 双端口 SRAM</strong> 设计确保了高并发地址分配能力。16 个 bank 允许同时处理 16 个独立的地址分配请求而不会产生 bank 冲突。FIFO 淘汰策略简单高效，适合 MoE 通信中 "写入后不再访问" 的访问模式。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 7: 运行时包管理器 RPM -->
+                <div id="rpm" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-box"></i> 运行时包管理器 RPM (Runtime Packet Manager)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">功能概述</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            RPM 位于生产者侧 GPU 的 Hub 中，负责优化网络传输。它将多个小型写入请求合并为缓存行对齐 (cache-line-aligned) 的数据包，提高网络带宽利用率，并通过轮转调度 (round-robin) 管理多目标传输。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">RPM 内部结构</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-red-400 mb-2"><i class="fas fa-database mr-1"></i> Remote Write Buffer Pool</h5>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    一组缓存行大小的缓冲区，临时存储待发送的写入数据。当 st.rowsp 指令发出时，数据首先写入 Buffer Pool 中的对应位置，而非立即发送。
+                                </p>
+                                <p class="text-xs text-slate-500 mt-2">Buffer 数量影响并发度：更多 buffer 允许更多并发写入。</p>
+                            </div>
+
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-amber-400 mb-2"><i class="fas fa-compress-arrows-alt mr-1"></i> 缓存行对齐包合并</h5>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    RPM 通过匹配 (RowID, RowOffset) 元组来合并来自多个 st.rowsp 请求的数据。属于同一 Row 且偏移连续的写入被合并到同一个缓存行大小的数据包中，减少网络包数量。
+                                </p>
+                                <p class="text-xs text-slate-500 mt-2">合并后发送一个完整缓存行而非多个小包。</p>
+                            </div>
+
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2"><i class="fas fa-sync-alt mr-1"></i> 包调度器</h5>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    使用 <strong>轮转调度 (Round-Robin)</strong> 在多个目标 GPU 之间公平分配带宽。支持 <strong>消费者感知排序</strong> (consumer-aware ordering)，确保接收端的数据到达顺序符合依赖要求。
+                                </p>
+                                <p class="text-xs text-slate-500 mt-2">兼顾公平性和数据依赖性。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">包合并机制详解</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            在 MoE 场景中，单个 token 数据通常远小于一个缓存行（64 字节）。如果不合并，每个 token 都会产生一个独立网络包，导致大量包头部开销和低带宽利用率。
+                        </p>
+
+                        <div class="code-block mt-3">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// 包合并机制</div>
+                                <div></div>
+                                <div>// 未合并 (传统方案):</div>
+                                <div>// token_1 (16 bytes) -> 网络包 (64B header + 16B data = 80B)</div>
+                                <div>// token_2 (16 bytes) -> 网络包 (64B header + 16B data = 80B)</div>
+                                <div>// token_3 (16 bytes) -> 网络包 (64B header + 16B data = 80B)</div>
+                                <div>// 总带宽: 240B (其中 192B 为头部开销, 利用率 20%)</div>
+                                <div></div>
+                                <div>// RPM 合并后:</div>
+                                <div>// token_1 + token_2 + token_3 (合并为 1 个缓存行)</div>
+                                <div>// -> 网络包 (64B header + 64B data = 128B)</div>
+                                <div>// 总带宽: 128B (其中 64B 为数据, 利用率 50%+)</div>
+                                <div></div>
+                                <div>// 合并条件: 匹配 (RowID, RowOffset) 元组</div>
+                                <div>// 只有同一 Row 且偏移连续的写入才能合并</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">轮转调度与消费者感知排序</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            RPM 的包调度器在多个目标 GPU 之间使用轮转策略分配网络带宽，确保没有单个目标饿死。同时，它考虑消费侧的依赖需求：<strong>消费者感知排序</strong> 确保关键路径数据（非 .nop 标记的数据）优先发送，而非关键路径数据可以在带宽空闲时发送。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 8: 数据可用性管理器 DAM -->
+                <div id="dam" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-signal"></i> 数据可用性管理器 DAM (Data Availability Manager)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">功能概述</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            DAM 位于消费侧 GPU 的 Hub 中，负责跟踪数据到达状态并在所有依赖数据就绪时自动触发 expert 计算。它用 <strong>事件触发</strong> 机制替代了传统的 <strong>忙等待轮询</strong>，显著减少 GPU 资源浪费。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">DAM 内部结构</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-cyan-400 mb-2"><i class="fas fa-memory mr-1"></i> 依赖表 (CAM Structure)</h5>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    DAM 使用 <strong>CAM (Content-Addressable Memory)</strong> 结构的依赖表来跟踪每个 expert 的数据到达状态。CAM 允许通过内容（而非地址）快速查找条目，适合动态 token 路由的不可预测模式。
+                                </p>
+                                <div class="code-block mt-2">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-cyan-400">// CAM 依赖表</div>
+                                        <div>// 每个条目跟踪一个 expert 的数据到达</div>
+                                        <div></div>
+                                        <div>// 条目结构:</div>
+                                        <div>// {</div>
+                                        <div>//     MallocID:    expert 标识</div>
+                                        <div>//     RowCount:    期望的 row 数量</div>
+                                        <div>//     ArrivedCnt:  已到达的 row 数量</div>
+                                        <div>//     Status:      PENDING / READY / DONE</div>
+                                        <div>// }</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2"><i class="fas fa-calculator mr-1"></i> TB Status Counters</h5>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    TB (Token Block) 状态计数器跟踪每个 token block 的数据到达进度。当所有期望的 token 数据到达后，DAM 自动触发对应 expert 的计算 kernel。
+                                </p>
+                                <div class="code-block mt-2">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-green-400">// TB 状态计数器</div>
+                                        <div>// 跟踪每个 expert 的 token block 到达</div>
+                                        <div></div>
+                                        <div>// 当 ArrivedCnt == RowCount 时:</div>
+                                        <div>//   1. 设置 Status = READY</div>
+                                        <div>//   2. 触发事件通知 GPU</div>
+                                        <div>//   3. 启动 expert 计算 kernel</div>
+                                        <div>//   4. 不再需要软件轮询!</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">事件触发 Dispatch vs 忙等待轮询</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="border border-red-500/30 rounded-lg p-4 bg-gradient-to-br from-red-500/5 to-transparent">
+                                <div class="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2"><i class="fas fa-times-circle"></i> 传统忙等待轮询</div>
+                                <ul class="text-xs text-slate-400 space-y-1">
+                                    <li>• GPU 持续轮询内存，检查数据是否到达</li>
+                                    <li>• 轮询消耗大量 GPU 周期和内存带宽</li>
+                                    <li>• 轮询间隔需要调优（太短浪费资源，太长增加延迟）</li>
+                                    <li>• 与计算 kernel 竞争资源</li>
+                                    <li>• 无法精确感知数据到达时刻</li>
+                                </ul>
+                            </div>
+                            <div class="border border-green-500/30 rounded-lg p-4 bg-gradient-to-br from-green-500/5 to-transparent">
+                                <div class="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2"><i class="fas fa-check-circle"></i> DAM 事件触发</div>
+                                <ul class="text-xs text-slate-400 space-y-1">
+                                    <li>• 硬件自动跟踪数据到达状态</li>
+                                    <li>• 所有数据到达后自动触发事件</li>
+                                    <li>• GPU 无需轮询，可继续其他工作</li>
+                                    <li>• 零资源开销</li>
+                                    <li>• 精确的数据到达感知</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mt-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">全局完成检测器 (Global Completion Detector)</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            DAM 还包含全局完成检测逻辑，用于跟踪整个 MoE 层的完成状态。当所有 expert 的计算都完成后，DAM 通知 combine 阶段可以开始。这消除了软件层对整个层完成状态的轮询需求。
+                        </p>
+                        <div class="code-block mt-3">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// 全局完成检测</div>
+                                <div></div>
+                                <div>// 跟踪所有 expert 的状态:</div>
+                                <div>// total_experts = 所有 expert 数量</div>
+                                <div>// completed_experts = 已完成计算的 expert 数量</div>
+                                <div></div>
+                                <div>// 每完成一个 expert:</div>
+                                <div>//   completed_experts++</div>
+                                <div>//   if completed_experts == total_experts:</div>
+                                <div>//       trigger_combine_phase()  // 自动触发 combine</div>
+                                <div></div>
+                                <div>// 不需要 CPU 或 GPU kernel 检查!</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 9: 通信工作流 -->
+                <div id="workflow" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-route"></i> 通信工作流 (Communication Workflow)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">Dispatch 阶段工作流</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            Dispatch 阶段将 token 从生产者 GPU 发送到拥有目标专家的消费 GPU。MoE-Hub 通过硬件加速消除了软件中介的多个步骤。
+                        </p>
+
+                        <div class="space-y-3 mt-4">
+                            <div class="workflow-step">
+                                <div class="step-number">1</div>
+                                <p class="text-sm text-slate-300"><strong>预分配 expert buffer:</strong> 调用 <code class="text-amber-300">rowspMalloc</code> 为每个 expert 预分配输入 buffer，获取 MallocID。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">2</div>
+                                <p class="text-sm text-slate-300"><strong>执行门控计算:</strong> GPU 运行门控网络，为每个 token 确定 Top-K 目标 expert。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">3</div>
+                                <p class="text-sm text-slate-300"><strong>发射 st.rowsp 指令:</strong> 对每个 token，发射 st.rowsp 指令将 token 数据发送出去。指令携带 (RowID, RowOffset, MallocID)，无需物理地址。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">4</div>
+                                <p class="text-sm text-slate-300"><strong>RPM 包合并:</strong> 生产者侧 RPM 将多个 st.rowsp 请求合并为缓存行对齐的数据包，通过轮转调度发送到网络。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">5</div>
+                                <p class="text-sm text-slate-300"><strong>AAU 地址分配:</strong> 消费侧 AAU 接收数据，通过 RAT/APT 分配物理地址，写入 HBM。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">6</div>
+                                <p class="text-sm text-slate-300"><strong>DAM 依赖跟踪:</strong> 消费侧 DAM 跟踪数据到达，当所有 token 到达后自动触发 expert 计算。</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">7</div>
+                                <p class="text-sm text-slate-300"><strong>Expert 计算:</strong> GPU 启动 expert 计算 kernel，处理 token 数据。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">Combine 阶段工作流</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            Combine 阶段将 expert 处理后的输出发送回原始生产者 GPU。与 dispatch 不同，combine 阶段的目标地址已知（反向于 dispatch），且部分数据（如 padding）可以使用 <code class="text-amber-300">.nop</code> 后缀标记为非关键路径。
+                        </p>
+
+                        <div class="code-block mt-3">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// Combine 阶段 st.rowsp 使用</div>
+                                <div></div>
+                                <div>// 关键路径数据 (需要依赖跟踪):</div>
+                                <div>st.rowsp expert_output, [row_id].[offset].[malloc_id]</div>
+                                <div></div>
+                                <div>// 非关键路径数据 (如 padding，不需要依赖跟踪):</div>
+                                <div>st.rowsp.nop padding_data, [row_id].[offset].[malloc_id]</div>
+                                <div></div>
+                                <div>// .nop 后缀告诉 DAM 不为此数据触发依赖事件</div>
+                                <div>// 避免无意义的数据触发，减少不必要的等待</div>
+                            </div>
+                        </div>
+
+                        <div class="insight-box mt-3">
+                            <h4 class="text-sm font-medium text-emerald-400 mb-1"><i class="fas fa-lightbulb mr-1"></i> .nop 后缀的意义</h4>
+                            <p class="text-sm text-slate-300">
+                                .nop 后缀是 MoE-Hub 针对 combine 阶段优化的关键设计。Combine 阶段经常需要发送 padding 数据来对齐 token 布局，这些 padding 不需要触发任何依赖事件。标记为 .nop 后，DAM 忽略这些数据，避免不必要的依赖计数增加和提前触发。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram mt-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">MoE-Hub vs 传统方案工作流对比</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="border border-red-500/30 rounded-lg p-4 bg-gradient-to-br from-red-500/5 to-transparent">
+                                <div class="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2"><i class="fas fa-times-circle"></i> 传统 MoE 通信</div>
+                                <div class="space-y-2 text-xs text-slate-400">
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">1.</span>
+                                        <span>门控计算 (GPU kernel)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">2.</span>
+                                        <span>All-gather 路由元数据 (NCCL)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">3.</span>
+                                        <span>CPU 参与分配 expert buffer</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">4.</span>
+                                        <span>软件 per-target 循环打包 token</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">5.</span>
+                                        <span>NCCL All-to-All 传输</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">6.</span>
+                                        <span>忙等待轮询 (消耗 GPU 资源!)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">7.</span>
+                                        <span>Expert 计算</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-red-400 flex-shrink-0">8.</span>
+                                        <span>Combine 阶段重复上述过程</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="border border-green-500/30 rounded-lg p-4 bg-gradient-to-br from-green-500/5 to-transparent">
+                                <div class="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-check-circle"></i> MoE-Hub 通信</div>
+                                <div class="space-y-2 text-xs text-slate-400">
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">1.</span>
+                                        <span>rowspMalloc 预分配 (MMIO, 一次性)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">2.</span>
+                                        <span>门控计算 (GPU kernel)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">3.</span>
+                                        <span>发射 st.rowsp (无需地址查找!)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">4.</span>
+                                        <span>RPM 自动包合并 + 网络传输</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">5.</span>
+                                        <span>AAU 自动分配物理地址 + 写入</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">6.</span>
+                                        <span>DAM 事件触发 expert 计算 (零轮询!)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">7.</span>
+                                        <span>Expert 计算 (与 dispatch 重叠!)</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-green-400 flex-shrink-0">8.</span>
+                                        <span>DAM 自动触发 combine (全局完成检测)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 10: 性能评估 -->
+                <div id="performance" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 性能评估</h3>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">8x</div>
+                            <div class="text-xs text-slate-400">NVIDIA H800 GPUs</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">400</div>
+                            <div class="text-xs text-slate-400">GB/s NVLink 带宽</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">4x</div>
+                            <div class="text-xs text-slate-400">NVSwitch 互连</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">~1us</div>
+                            <div class="text-xs text-slate-400">RTT 网络延迟</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">仿真设置</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            使用 <strong>Accel-Sim</strong> GPU 模拟器进行详细性能仿真。配置 8x NVIDIA H800 GPU，通过 4x NVSwitch 全互联，每条 NVLink 带宽 400 GB/s，RTT 延迟约 1 微秒。仿真涵盖了真实 MoE 工作负载。
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">对比基线</h4>
+                        <div class="overflow-x-auto mt-2">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-600">
+                                        <th class="text-left py-2 px-3 text-amber-300">基线方案</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">类型</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">特点</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-medium text-slate-300">Megatron-TE</td><td class="py-2 px-3 text-xs text-slate-400">生产级 MoE 框架</td><td class="py-2 px-3 text-xs text-slate-400">NVIDIA 官方 MoE 实现，NCCL 通信</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-medium text-slate-300">FasterMoE</td><td class="py-2 px-3 text-xs text-slate-400">MoE 推理优化</td><td class="py-2 px-3 text-xs text-slate-400">负载均衡 + 通信优化</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-medium text-slate-300">Tutel</td><td class="py-2 px-3 text-xs text-slate-400">MoE 系统</td><td class="py-2 px-3 text-xs text-slate-400">Microsoft 开源 MoE 框架</td></tr>
+                                    <tr class="border-b border-slate-800"><td class="py-2 px-3 font-medium text-slate-300">Comet</td><td class="py-2 px-3 text-xs text-slate-400">MoE 通信优化</td><td class="py-2 px-3 text-xs text-slate-400">细粒度 MoE 通信调度</td></tr>
+                                    <tr><td class="py-2 px-3 font-medium text-slate-300">CCFuser</td><td class="py-2 px-3 text-xs text-slate-400">计算通信融合</td><td class="py-2 px-3 text-xs text-slate-400">Kernel 融合优化</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">测试工作负载</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="arch-module">
+                                <div class="text-sm font-semibold text-amber-400 mb-1">Mixtral-8x7B</div>
+                                <p class="text-xs text-slate-400">Mistral AI 的开源 MoE 模型，8 个 expert，Top-2 门控。70B 总参数，12B 激活参数。</p>
+                            </div>
+                            <div class="arch-module">
+                                <div class="text-sm font-semibold text-amber-400 mb-1">Qwen2-MoE-2.7B</div>
+                                <p class="text-xs text-slate-400">阿里巴巴的 MoE 模型，2.7B 总参数。测试小规模 MoE 场景。</p>
+                            </div>
+                            <div class="arch-module">
+                                <div class="text-sm font-semibold text-amber-400 mb-1">Phi-3.5-MoE</div>
+                                <p class="text-xs text-slate-400">Microsoft 的轻量 MoE 模型。测试不同架构的 MoE 工作负载。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">核心性能结果</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2">每层加速比</h5>
+                                <div class="text-4xl font-bold text-green-400">1.40x - 3.08x</div>
+                                <p class="text-xs text-slate-400 mt-2">Per-layer speedup vs 基线方案</p>
+                                <p class="text-xs text-slate-500 mt-1">在不同 MoE 模型和 batch size 下测量</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2">端到端加速比</h5>
+                                <div class="text-4xl font-bold text-green-400">1.21x - 1.98x</div>
+                                <p class="text-xs text-slate-400 mt-2">End-to-end speedup vs 基线方案</p>
+                                <p class="text-xs text-slate-500 mt-1">包含计算和通信的完整推理/训练延迟</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2">小 Batch 场景</h5>
+                                <div class="text-3xl font-bold text-green-400">4.70x</div>
+                                <p class="text-xs text-slate-400 mt-1">平均加速比 (vs 非重叠方案)</p>
+                                <p class="text-xs text-slate-500 mt-1">小 batch 时通信占比更大，加速效果更显著</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2">大 Batch 场景</h5>
+                                <div class="text-3xl font-bold text-green-400">2.14x</div>
+                                <p class="text-xs text-slate-400 mt-1">平均加速比 (vs 非重叠方案)</p>
+                                <p class="text-xs text-slate-500 mt-1">大 batch 时计算占比增大，加速比有所下降但仍显著</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">硬件加速增益分解</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="arch-module border-amber-500/30">
+                                <div class="text-sm font-semibold text-amber-400 mb-1">硬件包管理 (RPM)</div>
+                                <div class="text-2xl font-bold text-amber-400">~1.13x</div>
+                                <p class="text-xs text-slate-400 mt-1">缓存行对齐合并 + 轮转调度带来的增益</p>
+                            </div>
+                            <div class="arch-module border-amber-500/30">
+                                <div class="text-sm font-semibold text-amber-400 mb-1">硬件依赖信号 (DAM)</div>
+                                <div class="text-2xl font-bold text-amber-400">~1.14x</div>
+                                <p class="text-xs text-slate-400 mt-1">事件触发 dispatch 消除忙等待带来的增益</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">Token 不平衡鲁棒性</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            MoE-Hub 在高 token 不平衡场景下（标准差最高达 0.05）仍保持显著的性能优势。这表明硬件加速方案对 MoE 的动态路由模式具有良好的适应性。
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">可扩展性</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            MoE-Hub 在 2-16 GPU 配置下展现出 <strong>近线性 FLOPS 扩展</strong>。这意味着随着 GPU 数量增加，计算效率不会因通信瓶颈而下降，证明硬件加速通信有效地解决了 MoE 的扩展问题。
+                        </p>
+                    </div>
+
+                    <div class="highlight-box">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-bullseye mr-1"></i> 96.8% 理想加速达成率</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            MoE-Hub 实现了理论理想加速比（计算与通信完全重叠）的 <strong>96.8%</strong>。这意味着剩余的 3.2% 延迟来自不可避免的物理限制（如网络 RTT、数据传输最小粒度等），而非架构设计缺陷。这一达成率显著优于所有基线方案。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 11: 硬件开销分析 -->
+                <div id="overhead" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-ruler-combined"></i> 硬件开销分析</h3>
+
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                        <div class="metric-card rounded-lg p-4 text-center bg-gradient-to-br from-cyan-500/20 to-transparent border-cyan-500/30">
+                            <div class="text-3xl font-bold text-cyan-400">0.06%</div>
+                            <div class="text-sm text-slate-400 mt-1">H800 芯片面积占比</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-4 text-center bg-gradient-to-br from-cyan-500/20 to-transparent border-cyan-500/30">
+                            <div class="text-3xl font-bold text-cyan-400">0.49</div>
+                            <div class="text-sm text-slate-400 mt-1">mm² (TSMC 7nm)</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-4 text-center bg-gradient-to-br from-cyan-500/20 to-transparent border-cyan-500/30">
+                            <div class="text-3xl font-bold text-cyan-400">极小</div>
+                            <div class="text-sm text-slate-400 mt-1">功耗和时序开销</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">面积开销分解</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-3">
+                            MoE-Hub 的总硬件面积为 <strong>0.49 mm²</strong>（在 TSMC 7nm 工艺下），仅占 H800 GPU 总芯片面积（约 814 mm²）的 <strong>0.06%</strong>。这是一个极小的面积投入。
+                        </p>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-600">
+                                        <th class="text-left py-2 px-3 text-cyan-300">模块</th>
+                                        <th class="text-left py-2 px-3 text-cyan-300">主要组件</th>
+                                        <th class="text-left py-2 px-3 text-cyan-300">面积占比</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">AAU</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">16-bank 双端口 SRAM (RAT) + APT + FIFO</td>
+                                        <td class="py-2 px-3 text-xs text-amber-400">主导 (最大)</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">RPM</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">Remote Write Buffer Pool + 合并逻辑 + 调度器</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">中等</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3 font-medium text-slate-300">DAM</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">CAM 依赖表 + TB 计数器 + 完成检测器</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">较小</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">RAT 是最大的硬件组件</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            RAT (Row Allocation Table) 作为 16-bank 双端口 SRAM，是 MoE-Hub 中面积最大的组件。这是因为 RAT 需要缓存大量 (MallocID, RowID) 到 LocalRowID 的映射，以支持高并发的地址分配。16 个 bank 的设计确保了并发地址分配时的 bank 冲突最小化。
+                        </p>
+                    </div>
+
+                    <div class="insight-box mt-4">
+                        <h4 class="text-sm font-medium text-emerald-400 mb-2"><i class="fas fa-lightbulb mr-1"></i> 性价比分析</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            仅用 0.06% 的芯片面积（相当于 H800 上不到一个 SM 的面积），MoE-Hub 就获得了 1.40x-3.08x 的每层加速和 1.21x-1.98x 的端到端加速。这意味着每平方毫米硬件面积带来的性能收益极高，是一次非常高效的硬件投资。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 12: 影响分析 -->
+                <div id="impact" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-rocket"></i> 影响分析</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <!-- Impact Card 1 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-violet-500/5 to-purple-700/5">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-microchip text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-white mb-2">GPU 架构设计新范式</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">
+                                        MoE-Hub 证明了在 GPU Hub 中添加专用通信加速模块是可行且高效的。仅 0.06% 的面积开销就获得显著的通信加速，这为未来 GPU 架构设计提供了新方向：将更多重复性通信操作硬件化，而非依赖软件库优化。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Impact Card 2 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-blue-500/5 to-cyan-700/5">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-700 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-brain text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-white mb-2">MoE 推理/训练加速</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">
+                                        随着 MoE 模型（Mixtral, Qwen-MoE, DeepSeek-MoE 等）的广泛应用，MoE-Hub 提供的硬件级通信加速可以直接提升这些模型的推理吞吐和训练效率。最高 1.98x 端到端加速意味着相同的硬件可以处理近两倍的 MoE 工作负载。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Impact Card 3 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-green-500/5 to-emerald-700/5">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-emerald-700 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-code text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-white mb-2">软件简化</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">
+                                        目的地无关范式极大简化了 MoE 通信软件栈。开发者无需手动处理目标地址解析、buffer 分配、包合并等复杂操作，只需发射 st.rowsp 指令。这降低了 MoE 系统开发门槛，减少了软件 bug 和维护成本。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Impact Card 4 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-amber-500/5 to-orange-700/5">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-amber-500 to-orange-700 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-expand-arrows-alt text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-white mb-2">可扩展性突破</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">
+                                        近线性的 FLOPS 扩展（2-16 GPU）意味着 MoE-Hub 解决了 MoE 模型在大规模分布式系统中的通信瓶颈。这为扩展到更多 GPU（32, 64, 128+）提供了可能，支持更大规模的 MoE 模型训练和推理。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Impact Card 5 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-red-500/5 to-pink-700/5">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-red-500 to-pink-700 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-balance-scale text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-white mb-2">与现有工作的互补</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">
+                                        MoE-Hub 与 FlashOverlap（信号驱动重叠）、T3（软硬件协同跟踪）、C3（DMA 卸载）等工作互补。MoE-Hub 专注于 MoE 特有的动态 token 路由问题，提供了硬件级的目的地无关通信抽象。未来可与其他计算通信重叠技术结合，实现全栈优化。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Impact Card 6 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-indigo-500/5 to-blue-700/5">
+                            <div class="flex items-start gap-3">
+                                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-700 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-industry text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-white mb-2">工业落地潜力</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed">
+                                        MoE-Hub 的硬件开销极小（0.06% 芯片面积），且仅需一条新指令和 MMIO API 支持，对现有 GPU 架构改动有限。这使得 GPU 厂商（NVIDIA, AMD, 华为等）在下一代 GPU 中集成 MoE-Hub 类似功能成为可能，为 AI 加速芯片提供差异化竞争力。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">MoE-Hub 在 MoE 技术生态中的位置</h4>
+                        <div class="code-block">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// MoE 计算通信优化技术栈</div>
+                                <div></div>
+                                <div>// 应用层:</div>
+                                <div>//   Mixtral, Qwen-MoE, DeepSeek-MoE, Phi-MoE ...</div>
+                                <div></div>
+                                <div>// 框架层:</div>
+                                <div>//   Megatron-TE, FasterMoE, Tutel, Comet, CCFuser</div>
+                                <div></div>
+                                <div>// 通信库层:</div>
+                                <div>//   NCCL, RCCL, DeepEP, NVSHMEM</div>
+                                <div></div>
+                                <div>// 计算通信重叠层:</div>
+                                <div>//   FlashOverlap (信号驱动) | T3 (Track & Trigger)</div>
+                                <div>//   C3 (DMA 卸载)          | MoE-Hub (硬件加速)  &lt;-- 本文</div>
+                                <div></div>
+                                <div>// 硬件层:</div>
+                                <div>//   GPU Hub: RPM + AAU + DAM (MoE-Hub 模块)</div>
+                                <div>//   新指令: st.rowsp / st.rowsp.nop</div>
+                                <div>//   新 API: rowspMalloc (MMIO)</div>
+                                <div>//   网络: NVLink / NVSwitch / Infinity Fabric</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Links -->
+                <div class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                    <div class="space-y-2">
+                        <div>
+                            <a href="https://arxiv.org/abs/2605.05888" target="_blank" class="ref-link mr-4"><i class="fas fa-external-link-alt mr-1"></i>arXiv:2605.05888 原文</a>
+                            <a href="https://arxiv.org/html/2605.05888v1" target="_blank" class="ref-link"><i class="fas fa-globe mr-1"></i>HTML 版本</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>MoE-Hub: Taming Software Complexity for Seamless MoE Overlap</p>
+            <p class="mt-1">Zhuoshan Zhou, Chen Zhang, Shuyi Zhang, et al. | arXiv:2605.05888v1 | May 7, 2026</p>
+            <p class="mt-1">上海交通大学、鹏城实验室、北京大学、之江实验室等</p>
+        </div>
+    </footer>
+
+    <script>
+        function scrollToSection(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                const headerOffset = 120;
+                const elementPosition = el.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+            }
+        }
+
+        // Highlight active nav tab on scroll
+        const sections = document.querySelectorAll('.section-block[id]');
+        const navTabs = document.querySelectorAll('.nav-tab');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 150) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navTabs.forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.getAttribute('onclick') && tab.getAttribute('onclick').includes(current)) {
+                    tab.classList.add('active');
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>

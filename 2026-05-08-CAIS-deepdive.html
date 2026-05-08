@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAIS: 面向 LLM 张量并行的计算感知交换机内计算深度解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.5rem; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.8rem; overflow-x: auto; line-height: 1.6; }
+        .highlight-box { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .insight-box { border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .tech-diagram { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.75rem; padding: 1.5rem; }
+        .paper-badge { font-family: 'Fira Code', monospace; background: rgba(245, 158, 11, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        .metric-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); }
+        .impact-card { transition: all 0.3s ease; border: 1px solid rgba(148, 163, 184, 0.15); }
+        .impact-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4); border-color: rgba(245, 158, 11, 0.4); }
+        .arch-module { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 0.75rem; padding: 1.25rem; }
+        .arch-module:hover { border-color: rgba(245, 158, 11, 0.5); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; }
+        .nav-tab:hover { color: #f59e0b; }
+        .nav-tab.active { color: #f59e0b; border-bottom: 2px solid #f59e0b; }
+        .arch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+        .arch-flow-arrow { display: flex; align-items: center; justify-content: center; color: #f59e0b; font-size: 1.5rem; }
+        .workflow-step { position: relative; padding-left: 2.5rem; }
+        .workflow-step::before { content: ''; position: absolute; left: 0.75rem; top: 2rem; bottom: -1rem; width: 2px; background: rgba(245, 158, 11, 0.3); }
+        .workflow-step:last-child::before { display: none; }
+        .workflow-step .step-number { position: absolute; left: 0; top: 0; width: 1.5rem; height: 1.5rem; background: rgba(245, 158, 11, 0.2); border: 2px solid rgba(245, 158, 11, 0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #f59e0b; font-weight: bold; }
+        .comparison-row { border-bottom: 1px solid rgba(148, 163, 184, 0.1); }
+        .comparison-row:last-child { border-bottom: none; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <!-- Sticky Header -->
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-network-wired text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">CAIS 论文深度解析</h1>
+                        <p class="text-xs text-slate-400">计算感知交换机内计算 | arXiv:2605.05628</p>
+                    </div>
+                </div>
+                <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-700/10 border border-amber-500/20">
+                    <div class="text-xs text-slate-400">最高端到端加速比</div>
+                    <div class="text-lg font-bold text-amber-400">1.44x</div>
+                </div>
+            </div>
+            <nav class="flex items-center gap-4 text-xs text-slate-400 overflow-x-auto pb-1">
+                <span class="nav-tab" onclick="scrollToSection('overview')">概览</span>
+                <span class="nav-tab" onclick="scrollToSection('motivation')">动机</span>
+                <span class="nav-tab" onclick="scrollToSection('tp-patterns')">TP 通信模式</span>
+                <span class="nav-tab" onclick="scrollToSection('architecture')">CAIS 架构</span>
+                <span class="nav-tab" onclick="scrollToSection('isa')">ISA 扩展</span>
+                <span class="nav-tab" onclick="scrollToSection('switch-micro')">交换机微架构</span>
+                <span class="nav-tab" onclick="scrollToSection('microfuncs')">微函数机制</span>
+                <span class="nav-tab" onclick="scrollToSection('tb-coord')">TB 协调与数据流</span>
+                <span class="nav-tab" onclick="scrollToSection('performance')">性能评估</span>
+                <span class="nav-tab" onclick="scrollToSection('overhead')">硬件开销</span>
+                <span class="nav-tab" onclick="scrollToSection('findings')">关键发现</span>
+                <span class="nav-tab" onclick="scrollToSection('impact')">影响分析</span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <div class="glass-card rounded-xl p-6 mt-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="paper-badge">arXiv:2605.05628</span>
+                <h2 class="text-lg font-semibold text-amber-400">Towards Compute-Aware In-Switch Computing for LLMs Tensor-Parallelism on Multi-GPU Systems</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-amber-500/10 to-orange-700/10 border border-amber-500/20">
+                    <div class="text-sm text-slate-400 mb-1">作者</div>
+                    <div class="text-xs text-amber-400">Chen Zhang, Qijun Zhang, Zhuoshan Zhou, Yijia Diao, Haibo Wang, Zhe Zhou, Zhipeng Tu, Zhiyao Li, Guangyu Sun, Zhuoran Song, Zhigang Ji, Jingwen Leng, Minyi Guo</div>
+                    <div class="text-xs text-slate-500 mt-1">上海交通大学、ETH Zurich、NVIDIA</div>
+                </div>
+                <div class="metric-card rounded-lg p-4 bg-gradient-to-r from-amber-500/10 to-orange-700/10 border border-amber-500/20">
+                    <div class="text-sm text-slate-400 mb-1">发表信息</div>
+                    <div class="text-xs text-amber-400">arXiv:2605.05628, May 7, 2026</div>
+                    <div class="text-xs text-slate-500 mt-1">实验平台: Accel-Sim + BookSim2 扩展仿真, 8x NVIDIA H100 GPU 系统</div>
+                </div>
+            </div>
+
+            <div class="space-y-8">
+
+                <!-- Section 1: 论文概览 -->
+                <div id="overview" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-file-alt"></i> 论文概览</h3>
+
+                    <div class="highlight-box mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-bullseye mr-1"></i> 核心贡献</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            本文提出 <strong>CAIS</strong> (Compute-Aware In-Switch computing)，首个 <strong>计算感知</strong> 的交换机内计算框架，专门针对 LLM 张量并行 (Tensor Parallelism, TP) 中的通信瓶颈。核心创新在于 <strong>将通信模式与计算的内存在语义上对齐</strong>：通过在 GPU 中扩展 PTX 指令集（ld.cais 和 red.cais），并在 NVSwitch 中新增合并表 (Merging Table) 和 CAM 查找表 (CAM Lookup Table)，使交换机能够识别和合并来自多个 GPU 的计算相关请求。CAIS 消除了传统集合通信中的全局屏障，实现 <strong>1.38x 平均端到端加速比</strong>（相比最优 NVLS 方案），子层最高 <strong>1.53x 加速</strong>，且硬件开销极低（交换机 &lt;1% 芯片面积，GPU &lt;0.01% 芯片面积）。
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">1.38x</div>
+                            <div class="text-xs text-slate-400">平均端到端加速比</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">1.44x</div>
+                            <div class="text-xs text-slate-400">最高推理/训练加速</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">1.53x</div>
+                            <div class="text-xs text-slate-400">子层最高加速比</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/30">
+                            <div class="text-2xl font-bold text-amber-400">&lt;0.01%</div>
+                            <div class="text-xs text-slate-400">GPU 芯片面积占比</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">抽象 (Abstract)</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            大规模语言模型训练已扩展至万级 GPU 集群，张量并行 (TP) 成为减少每 GPU 内存占用的关键技术。然而，TP 引入的跨 GPU 通信（尤其是 AllReduce）已成为主要性能瓶颈。现有方案（如 NCCL 和 NVLS）通过硬件加速集体操作来提升带宽，但忽视了 TP 通信与底层计算之间的 <strong>内存语义不匹配</strong>。本文首次揭示了这种不匹配，并提出 CAIS —— 一种计算感知的交换机内计算框架。CAIS 通过在交换机中识别和对齐计算相关的通信请求，实现了 Load Merging（加载合并）和 Reduction Merging（归约合并）。配合合并感知的 TB 协调和图级优化器，CAIS 在 8-GPU H100 系统上实现了平均 1.38x 的端到端加速比。
+                        </p>
+                    </div>
+
+                    <div class="mt-2 text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2605.05628" target="_blank" class="ref-link">arXiv:2605.05628 原文</a> | <a href="https://www.researchgate.net/publication/401575046" target="_blank" class="ref-link">ResearchGate</a></div>
+                </div>
+
+                <!-- Section 2: 研究动机 -->
+                <div id="motivation" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> 研究动机</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-expand-arrows-alt mr-1"></i> LLM 训练规模扩展至万级 GPU</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                随着 LLM 参数量爆炸性增长（GPT-4、Llama 3 等达千亿至万亿参数级别），训练和推理已扩展到 <strong>10K+ GPU</strong> 集群。在如此规模下，单个 GPU 无法容纳模型权重和激活值，必须使用模型并行策略。张量并行 (TP) 通过将每个层的权重矩阵按行或列切分到多个 GPU 上，成为减少单 GPU 内存占用的核心手段。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-bolt mr-1"></i> 张量并行通信瓶颈</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                TP 的每个层都需要跨 GPU 执行集体通信操作：
+                            </p>
+                            <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                                <li>• <strong>基本 TP:</strong> 每个 TP 步骤需要一个 AllReduce 来聚合各 GPU 的部分结果</li>
+                                <li>• <strong>序列并行 (SP):</strong> 需要 Reduce-Scatter + AllGather 组合操作</li>
+                                <li>• TP 通信占总数据流量的 <strong>99%+</strong>，成为不可忽视的瓶颈</li>
+                                <li>• 在高速互连 (NVLink 900 GB/s) 上，通信延迟仍占层延迟的显著比例</li>
+                            </ul>
+                        </div>
+
+                        <div class="highlight-box">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-puzzle-piece mr-1"></i> 核心洞察：集体操作与 Kernel 内存语义的不匹配</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed">
+                                现有 NCCL/NVLS 方案使用标准的集体通信操作（AllReduce、AllGather、Reduce-Scatter），但这些操作的 <strong>内存语义</strong> 与计算 Kernel 的实际内存访问模式存在根本不匹配：
+                            </p>
+                            <ul class="text-sm text-slate-300 space-y-1 mt-2 ml-4">
+                                <li>• <strong>AllGather 问题:</strong> 采用"推送" (push) 模式，数据被 <strong>急切地</strong> (eagerly) 推送到所有 GPU，创建了全局同步屏障。而 AG-GEMM 计算实际需要的是 <strong>"拉取"</strong> (pull) 模式 —— 按需从内存读取数据。</li>
+                                <li>• <strong>Reduce-Scatter 问题:</strong> 采用"拉取" (pull) 归约模式，而 GEMM-RS 计算实际需要的是 <strong>"推送"</strong> (push) 模式 —— 将计算结果分布式写入。</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-exchange-alt mr-1"></i> 不匹配的后果</h4>
+                            <ul class="text-sm text-slate-400 space-y-1 ml-4">
+                                <li>• <strong>全局屏障 (Global Barrier):</strong> AllGather 推送模式强制所有 GPU 等待最慢者，隔离了计算和通信阶段</li>
+                                <li>• <strong>额外内存访问:</strong> 推送模式下数据先写入全局缓冲区，计算再读取，引入额外 HBM 访问</li>
+                                <li>• <strong>带宽浪费:</strong> 数据被推送到尚未准备好消费的 GPU，占用宝贵的互连带宽</li>
+                                <li>• <strong>无法重叠:</strong> 计算和通信阶段被屏障隔离，无法实现细粒度重叠</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: 张量并行通信模式 -->
+                <div id="tp-patterns" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-project-diagram"></i> 张量并行通信模式</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">TP 通信流量分析</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            TP 中的集合通信占 LLM 总数据流量的 <strong>99% 以上</strong>。理解这些通信模式的内存语义是 CAIS 设计的基础。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">两种核心 TP 通信模式</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- AG-GEMM Pattern -->
+                            <div class="arch-module border-blue-500/30">
+                                <div class="text-sm font-bold text-blue-400 mb-3 flex items-center gap-2"><i class="fas fa-arrow-down"></i> AG-GEMM 模式</div>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-3">
+                                    <strong>语义:</strong> 内存 <strong>读取</strong> (Read) 模式。GEMM 计算需要从远端 GPU 获取输入数据（AllGather 的输入）。
+                                </p>
+                                <div class="code-block">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-blue-400">// AG-GEMM: 当前系统 vs CAIS</div>
+                                        <div></div>
+                                        <div>// 当前系统 (推送模式):</div>
+                                        <div>// AllGather -> 数据推送到所有 GPU</div>
+                                        <div>//   -> 写入全局缓冲区 (HBM)</div>
+                                        <div>//   -> GEMM 从缓冲区读取</div>
+                                        <div>// 问题: 全局屏障 + 额外 HBM 访问</div>
+                                        <div></div>
+                                        <div>// CAIS (拉取模式):</div>
+                                        <div>// ld.cais -> GEMM 直接从远端拉取</div>
+                                        <div>//   -> 交换机合并相同请求</div>
+                                        <div>//   -> 一次响应服务多个 TB</div>
+                                        <div>// 优势: 无屏障, 按需加载</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- GEMM-RS Pattern -->
+                            <div class="arch-module border-purple-500/30">
+                                <div class="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2"><i class="fas fa-arrow-up"></i> GEMM-RS 模式</div>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-3">
+                                    <strong>语义:</strong> 分布式 <strong>写入</strong> (Write) 模式。GEMM 计算结果需要分布式归约 (Reduce-Scatter) 到各 GPU。
+                                </p>
+                                <div class="code-block">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-purple-400">// GEMM-RS: 当前系统 vs CAIS</div>
+                                        <div></div>
+                                        <div>// 当前系统 (拉取归约):</div>
+                                        <div>// GEMM 写入本地缓冲区</div>
+                                        <div>//   -> Reduce-Scatter 从各 GPU 拉取</div>
+                                        <div>//   -> 在目标 GPU 上归约</div>
+                                        <div>// 问题: 额外 HBM 写 + 拉取延迟</div>
+                                        <div></div>
+                                        <div>// CAIS (推送归约):</div>
+                                        <div>// red.cais -> GEMM 直接推送结果</div>
+                                        <div>//   -> 交换机内归约 (Merging Table)</div>
+                                        <div>//   -> 归约完成写入目标 GPU</div>
+                                        <div>// 优势: 消除中间缓冲, 流水线归约</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">基本 TP 与序列并行 (SP) 对比</h4>
+                        <div class="overflow-x-auto mt-2">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-600">
+                                        <th class="text-left py-2 px-3 text-amber-300">维度</th>
+                                        <th class="text-left py-2 px-3 text-blue-400">基本 TP (AllReduce)</th>
+                                        <th class="text-left py-2 px-3 text-purple-400">序列并行 (Reduce-Scatter + AllGather)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">通信操作</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">AllReduce (每层一次)</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">Reduce-Scatter + AllGather (每层各一次)</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">通信模式</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">AG-GEMM-AR (推送+计算+推送)</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">AG-GEMM + GEMM-RS (交替)</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">数据流量</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">2x (AllReduce = RS + AG)</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">2x (RS + AG 各一次)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3 font-medium text-slate-300">CAIS 映射</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">ld.cais + red.cais 组合</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">ld.cais (AG) + red.cais (RS)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="insight-box mt-4">
+                        <h4 class="text-sm font-medium text-emerald-400 mb-2"><i class="fas fa-lightbulb mr-1"></i> 语义对齐的核心价值</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            CAIS 的关键洞察是：<strong>通信操作的内存语义必须与计算 Kernel 的内存访问模式一致</strong>。当语义对齐时，数据可以直接从生产者流向消费者，不需要中间缓冲和全局同步。这就是 Load Merging 和 Reduction Merging 的基础。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 4: CAIS 架构 -->
+                <div id="architecture" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-microchip"></i> CAIS 架构</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-5 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-3">首个计算感知的交换机内计算框架</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">
+                            CAIS 是 <strong>首个</strong> 将计算感知能力引入交换机内计算的框架。与传统交换机只做数据转发不同，CAIS 交换机能够 <strong>识别</strong> 和 <strong>合并</strong> 来自多个 GPU 的计算相关请求，实现语义对齐的通信优化。
+                        </p>
+
+                        <div class="tech-diagram mb-4">
+                            <div class="text-center text-sm font-semibold text-white mb-4">CAIS 系统架构总览</div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- GPU Side -->
+                                <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                                    <div class="text-sm font-bold text-blue-400 mb-3 flex items-center gap-2"><i class="fas fa-desktop"></i> GPU 侧增强</div>
+                                    <div class="space-y-3">
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-blue-300 mb-1">PTX ISA 扩展</div>
+                                            <p class="text-xs text-slate-400">ld.cais / red.cais 指令</p>
+                                            <p class="text-xs text-slate-500 mt-1">Eligibility Flag 标识可合并请求</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-cyan-300 mb-1">TB 协调器</div>
+                                            <p class="text-xs text-slate-400">合并感知的线程块调度</p>
+                                            <p class="text-xs text-slate-500 mt-1">编译器分组 + 轻量级同步器</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-green-300 mb-1">图级优化器</div>
+                                            <p class="text-xs text-slate-400">非对称 Kernel 重叠调度</p>
+                                            <p class="text-xs text-slate-500 mt-1">交错 GEMM-RS 与 AG-GEMM</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Switch Side -->
+                                <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex flex-col items-center justify-center">
+                                    <div class="text-sm font-bold text-amber-400 mb-3"><i class="fas fa-network-wired"></i> CAIS 交换机</div>
+                                    <div class="text-center space-y-2">
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-amber-300 mb-1">CAM 查找表</div>
+                                            <p class="text-xs text-slate-400">地址+类型匹配</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-orange-300 mb-1">Merging Table</div>
+                                            <p class="text-xs text-slate-400">部分结果 + 会话状态</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-yellow-300 mb-1">LRU 淘汰 + Load-Wait</div>
+                                            <p class="text-xs text-slate-400">状态管理</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-red-300 mb-1">确定性哈希路由</div>
+                                            <p class="text-xs text-slate-400">相关请求路由到同一条目</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 text-amber-400 text-2xl"><i class="fas fa-arrows-alt-h"></i></div>
+                                </div>
+
+                                <!-- NVLink Fabric -->
+                                <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                                    <div class="text-sm font-bold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> NVLink 互连</div>
+                                    <div class="space-y-3">
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-green-300 mb-1">NVSwitch Fabric</div>
+                                            <p class="text-xs text-slate-400">8-GPU 全互联拓扑</p>
+                                            <p class="text-xs text-slate-500 mt-1">H100 NVLink 900 GB/s</p>
+                                        </div>
+                                        <div class="bg-slate-800/60 rounded p-3">
+                                            <div class="text-xs font-semibold text-emerald-300 mb-1">非对称流量模式</div>
+                                            <p class="text-xs text-slate-400">归约: GPU -> Switch 重负载</p>
+                                            <p class="text-xs text-slate-500 mt-1">加载: Switch -> GPU 重负载</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="highlight-box">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-key mr-1"></i> 设计哲学</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            CAIS 的核心设计理念是 <strong>"语义对齐"</strong> (Semantic Alignment)：让交换机的行为与计算 Kernel 的内存访问意图一致。计算 Kernel 需要读数据，CAIS 就提供拉取式 Load Merging；计算 Kernel 需要写数据，CAIS 就提供推送式 Reduction Merging。这种对齐消除了全局屏障和中间缓冲，使通信和计算能够自然重叠。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 5: ISA 扩展 -->
+                <div id="isa" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-code"></i> ISA 扩展 (ISA Extensions)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">两条新型 PTX 指令</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            CAIS 在 NVIDIA PTX (Parallel Thread Execution) 指令集中扩展了两条专用指令：<strong>ld.cais</strong> (计算感知加载) 和 <strong>red.cais</strong> (计算感知归约)。这两条指令携带一个 <strong>Eligibility Flag</strong>，用于标识该请求是否可以与来自其他 GPU 的同类请求合并。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">ld.cais 指令详解</h4>
+
+                        <div class="code-block mb-4">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-blue-400">// ld.cais: Compute-Aware Load</div>
+                                <div class="text-blue-400">// 语义: 从远端 GPU 拉取数据, 交换机自动合并相同请求</div>
+                                <div></div>
+                                <div>// 指令格式:</div>
+                                <div>// ld.cais.dst [reg], [address], {eligible_flag}</div>
+                                <div></div>
+                                <div>// 参数解析:</div>
+                                <div>//   dst        - 目标寄存器 (接收数据)</div>
+                                <div>//   address    - 远端 GPU 的内存地址</div>
+                                <div>//   eligible   - 可合并标识 (0/1)</div>
+                                <div>//                eligible=1: 此请求可与其他 GPU</div>
+                                <div>//                           的相同地址请求合并</div>
+                                <div>//                eligible=0: 标准加载行为</div>
+                                <div></div>
+                                <div>// 执行流程:</div>
+                                <div>// 1. GPU 发送加载请求到 NVSwitch</div>
+                                <div>// 2. Switch CAM 查找是否有匹配条目</div>
+                                <div>// 3. 若匹配 -> TB 进入 Load-Wait 状态</div>
+                                <div>// 4. 若第一个请求的响应返回 -> 服务所有等待 TB</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-blue-400 mb-1">Eligibility Flag (可合并标识)</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    编译器在编译时分析哪些内存访问区域会被多个 GPU 的 Thread Block 同时访问。对这些区域标记 <code class="text-blue-300">eligible=1</code>，使交换机能够识别并合并相同请求。非共享区域保持 <code class="text-slate-300">eligible=0</code>，走标准路径。
+                                </p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-cyan-400 mb-1">Load-Wait 状态</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    当 ld.cais 请求到达交换机且发现已有相同请求在等待响应时，后续请求的 TB 进入 <strong>Load-Wait</strong> 状态。TB 暂停执行但不释放资源，等待首个请求的响应到达后一并接收数据并恢复执行。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">red.cais 指令详解</h4>
+
+                        <div class="code-block mb-4">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-purple-400">// red.cais: Compute-Aware Reduction</div>
+                                <div class="text-purple-400">// 语义: 将数据推送到交换机进行归约, 交换机内累积部分结果</div>
+                                <div></div>
+                                <div>// 指令格式:</div>
+                                <div>// red.cais [value], [address], {eligible_flag}</div>
+                                <div></div>
+                                <div>// 参数解析:</div>
+                                <div>//   value      - 要归约的数据 (GEMM 输出)</div>
+                                <div>//   address    - 归约目标地址</div>
+                                <div>//   eligible   - 可合并标识 (0/1)</div>
+                                <div>//                eligible=1: 此归约可与其他 GPU</div>
+                                <div>//                           的同地址归约在交换机内合并</div>
+                                <div>//                eligible=0: 标准归约行为</div>
+                                <div></div>
+                                <div>// 执行流程:</div>
+                                <div>// 1. GPU 通过 red.cais 推送部分结果到 Switch</div>
+                                <div>// 2. Switch Merging Table 累积 (element-wise sum)</div>
+                                <div>// 3. 所有贡献到达后, 归约结果写入目标 GPU</div>
+                                <div>// 4. 不需要所有 GPU 先写入本地缓冲!</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-purple-400 mb-1">推送式归约 (Push-Mode Reduction)</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    与传统的"先写入本地缓冲再拉取归约"不同，red.cais 允许 GEMM 计算结果 <strong>直接推送</strong> 到交换机。交换机中的 Merging Table 在飞行中 (in-flight) 累积部分结果，消除中间 HBM 写操作。
+                                </p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-violet-400 mb-1">Session State (会话状态)</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    Merging Table 维护每个归约会话的状态：<strong>已到达贡献数</strong>、<strong>累积的部分和</strong>、<strong>期望总贡献数</strong>。当所有贡献到达后，最终归约结果被写入目标 GPU 内存。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insight-box mt-4">
+                        <h4 class="text-sm font-medium text-emerald-400 mb-2"><i class="fas fa-lightbulb mr-1"></i> ISA 扩展的最小侵入性</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            ld.cais 和 red.cais 是对标准 PTX 加载/归约指令的 <strong>最小扩展</strong>。它们保持了原有指令的语义，仅增加了一个 eligibility flag。当 flag=0 时，行为与标准指令完全相同，确保向后兼容。编译器可以自动为共享内存区域插入 eligible flag，对程序员透明。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 6: 交换机微架构 -->
+                <div id="switch-micro" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-server"></i> 交换机微架构 (Switch Microarchitecture)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">CAIS 交换机硬件组件</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            CAIS 在 NVSwitch 中新增了两个核心硬件组件：<strong>CAM Lookup Table</strong> 用于快速匹配请求，<strong>Merging Table</strong> 用于维护合并状态和部分结果。这些组件通过确定性哈希路由确保相关请求被导向同一个条目。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">交换机内部结构</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="arch-module">
+                                <div class="text-sm font-bold text-amber-400 mb-3 flex items-center gap-2"><i class="fas fa-search"></i> CAM Lookup Table</div>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-3">
+                                    CAM (Content-Addressable Memory) 查找表实现 <strong>按内容匹配</strong> 而非按地址访问。当 ld.cais 或 red.cais 请求到达时，交换机使用 <strong>(地址 + 类型)</strong> 作为键在 CAM 中查找。
+                                </p>
+                                <div class="code-block">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-amber-400">// CAM 查找表条目</div>
+                                        <div class="text-amber-400">// 键: (Address + RequestType)</div>
+                                        <div class="text-amber-400">// 值: MergingTableIndex</div>
+                                        <div></div>
+                                        <div>// 查找流程:</div>
+                                        <div>// 1. 请求到达 -> 提取 (地址, 类型)</div>
+                                        <div>// 2. CAM 并行匹配所有条目</div>
+                                        <div>// 3. 命中 (Hit) -> 获取 Merging Table 索引</div>
+                                        <div>// 4. 未命中 (Miss) -> 分配新 Merging Table 条目</div>
+                                        <div></div>
+                                        <div>// 类型字段区分:</div>
+                                        <div>//   - LD (ld.cais 加载请求)</div>
+                                        <div>//   - RED (red.cais 归约请求)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="arch-module">
+                                <div class="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2"><i class="fas fa-layer-group"></i> Merging Table</div>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-3">
+                                    Merging Table 存储每个合并会话的 <strong>部分结果</strong> 和 <strong>会话状态</strong>。它是 CAIS 实现 Load Merging 和 Reduction Merging 的核心数据结构。
+                                </p>
+                                <div class="code-block">
+                                    <div class="text-slate-300 space-y-1">
+                                        <div class="text-orange-400">// Merging Table 条目</div>
+                                        <div class="text-orange-400">// 每个条目跟踪一个合并会话</div>
+                                        <div></div>
+                                        <div>struct MergingEntry {</div>
+                                        <div>    Address    addr;        // 目标地址</div>
+                                        <div>    Type       req_type;    // LD / RED</div>
+                                        <div>    uint32_t   arrived;     // 已到达请求数</div>
+                                        <div>    uint32_t   expected;    // 期望总请求数</div>
+                                        <div>    Data       partial;     // 部分结果 (仅 RED)</div>
+                                        <div>    State      state;       // ACTIVE / READY / DONE</div>
+                                        <div>    WaitList   waiters;     // 等待的 TB 列表</div>
+                                        <div>}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">LRU 淘汰策略</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            当 Merging Table 已满且需要分配新条目时，CAIS 使用 <strong>LRU (Least Recently Used)</strong> 策略淘汰最久未使用的条目。LRU 适合 TP 场景，因为：
+                        </p>
+                        <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                            <li>• TP 通信模式在层与层之间高度重复</li>
+                            <li>• 近期活跃的条目大概率在下一层再次活跃</li>
+                            <li>• 淘汰策略简单高效，硬件开销小</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">Load-Wait 状态管理</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            对于 ld.cais 请求，当 CAM 查找命中（即已有相同地址的加载请求在等待响应）时，后续请求的 Thread Block 进入 <strong>Load-Wait</strong> 状态：
+                        </p>
+                        <div class="code-block mt-3">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// Load-Wait 状态机</div>
+                                <div></div>
+                                <div>// TB 发射 ld.cais 请求</div>
+                                <div>//   |</div>
+                                <div>//   v</div>
+                                <div>// CAM 查找:</div>
+                                <div>//   Miss -> 分配新 Merging Table 条目, TB 继续执行</div>
+                                <div>//   Hit  -> TB 加入 WaitList, 进入 Load-Wait 状态</div>
+                                <div>//              |</div>
+                                <div>//              v</div>
+                                <div>// 首个请求响应到达:</div>
+                                <div>//   从 HBM 读取数据</div>
+                                <div>//     |</div>
+                                <div>//     v</div>
+                                <div>// 广播给所有等待的 TB</div>
+                                <div>//   -> 所有 TB 恢复执行</div>
+                                <div>//   -> Merging Table 条目标记为 DONE</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">确定性哈希路由 (Deterministic Hashing Routing)</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            CAIS 使用 <strong>确定性哈希函数</strong> 确保访问相同地址的请求始终被路由到 Merging Table 的同一个条目。这是合并正确性的关键保障：
+                        </p>
+                        <div class="code-block mt-3">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// 确定性哈希路由</div>
+                                <div></div>
+                                <div>// hash(address, req_type) -> MergingTableIndex</div>
+                                <div></div>
+                                <div>// 保证:</div>
+                                <div>// 1. 相同 (address, type) -> 相同条目</div>
+                                <div>// 2. 不同 (address, type) -> 不同条目 (低冲突率)</div>
+                                <div>// 3. 哈希函数简单 -> 低延迟 (1-2 cycle)</div>
+                                <div></div>
+                                <div>// 如果发生哈希冲突:</div>
+                                <div>// -> 冲突的请求串行处理</div>
+                                <div>// -> 不影响正确性, 仅轻微影响性能</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insight-box mt-4">
+                        <h4 class="text-sm font-medium text-emerald-400 mb-2"><i class="fas fa-lightbulb mr-1"></i> Merging Table 大小与 GPU 数量无关</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            一个关键设计发现：<strong>Merging Table 的大小不随 GPU 数量增长</strong>。原因在于 TP 场景中，所有 GPU 的 Thread Block 是同步发射请求的（synchronized request issuance），且存在硬件级别的请求节流 (throttling)。这意味着无论系统有 8 GPU 还是 64 GPU，同时活跃的最大合并会话数是常数。这使 CAIS 具有 <strong>天然可扩展性</strong>。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 7: 微函数机制 -->
+                <div id="microfuncs" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-cogs"></i> 微函数机制 (Micro-Functions)</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">两大核心微函数</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            CAIS 的交换机内计算能力由两个核心微函数实现：<strong>Load Merging</strong> (加载合并) 和 <strong>Reduction Merging</strong> (归约合并)。它们分别对应 ld.cais 和 red.cais 指令的执行语义。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">Load Merging 机制</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">
+                            Load Merging 解决了 AG-GEMM 模式中的语义不匹配问题。当多个 GPU 的 Thread Block 需要读取相同内存区域时，交换机缓存第一个请求的响应，并用它服务所有后续的相同请求。
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <div class="text-sm font-bold text-blue-400 mb-2">阶段 1: 首个请求</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    GPU_0 的 TB_0 发射 ld.cais 请求。CAM 查找未命中，交换机分配新 Merging Table 条目，并向目标 GPU 的 HBM 发起实际读取请求。
+                                </p>
+                                <div class="text-xs text-blue-400 mt-2 font-mono">TB_0 -> ld.cais(addr) -> MISS -> 读取 HBM</div>
+                            </div>
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <div class="text-sm font-bold text-amber-400 mb-2">阶段 2: 后续请求</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    GPU_1 的 TB_1 发射相同地址的 ld.cais 请求。CAM 查找命中，TB_1 加入等待列表 (WaitList)，进入 Load-Wait 状态。
+                                </p>
+                                <div class="text-xs text-amber-400 mt-2 font-mono">TB_1 -> ld.cais(addr) -> HIT -> WaitList</div>
+                            </div>
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <div class="text-sm font-bold text-green-400 mb-2">阶段 3: 响应广播</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    首个请求的响应从 HBM 返回。交换机将同一份数据广播给所有等待的 TB（TB_0, TB_1, ...）。所有 TB 恢复执行。
+                                </p>
+                                <div class="text-xs text-green-400 mt-2 font-mono">HBM -> 数据 -> TB_0, TB_1, ... -> RESUME</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded p-3 mt-4">
+                            <h5 class="text-xs font-semibold text-amber-300 mb-2">Load Merging 带宽节省</h5>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                在 8-GPU TP 场景中，如果所有 8 个 GPU 都需要读取相同的权重数据（例如 Attention 层的 Q/K/V 投影权重），传统方案需要 8 次独立的 HBM 读取。使用 Load Merging 后，只需 <strong>1 次 HBM 读取</strong>，带宽节省 <strong>87.5%</strong>。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">Reduction Merging 机制</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">
+                            Reduction Merging 解决了 GEMM-RS 模式中的语义不匹配问题。多个 GPU 的 GEMM 计算结果通过 red.cais 直接推送到交换机，交换机在 Merging Table 中 <strong>飞行中累积</strong> (in-flight accumulation) 部分和。
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <div class="text-sm font-bold text-purple-400 mb-2">阶段 1: 首个贡献</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    GPU_0 的 GEMM 完成，通过 red.cais 推送部分结果。CAM 未命中，交换机分配新条目，初始化部分和 <code class="text-purple-300">partial = value_0</code>，<code class="text-purple-300">arrived = 1</code>。
+                                </p>
+                                <div class="text-xs text-purple-400 mt-2 font-mono">GPU_0 -> red.cais(val0) -> partial = val0</div>
+                            </div>
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <div class="text-sm font-bold text-amber-400 mb-2">阶段 2: 后续贡献累积</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    GPU_1, GPU_2, ... 的 GEMM 完成后各自推送部分结果。交换机执行 <strong>element-wise 累加</strong>：<code class="text-amber-300">partial += value_i</code>。
+                                </p>
+                                <div class="text-xs text-amber-400 mt-2 font-mono">GPU_i -> red.cais(vali) -> partial += vali</div>
+                            </div>
+                            <div class="bg-slate-800/60 rounded-lg p-4">
+                                <div class="text-sm font-bold text-green-400 mb-2">阶段 3: 最终写入</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    当 <code class="text-green-300">arrived == expected</code> 时，所有贡献已到达。最终归约结果 <code class="text-green-300">partial</code> 被写入目标 GPU 的 HBM。
+                                </p>
+                                <div class="text-xs text-green-400 mt-2 font-mono">all arrived -> write(partial) to target GPU</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded p-3 mt-4">
+                            <h5 class="text-xs font-semibold text-amber-300 mb-2">Reduction Merging 内存节省</h5>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                传统方案需要每个 GPU 先将 GEMM 结果写入本地 HBM 缓冲区，然后由 Reduce-Scatter 从各缓冲区读取并归约。Reduction Merging <strong>完全消除了中间 HBM 写操作</strong>，数据从 GEMM 输出直接流到交换机归约，最终写入目标 GPU。这节省了 <strong>2x 的 HBM 带宽</strong>（省去写入和读取中间缓冲）。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">淘汰策略 (Eviction Policies)</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            Merging Table 的条目在以下情况下被淘汰：
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                            <div class="arch-module border-green-500/30">
+                                <div class="text-sm font-semibold text-green-400 mb-1">正常完成淘汰</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    当所有期望的贡献/请求都已到达（arrived == expected），条目状态设为 DONE。下一个时钟周期条目被标记为可重用。这是最常见的淘汰路径。
+                                </p>
+                            </div>
+                            <div class="arch-module border-red-500/30">
+                                <div class="text-sm font-semibold text-red-400 mb-1">LRU 强制淘汰</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    当 Merging Table 满且需要新条目时，LRU 策略淘汰最久未使用的条目。如果该条目尚未完成（arrived < expected），其累积的部分结果丢失，相关请求回退到标准路径重新执行。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 8: TB 协调与数据流优化 -->
+                <div id="tb-coord" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-sync-alt"></i> TB 协调与数据流优化</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">合并感知的 TB 协调 (Merging-Aware TB Coordination)</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            CAIS 的成功不仅依赖交换机硬件，还需要软件-硬件协同设计来确保 Thread Block 的请求能够高效合并。核心机制包括 <strong>编译器驱动的 TB 分组</strong> 和 <strong>轻量级同步器</strong>。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">编译器 TB 分组机制</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">
+                            CAIS 编译器分析计算图的内存访问模式，识别哪些 Thread Block 会访问相同的内存区域。然后将这些 TB 分组，确保它们 <strong>同步发射</strong> ld.cais 或 red.cais 请求，最大化交换机合并命中率。
+                        </p>
+
+                        <div class="code-block">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// CAIS 编译器 TB 分组伪代码</div>
+                                <div></div>
+                                <div>// 步骤 1: 分析内存访问区域</div>
+                                <div>for each kernel in compute_graph:</div>
+                                <div>    access_regions = analyze_memory_access(kernel)</div>
+                                <div>    </div>
+                                <div>// 步骤 2: 识别共享区域</div>
+                                <div>for each region in access_regions:</div>
+                                <div>    if region.is_accessed_by_multiple_gpus():</div>
+                                <div>        region.eligible = true  // 标记可合并</div>
+                                <div>        group_tbs(region)</div>
+                                <div>        </div>
+                                <div>// 步骤 3: 生成同步代码</div>
+                                <div>for each tb_group:</div>
+                                <div>    insert_lightweight_sync(tb_group)</div>
+                                <div>    // 确保组内 TB 同步发射请求</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">轻量级同步器 (Lightweight Synchronizer)</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            为了确保组内 TB 同步发射请求，CAIS 设计了一个轻量级同步原语。与传统 GPU barrier 不同，这个同步器：
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                            <div class="arch-module border-red-500/30">
+                                <div class="text-sm font-semibold text-red-400 mb-1">传统 Barrier</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    全局同步屏障，等待所有 GPU 到达。延迟约 <strong>35 微秒</strong>，因为需要等待最慢的 GPU 和最长的网络路径。
+                                </p>
+                            </div>
+                            <div class="arch-module border-green-500/30">
+                                <div class="text-sm font-semibold text-green-400 mb-1">CAIS 轻量级同步器</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    仅同步 <strong>同一组内</strong> 的 TB（通常只有同层访问相同区域的几个 TB）。延迟降至 <strong>&lt;3 微秒</strong>，减少约 <strong>91%</strong>。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">图级优化器 (Graph-Level Optimizer)</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-4">
+                            CAIS 的图级优化器在计算图层面进行调度优化，实现 <strong>非对称 Kernel 重叠</strong> (Asymmetric Kernel Overlapping)。它分析了 TP 通信中 <strong>非对称流量模式</strong>：归约操作 (red.cais) 产生大量 GPU-to-Switch 流量，而加载操作 (ld.cais) 产生大量 Switch-to-GPU 流量。
+                        </p>
+
+                        <div class="code-block mb-4">
+                            <div class="text-slate-300 space-y-1">
+                                <div class="text-amber-400">// 非对称 Kernel 重叠调度</div>
+                                <div></div>
+                                <div>// 问题: 归约和加载产生方向相反的流量</div>
+                                <div>//   - red.cais: 大量 GPU -> Switch 流量 (上行)</div>
+                                <div>//   - ld.cais: 大量 Switch -> GPU 流量 (下行)</div>
+                                <div></div>
+                                <div>// CAIS 解决方案: 交错执行</div>
+                                <div>// 时间线:</div>
+                                <div></div>
+                                <div>// T0: GEMM-RS 执行 -> red.cais 推送结果 (上行占满)</div>
+                                <div>// T1: AG-GEMM 执行 -> ld.cais 拉取数据  (下行占满)</div>
+                                <div>// T2: 下一个 GEMM-RS -> red.cais ...</div>
+                                <div>// T3: 下一个 AG-GEMM -> ld.cais ...</div>
+                                <div></div>
+                                <div>// 效果: 双向链路同时被充分利用</div>
+                                <div>// 避免了单一方向的链路空闲</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-green-400 mb-1">细粒度依赖 (Fine-Grained Dependencies)</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    图级优化器建立细粒度的数据依赖关系。消费者 TB 在数据 <strong>可用时立即启动</strong>，而不是等待整个通信阶段完成。这实现了计算和通信的 <strong>最大重叠</strong>。
+                                </p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded p-3">
+                                <div class="text-xs font-semibold text-red-400 mb-1">非对称流量平衡</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    通过交错 GEMM-RS（上行重）和 AG-GEMM（下行重）的执行，NVLink 双向链路同时被充分利用。这避免了传统方案中一个方向链路空闲、另一个方向拥塞的问题。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="highlight-box">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2"><i class="fas fa-flask mr-1"></i> 协同设计必要性证明</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            论文评估了 <strong>CAIS-Base</strong> 变体（仅有 ld.cais/red.cais 指令和交换机硬件，没有 TB 协调和图级优化器）。结果显示 CAIS-Base 显著落后于完整 CAIS，证明了 <strong>软硬件协同设计的必要性</strong>。仅有硬件支持是不够的，必须有编译器支持和调度优化才能充分释放 CAIS 的性能潜力。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 9: 性能评估 -->
+                <div id="performance" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-chart-line"></i> 性能评估</h3>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">8x</div>
+                            <div class="text-xs text-slate-400">NVIDIA H100 GPUs</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">900</div>
+                            <div class="text-xs text-slate-400">GB/s NVLink 带宽</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">3.87%</div>
+                            <div class="text-xs text-slate-400">仿真误差 (vs 真实 NCCL)</div>
+                        </div>
+                        <div class="metric-card rounded-lg p-3 text-center bg-gradient-to-br from-green-500/20 to-transparent border-green-500/30">
+                            <div class="text-2xl font-bold text-green-400">1.38x</div>
+                            <div class="text-xs text-slate-400">平均端到端加速比</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">仿真平台</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            CAIS 使用 <strong>Accel-Sim</strong> GPU 模拟器 + <strong>BookSim2</strong> 网络模拟器的扩展版本进行性能评估。仿真平台被扩展以支持：
+                        </p>
+                        <ul class="text-sm text-slate-400 space-y-1 mt-2 ml-4">
+                            <li>• ld.cais / red.cais 指令的执行模型</li>
+                            <li>• CAIS 交换机的 CAM Lookup Table 和 Merging Table 行为</li>
+                            <li>• TB 协调器和图级优化器的调度逻辑</li>
+                            <li>• 8-GPU H100 系统的完整 NVLink/NVSwitch 拓扑</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">仿真验证</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            仿真平台通过与真实硬件上运行的 NCCL 进行对比来验证准确性：
+                        </p>
+                        <div class="highlight-box mt-2">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-green-400 text-lg mt-1"></i>
+                                <div>
+                                    <p class="text-sm text-slate-300 leading-relaxed">
+                                        <strong>仿真与真实 NCCL 的平均误差仅 3.87%</strong>，证明 Accel-Sim + BookSim2 扩展仿真平台能够准确反映真实硬件行为。这一验证结果确保了 CAIS 性能评估的可信度。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">核心性能结果</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4 border border-green-500/30">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2">端到端加速比</h5>
+                                <div class="text-4xl font-bold text-green-400">1.38x</div>
+                                <p class="text-xs text-slate-400 mt-2">平均端到端加速比 (vs SOTA NVLS-enabled 方案)</p>
+                                <p class="text-xs text-slate-500 mt-1">覆盖训练和推理工作负载</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4 border border-green-500/30">
+                                <h5 class="text-sm font-semibold text-green-400 mb-2">最高加速比</h5>
+                                <div class="text-4xl font-bold text-green-400">1.44x</div>
+                                <p class="text-xs text-slate-400 mt-2">最高推理/训练加速比</p>
+                                <p class="text-xs text-slate-500 mt-1">特定模型和配置下测量</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4 border border-amber-500/30">
+                                <h5 class="text-sm font-semibold text-amber-400 mb-2">子层加速比</h5>
+                                <div class="text-3xl font-bold text-amber-400">up to 1.53x</div>
+                                <p class="text-xs text-slate-400 mt-1">vs TP-NVLS 子层加速比</p>
+                                <p class="text-xs text-slate-500 mt-1">单个 Transformer 子层</p>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4 border border-blue-500/30">
+                                <h5 class="text-sm font-semibold text-blue-400 mb-2">CAIS-Base 对比</h5>
+                                <div class="text-lg font-bold text-blue-400">显著落后</div>
+                                <p class="text-xs text-slate-400 mt-2">CAIS-Base (无协调/优化器) vs 完整 CAIS</p>
+                                <p class="text-xs text-slate-500 mt-1">证明协同设计必要性</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">对比基线</h4>
+                        <div class="overflow-x-auto mt-2">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-600">
+                                        <th class="text-left py-2 px-3 text-amber-300">基线方案</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">类型</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">特点</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">NCCL (标准)</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">生产级通信库</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">NVIDIA 官方集合通信库，ring/tree 算法</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">NVLS (NVIDIA)</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">硬件加速集体操作</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">NVIDIA Link 级别的硬件加速，SOTA 基线</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">TP-NVLS</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">TP 优化的 NVLS</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">针对 TP 工作负载优化的 NVLS 变体</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3 font-medium text-slate-300">CAIS-Base</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">CAIS 硬件-only</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">仅有 ISA 扩展和交换机硬件，无 TB 协调和优化器</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">加速比分解分析</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="arch-module border-blue-500/30">
+                                <div class="text-sm font-semibold text-blue-400 mb-1">Load Merging 增益</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    消除 AllGather 中的全局屏障和额外 HBM 访问。多个 GPU 的相同加载请求合并为一次 HBM 读取，显著减少上行带宽需求和内存访问延迟。
+                                </p>
+                            </div>
+                            <div class="arch-module border-purple-500/30">
+                                <div class="text-sm font-semibold text-purple-400 mb-1">Reduction Merging 增益</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    消除 Reduce-Scatter 中的中间缓冲写入。GEMM 结果直接推送到交换机归约，消除 2x HBM 带宽开销（写缓冲 + 读缓冲）。
+                                </p>
+                            </div>
+                            <div class="arch-module border-green-500/30">
+                                <div class="text-sm font-semibold text-green-400 mb-1">图级优化器增益</div>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    非对称 Kernel 重叠交错 GEMM-RS 和 AG-GEMM 执行，使 NVLink 双向链路同时被充分利用。细粒度依赖使消费者 TB 在数据可用时立即启动。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 10: 硬件开销分析 -->
+                <div id="overhead" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-ruler-combined"></i> 硬件开销分析</h3>
+
+                    <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-amber-400 mb-2">极低的硬件开销</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            CAIS 的硬件设计以 <strong>极小面积开销</strong> 实现了显著的性能提升。这使其成为极具实用价值的优化方案。
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="arch-module border-amber-500/30">
+                            <div class="text-sm font-bold text-amber-400 mb-3 flex items-center gap-2"><i class="fas fa-microchip"></i> 交换机开销</div>
+                            <div class="text-4xl font-bold text-amber-400 mb-2">0.50 mm&sup2;</div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                NVSwitch 芯片上的新增面积，占 NVSwitch 总芯片面积的 <strong>&lt;1%</strong>。
+                            </p>
+                            <div class="mt-3 space-y-2 text-xs text-slate-400">
+                                <div class="flex items-start gap-2">
+                                    <span class="text-amber-400 flex-shrink-0">•</span>
+                                    <span>CAM Lookup Table: 主要面积消耗，用于并行匹配</span>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <span class="text-amber-400 flex-shrink-0">•</span>
+                                    <span>Merging Table: 存储部分结果和会话状态</span>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <span class="text-amber-400 flex-shrink-0">•</span>
+                                    <span>LRU 逻辑 + Load-Wait 状态机: 控制逻辑开销极小</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arch-module border-green-500/30">
+                            <div class="text-sm font-bold text-green-400 mb-3 flex items-center gap-2"><i class="fas fa-desktop"></i> GPU 开销</div>
+                            <div class="text-4xl font-bold text-green-400 mb-2">0.019 mm&sup2;</div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                每个 H100 GPU die 上的新增面积，占 H100 GPU 总芯片面积的 <strong>&lt;0.01%</strong>。
+                            </p>
+                            <div class="mt-3 space-y-2 text-xs text-slate-400">
+                                <div class="flex items-start gap-2">
+                                    <span class="text-green-400 flex-shrink-0">•</span>
+                                    <span>ld.cais / red.cais 指令解码: 扩展 PTX 解码器</span>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <span class="text-green-400 flex-shrink-0">•</span>
+                                    <span>Eligibility Flag 传递逻辑: 标识可合并请求</span>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <span class="text-green-400 flex-shrink-0">•</span>
+                                    <span>Load-Wait 状态管理: TB 暂停/恢复控制</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insight-box mb-4">
+                        <h4 class="text-sm font-medium text-emerald-400 mb-2"><i class="fas fa-expand-arrows-alt mr-1"></i> 可扩展性: Merge Table 大小与 GPU 数量无关</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed">
+                            由于 TP 场景中所有 GPU 的 Thread Block 同步发射请求 (synchronized request issuance) 且受硬件节流 (throttling) 控制，同时活跃的最大合并会话数是一个 <strong>常数</strong>。因此 Merging Table 的大小不随 GPU 数量增长，CAIS 在扩展到 64 GPU、128 GPU 甚至更大规模时，硬件开销保持不变。这是 CAIS 相对于其他交换机内计算方案的关键优势。
+                        </p>
+                    </div>
+
+                    <div class="tech-diagram">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">硬件开销总结对比</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-600">
+                                        <th class="text-left py-2 px-3 text-amber-300">组件</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">新增面积</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">占比</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">影响评估</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">NVSwitch CAM 表</td>
+                                        <td class="py-2 px-3 font-mono text-xs text-amber-400">~0.25 mm&sup2;</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">&lt;0.5%</td>
+                                        <td class="py-2 px-3 text-xs text-green-400">极低</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">NVSwitch Merging Table</td>
+                                        <td class="py-2 px-3 font-mono text-xs text-amber-400">~0.20 mm&sup2;</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">&lt;0.4%</td>
+                                        <td class="py-2 px-3 text-xs text-green-400">极低</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">NVSwitch 控制逻辑</td>
+                                        <td class="py-2 px-3 font-mono text-xs text-amber-400">~0.05 mm&sup2;</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">&lt;0.1%</td>
+                                        <td class="py-2 px-3 text-xs text-green-400">可忽略</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">GPU ISA 扩展</td>
+                                        <td class="py-2 px-3 font-mono text-xs text-green-400">~0.008 mm&sup2;</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">&lt;0.005%</td>
+                                        <td class="py-2 px-3 text-xs text-green-400">可忽略</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">GPU Load-Wait 逻辑</td>
+                                        <td class="py-2 px-3 font-mono text-xs text-green-400">~0.011 mm&sup2;</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">&lt;0.01%</td>
+                                        <td class="py-2 px-3 text-xs text-green-400">可忽略</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3 font-bold text-slate-300">总计</td>
+                                        <td class="py-2 px-3 font-mono text-xs text-amber-400">0.519 mm&sup2;</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">交换机 &lt;1%<br>GPU &lt;0.01%</td>
+                                        <td class="py-2 px-3 text-xs text-green-400">极低</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 11: 关键发现 -->
+                <div id="findings" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-lightbulb"></i> 关键发现</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4 border-l-4 border-emerald-500">
+                            <h4 class="text-sm font-medium text-emerald-400 mb-2 flex items-center gap-2"><i class="fas fa-check-circle"></i> 发现 1: 语义对齐消除全局屏障</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                通过将通信操作的内存语义与计算 Kernel 的访问模式对齐，CAIS 从根本上消除了 AllGather 和 Reduce-Scatter 中的全局同步屏障。计算和通信不再被隔离，而是可以自然重叠。这是性能提升的根本来源。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4 border-l-4 border-blue-500">
+                            <h4 class="text-sm font-medium text-blue-400 mb-2 flex items-center gap-2"><i class="fas fa-check-circle"></i> 发现 2: 时间对齐减少 87% 缓冲需求</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                通过合并感知的 TB 协调，CAIS 确保访问相同内存区域的 Thread Block 同步发射请求。这种 <strong>时间对齐</strong> (temporal alignment) 使交换机能够最大化合并命中率，将中间缓冲需求减少 <strong>87%</strong>。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4 border-l-4 border-amber-500">
+                            <h4 class="text-sm font-medium text-amber-400 mb-2 flex items-center gap-2"><i class="fas fa-check-circle"></i> 发现 3: 带宽利用率接近峰值</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                非对称 Kernel 重叠调度使 NVLink 双向链路同时被充分利用。GEMM-RS 填充上行链路，AG-GEMM 填充下行链路，双向带宽利用率都接近理论峰值。这避免了传统方案中单一方向链路空闲的问题。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4 border-l-4 border-purple-500">
+                            <h4 class="text-sm font-medium text-purple-400 mb-2 flex items-center gap-2"><i class="fas fa-check-circle"></i> 发现 4: 可扩展性保持不变</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                Merging Table 大小不随 GPU 数量增长（由于同步请求发射和节流机制），CAIS 在扩展到更大规模时硬件开销保持恒定。这使得 CAIS 在万级 GPU 集群中仍然可行。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4 border-l-4 border-red-500">
+                            <h4 class="text-sm font-medium text-red-400 mb-2 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> 发现 5: 协同设计是必要条件</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                CAIS-Base（仅有硬件支持）显著落后于完整 CAIS。这证明了 <strong>软硬件协同设计</strong> 的必要性：仅有 ld.cais/red.cais 指令和交换机硬件是不够的，必须有编译器 TB 分组、轻量级同步器和图级优化器配合才能释放全部性能潜力。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800/50 rounded-lg p-4 border-l-4 border-cyan-500">
+                            <h4 class="text-sm font-medium text-cyan-400 mb-2 flex items-center gap-2"><i class="fas fa-check-circle"></i> 发现 6: 极低硬件开销实现显著加速</h4>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                CAIS 以交换机 &lt;1% 芯片面积和 GPU &lt;0.01% 芯片面积的极低开销，实现了 1.38x 平均端到端加速比。这种极高的 <strong>性能-面积比</strong> 使 CAIS 成为下一代 GPU 互连架构的理想增强方案。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 12: 影响分析 -->
+                <div id="impact" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-rocket"></i> 影响分析</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <!-- Impact Card 1 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-blue-500/5 to-transparent">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-brain text-blue-400"></i>
+                                </div>
+                                <h4 class="text-sm font-semibold text-blue-400">LLM 训练优化</h4>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                CAIS 直接加速 LLM 训练中的张量并行通信瓶颈。1.38x-1.44x 的端到端加速比意味着在相同时间内可以训练更大的模型，或在更短时间内完成相同训练。对于万卡集群，这可以节省数周训练时间。
+                            </p>
+                        </div>
+
+                        <!-- Impact Card 2 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-purple-500/5 to-transparent">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-network-wired text-purple-400"></i>
+                                </div>
+                                <h4 class="text-sm font-semibold text-purple-400">交换机内计算新范式</h4>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                CAIS 开创了 <strong>计算感知</strong> 交换机内计算的新范式。与传统交换机只做数据转发不同，CAIS 证明交换机可以感知计算语义、合并相关请求、执行简单的归约操作。这为未来智能交换机架构指明了方向。
+                            </p>
+                        </div>
+
+                        <!-- Impact Card 3 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-green-500/5 to-transparent">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-code-branch text-green-400"></i>
+                                </div>
+                                <h4 class="text-sm font-semibold text-green-400">NCCL 演进方向</h4>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                CAIS 揭示了 NCCL/NVLS 中集体操作与计算 Kernel 内存语义的不匹配问题。未来 NCCL 版本可能需要支持"感知计算"的通信原语，在语义层面而不仅是带宽层面优化集体操作。
+                            </p>
+                        </div>
+
+                        <!-- Impact Card 4 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-amber-500/5 to-transparent">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-microchip text-amber-400"></i>
+                                </div>
+                                <h4 class="text-sm font-semibold text-amber-400">GPU 架构设计启示</h4>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                CAIS 以极低的硬件开销（&lt;0.01% GPU 面积）实现显著加速，证明 <strong>小而精准的硬件增强</strong> 比大规模架构改动更具实用价值。这为下一代 GPU 设计提供了重要参考。
+                            </p>
+                        </div>
+
+                        <!-- Impact Card 5 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-red-500/5 to-transparent">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-layer-group text-red-400"></i>
+                                </div>
+                                <h4 class="text-sm font-semibold text-red-400">编译器-硬件协同</h4>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                CAIS-Base 的落后证明了仅有硬件支持是不够的。编译器必须参与 TB 分组、eligibility flag 插入和细粒度依赖分析。这推动了 <strong>全栈协同设计</strong> 的理念，对 ML 编译器 (如 Triton、TVM) 的设计有启发意义。
+                            </p>
+                        </div>
+
+                        <!-- Impact Card 6 -->
+                        <div class="impact-card glass-card rounded-xl p-5 bg-gradient-to-br from-cyan-500/5 to-transparent">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-8 h-8 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-expand-arrows-alt text-cyan-400"></i>
+                                </div>
+                                <h4 class="text-sm font-semibold text-cyan-400">大规模扩展性</h4>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                Merging Table 大小不随 GPU 数量增长，使 CAIS 在扩展到万级 GPU 时仍然可行。结合语义对齐消除全局屏障的优势，CAIS 为 <strong>超大规模 LLM 训练</strong> 提供了一种可扩展的通信优化路径。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="tech-diagram mb-4">
+                        <h4 class="text-sm font-medium text-amber-300 mb-3">CAIS 与相关工作的定位</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-600">
+                                        <th class="text-left py-2 px-3 text-amber-300">方案</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">核心思想</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">语义对齐</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">交换机计算</th>
+                                        <th class="text-left py-2 px-3 text-amber-300">全局屏障</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">NCCL</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">Ring/Tree 算法优化</td>
+                                        <td class="py-2 px-3 text-xs text-red-400"><i class="fas fa-times mr-1"></i>无</td>
+                                        <td class="py-2 px-3 text-xs text-red-400"><i class="fas fa-times mr-1"></i>无</td>
+                                        <td class="py-2 px-3 text-xs text-red-400"><i class="fas fa-times mr-1"></i>有</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">NVLS</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">硬件加速集体操作</td>
+                                        <td class="py-2 px-3 text-xs text-red-400"><i class="fas fa-times mr-1"></i>无</td>
+                                        <td class="py-2 px-3 text-xs text-amber-400"><i class="fas fa-minus mr-1"></i>部分</td>
+                                        <td class="py-2 px-3 text-xs text-red-400"><i class="fas fa-times mr-1"></i>有</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3 font-medium text-slate-300">MoE-Hub</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">MoE 硬件加速通信</td>
+                                        <td class="py-2 px-3 text-xs text-amber-400"><i class="fas fa-minus mr-1"></i>部分</td>
+                                        <td class="py-2 px-3 text-xs text-red-400"><i class="fas fa-times mr-1"></i>无</td>
+                                        <td class="py-2 px-3 text-xs text-green-400"><i class="fas fa-check mr-1"></i>消除</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3 font-bold text-slate-300">CAIS</td>
+                                        <td class="py-2 px-3 text-xs text-slate-400">计算感知交换机内计算</td>
+                                        <td class="py-2 px-3 text-xs text-green-400"><i class="fas fa-check mr-1"></i>完整</td>
+                                        <td class="py-2 px-3 text-xs text-green-400"><i class="fas fa-check mr-1"></i>完整</td>
+                                        <td class="py-2 px-3 text-xs text-green-400"><i class="fas fa-check mr-1"></i>消除</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Links -->
+                <div id="sources" class="section-block">
+                    <h3 class="text-base font-semibold text-amber-300 mb-3 flex items-center gap-2"><i class="fas fa-link"></i> 来源链接</h3>
+                    <div class="space-y-2">
+                        <div class="flex flex-wrap gap-4">
+                            <div>
+                                <div class="text-xs text-slate-500 mb-1">CAIS 论文</div>
+                                <a href="https://arxiv.org/abs/2605.05628" target="_blank" class="ref-link mr-4"><i class="fas fa-external-link-alt mr-1"></i>arXiv:2605.05628 原文</a>
+                                <a href="https://www.researchgate.net/publication/401575046" target="_blank" class="ref-link"><i class="fas fa-book-open mr-1"></i>ResearchGate</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>CAIS: 面向 LLM 张量并行的计算感知交换机内计算 | arXiv:2605.05628</p>
+            <p class="mt-1">作者: Chen Zhang, Qijun Zhang, Zhuoshan Zhou 等 | 机构: 上海交通大学、ETH Zurich、NVIDIA</p>
+        </div>
+    </footer>
+
+    <script>
+        function scrollToSection(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                const headerOffset = 100;
+                const elementPosition = el.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+            }
+        }
+
+        // Update active tab on scroll
+        const sections = ['overview', 'motivation', 'tp-patterns', 'architecture', 'isa', 'switch-micro', 'microfuncs', 'tb-coord', 'performance', 'overhead', 'findings', 'impact'];
+        const navTabs = document.querySelectorAll('.nav-tab');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            const scrollPos = window.pageYOffset + 150;
+
+            sections.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.offsetTop <= scrollPos) {
+                    current = id;
+                }
+            });
+
+            navTabs.forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.getAttribute('onclick') && tab.getAttribute('onclick').includes(current)) {
+                    tab.classList.add('active');
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>

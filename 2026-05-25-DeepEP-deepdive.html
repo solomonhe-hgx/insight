@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepEP 技术深度报告 - 架构、算法与生态全景</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: white; box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .badge-deepep { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .badge-arch { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .badge-perf { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .badge-api { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .badge-compare { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .badge-trend { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        .metric-card { background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); }
+        .update-card { transition: all 0.3s ease; }
+        .update-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .detail-section { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        .ref-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-radius: 4px; text-decoration: none; margin-left: 6px; white-space: nowrap; transition: all 0.15s; }
+        .ref-link:hover { background: rgba(59, 130, 246, 0.3); }
+        .ref-link.green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .ref-link.green:hover { background: rgba(16, 185, 129, 0.3); }
+        .ref-link.cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; }
+        .ref-link.cyan:hover { background: rgba(6, 182, 212, 0.3); }
+        .ref-link.purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .ref-link.purple:hover { background: rgba(139, 92, 246, 0.3); }
+        .ref-link.amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .ref-link.amber:hover { background: rgba(245, 158, 11, 0.3); }
+        .ref-link.red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .ref-link.red:hover { background: rgba(239, 68, 68, 0.3); }
+        .feature-expand-btn { cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 11px; flex-shrink: 0; }
+        .feature-expand-btn:hover { background: rgba(59, 130, 246, 0.15); }
+        .feature-expand-icon { transition: transform 0.3s ease; display: inline-block; font-size: 10px; }
+        .feature-expand-icon.expanded { transform: rotate(90deg); }
+        .feature-detail { animation: slideDown 0.3s ease-out; }
+        .feature-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
+        .code-block { font-family: 'JetBrains Mono', monospace; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.6; overflow-x: auto; }
+        .diagram-box { border: 2px solid rgba(6, 182, 212, 0.4); border-radius: 8px; padding: 12px; text-align: center; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="text-slate-200">
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-rocket text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">DeepEP 技术深度报告</h1>
+                        <p class="text-xs text-slate-400">架构 · 算法 · API · 性能 · 生态全景 | 基于 GitHub 源码 + 第三方资料</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-slate-300">DeepEP 版本</div>
+                        <div class="text-xs text-slate-400">V2 (2026-04-23)</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg">
+                        <div class="text-2xl font-bold text-cyan-400">1.3x</div>
+                        <div class="text-xs text-slate-400">vs V1 性能提升</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('overview')" id="tab-overview" class="tab-active px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-chart-line"></i> 总览
+            </button>
+            <button onclick="showTab('architecture')" id="tab-architecture" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-sitemap"></i> 架构设计
+            </button>
+            <button onclick="showTab('dispatch')" id="tab-dispatch" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-exchange-alt"></i> Dispatch 机制
+            </button>
+            <button onclick="showTab('combine')" id="tab-combine" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-object-group"></i> Combine 机制
+            </button>
+            <button onclick="showTab('api')" id="tab-api" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-code"></i> API 参考
+            </button>
+            <button onclick="showTab('performance')" id="tab-performance" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-tachometer-alt"></i> 性能基准
+            </button>
+            <button onclick="showTab('comparison')" id="tab-comparison" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-balance-scale"></i> 竞品对比
+            </button>
+            <button onclick="showTab('trends')" id="tab-trends" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-lightbulb"></i> 趋势展望
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <!-- ==================== Overview Tab ==================== -->
+        <section id="content-overview" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-rocket text-cyan-400"></i></div>
+                        <div class="text-sm text-slate-400">DeepEP 定位</div>
+                    </div>
+                    <div class="text-sm text-slate-300 mt-2">专为 MoE Expert Parallel 设计的高性能通信库，覆盖训练与推理</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-microchip text-purple-400"></i></div>
+                        <div class="text-sm text-slate-400">V2 核心变化</div>
+                    </div>
+                    <div class="text-sm text-slate-300 mt-2">NCCL Gin 后端 + 全 JIT 编译 + 统一 ElasticBuffer，弃用 NVSHMEM</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-bolt text-green-400"></i></div>
+                        <div class="text-sm text-slate-400">峰值带宽</div>
+                    </div>
+                    <div class="text-3xl font-bold text-green-400">740 GB/s</div>
+                    <div class="text-xs text-slate-500 mt-1">NVLink SM100 EP8</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-compress-arrows-alt text-amber-400"></i></div>
+                        <div class="text-sm text-slate-400">SM 占用降低</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">4x</div>
+                    <div class="text-xs text-slate-500 mt-1">24 SM → 4-6 SM</div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-info-circle text-cyan-400"></i> DeepEP 是什么</h2>
+                <div class="space-y-4 text-slate-300 leading-relaxed">
+                    <p>DeepEP (Deep Every Parallel) 是由 DeepSeek 开源的、专为 Mixture-of-Experts (MoE) 模型中 Expert Parallel (EP) 场景设计的高性能通信库。它提供了高吞吐、低延迟的 GPU 全对全（all-to-all）通信内核，覆盖 MoE 的 dispatch（token 分发）和 combine（结果聚合）两个核心阶段，支持 FP8/BF16 等低精度数据类型。</p>
+                    <p>V2 是 2026 年 4 月 23 日发布的完全重构版本，核心变化包括：
+                        <span class="text-cyan-400">(1) 弃用 NVSHMEM，切换为更轻量的 NCCL Gin 后端</span>；
+                        <span class="text-purple-400">(2) 全部 CUDA kernel 改为 JIT 运行时编译</span>；
+                        <span class="text-green-400">(3) 统一的 ElasticBuffer API 替代了 V1 中分离的 high-throughput / low-latency 接口</span>；
+                        <span class="text-amber-400">(4) SM 占用从 24 降到 4-6，同时保持或超越 V1 性能</span>。
+                    </p>
+                    <div class="flex items-center gap-4 text-xs text-slate-400 mt-3">
+                        <span><i class="fab fa-github mr-1"></i> <a href="https://github.com/deepseek-ai/DeepEP" target="_blank" class="text-cyan-400 hover:text-cyan-300">github.com/deepseek-ai/DeepEP</a></span>
+                        <span><i class="fas fa-globe mr-1"></i> <a href="https://deepep.org/" target="_blank" class="text-cyan-400 hover:text-cyan-300">deepep.org</a></span>
+                        <span><i class="fas fa-balance-scale mr-1"></i> MIT License</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-cubes text-purple-400"></i> V2 核心架构一览</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="space-y-3">
+                        <div class="diagram-box border-purple-500/40">
+                            <i class="fas fa-layer-group text-purple-400 text-xl mb-2"></i>
+                            <h3 class="font-medium text-purple-300">统一 API 层</h3>
+                            <p class="text-xs text-slate-400 mt-1">ElasticBuffer — 自动计算最优 SM/QP 数量，无需手动调优</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="diagram-box border-cyan-500/40">
+                            <i class="fas fa-code text-cyan-400 text-xl mb-2"></i>
+                            <h3 class="font-medium text-cyan-300">JIT 编译层</h3>
+                            <p class="text-xs text-slate-400 mt-1">运行时 JIT 编译 CUDA kernel，免安装 CUDA 工具链，按配置动态生成最优代码</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="diagram-box border-green-500/40">
+                            <i class="fas fa-network-wired text-green-400 text-xl mb-2"></i>
+                            <h3 class="font-medium text-green-300">NCCL Gin 后端</h3>
+                            <p class="text-xs text-slate-400 mt-1">GPU-Initiated Networking，header-only 轻量后端，复用 NCCL communicator</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div class="space-y-3">
+                        <div class="diagram-box border-amber-500/40">
+                            <i class="fas fa-memory text-amber-400 text-xl mb-2"></i>
+                            <h3 class="font-medium text-amber-300">NVLink 互联层</h3>
+                            <p class="text-xs text-slate-400 mt-1">节点内 NVLink 通信，峰值 740 GB/s，降低节点间 RDMA 负载</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="diagram-box border-blue-500/40">
+                            <i class="fas fa-globe text-blue-400 text-xl mb-2"></i>
+                            <h3 class="font-medium text-blue-300">RDMA 传输层</h3>
+                            <p class="text-xs text-slate-400 mt-1">节点间 RDMA (InfiniBand/RoCE) 传输，峰值 90 GB/s</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-code-branch text-blue-400"></i> V1 → V2 关键变化</h2>
+                <ul class="space-y-3 text-sm text-slate-300">
+                    <li class="flex flex-col gap-1">
+                        <div class="feature-row">
+                            <i class="fas fa-exchange-alt text-cyan-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>后端切换：</strong>从 NVSHMEM 切换到 NCCL Gin — NVSHMEM 是重量级 PGAS 运行时，NCCL Gin 是 header-only 轻量模块，复用已有 NCCL communicator <a class="ref-link cyan" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a> </span>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer flex-shrink-0" onclick="toggleFeatureDetail('v2-backend')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-v2-backend"></i>设计原理</span>
+                        </div>
+                        <div id="feature-v2-backend" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-cyan-500/20">
+                            <h5 class="text-sm font-medium text-cyan-300 mb-3"><i class="fas fa-cogs mr-2"></i>NCCL Gin 后端切换详细设计原理</h5>
+                            <div class="space-y-3 text-sm text-slate-400">
+                                <div><strong class="text-slate-300">核心问题：</strong>V1 使用 NVSHMEM 作为 RDMA 后端。NVSHMEM 是一个完整的 PGAS (Partitioned Global Address Space) 编程模型——它需要独立的初始化流程（nvshmem_init）、独立的内存管理（nvshmem_malloc）、独立的同步机制（nvshmem_barrier）。这不仅增加了代码复杂度，还意味着 DeepEP 和 NCCL（用于其他 collective 如 all-reduce）运行在两套独立的通信栈上，无法共享 communicator 和拓扑信息。在 DeepSeek-V3 这样的大模型训练中，一个 rank 既要用 NCCL 做 all-reduce（data parallel），又要用 DeepEP 做 dispatch/combine（expert parallel），两套通信栈并存会带来：(1) 双倍的 NIC queue pair 占用；(2) 独立的内存注册和地址翻译开销；(3) 调试困难——两套栈的日志和诊断工具不同。</div>
+                                <div><strong class="text-slate-300">设计原理：</strong>NCCL Gin (GPU-Initiated Networking) 是 NCCL 2.30+ 引入的 Device API 扩展。它允许 GPU kernel 直接发起 RDMA 操作（put/get/signal），而不需要 CPU 协调。关键优势：(1) <em>Header-only 轻量集成：</em>NCCL Gin 只是一个头文件库（nccl/device_api.h），不需要独立的运行时进程。只需在构建时包含 NCCL header，kernel 中调用 ncclGin_Put/Get 等函数即可。(2) <em>复用 NCCL communicator：</em>DeepEP V2 的 ElasticBuffer 初始化时复用已有的 NCCL communicator（来自 PyTorch 的 ProcessGroup），共享同一个 NIC queue pair 和内存注册表。(3) <em>统一的拓扑感知：</em>NCCL 的拓扑检测（PCI 扫描、NVML、NUMA 感知）同样服务于 DeepEP 的通信路径选择，不需要单独的实现。</div>
+                                <div><strong class="text-slate-300">适用场景：</strong>所有同时使用 Data Parallel + Expert Parallel 的训练场景。特别是在 DeepSeek-V3 这类模型中，DP 和 EP 混合使用，统一通信栈可以显著降低系统复杂度和内存开销。</div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="flex flex-col gap-1">
+                        <div class="feature-row">
+                            <i class="fas fa-rocket text-green-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>全 JIT 编译：</strong>所有 CUDA kernel 运行时 JIT 编译，安装时无需 CUDA 工具链，按硬件和配置动态生成最优代码 <a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a> </span>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer flex-shrink-0" onclick="toggleFeatureDetail('v2-jit')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-v2-jit"></i>设计原理</span>
+                        </div>
+                        <div id="feature-v2-jit" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-green-500/20">
+                            <h5 class="text-sm font-medium text-green-300 mb-3"><i class="fas fa-cogs mr-2"></i>JIT 编译详细设计原理</h5>
+                            <div class="space-y-3 text-sm text-slate-400">
+                                <div><strong class="text-slate-300">核心问题：</strong>DeepEP 的 dispatch/combine kernel 有大量编译时常量参数：hidden 维度、top-k 数量、是否 FP8、专家数量、每 rank token 上限、SM 数量等。V1 的做法是预编译一组 kernel 变体（类似 "template instantiation matrix"），在 setup.py 中用 nvcc 编译所有组合。这导致：(1) 安装时间长（需要完整 CUDA 工具链）；(2) 二进制文件巨大（数百 MB）；(3) 新的参数组合需要重新编译库。</div>
+                                <div><strong class="text-slate-300">设计原理：</strong>V2 改为 JIT 运行时编译。具体流程：(1) <em>Kernel 模板：</em>源代码中维护 CUDA kernel 的 C++ 模板，使用宏和常量参数化所有可变维度。(2) <em>运行时生成：</em>当 ElasticBuffer 初始化时，根据传入的 hidden、topk、fp8 等参数，动态生成一个特定于此配置的 CUDA C 源码字符串。(3) <em>在线编译：</em>调用 PyTorch 的 JIT 编译接口（类似 torch.utils.cpp_extension.load_inline），在首次 dispatch/combine 调用时将源码编译为 PTX → SASS。(4) <em>缓存：</em>编译结果缓存到本地磁盘，下次相同配置时直接加载，无需重新编译。</div>
+                                <div><strong class="text-slate-300">适用场景：</strong>(1) 快速部署——用户只需 pip install，无需 nvcc；(2) 动态配置——不同模型的 hidden 维度、expert 数量差异很大，JIT 可以按需生成最优 kernel；(3) 迭代开发——开发者修改 kernel 源码后，用户无需重新安装库，下次运行时自动编译新代码。</div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="flex flex-col gap-1">
+                        <div class="feature-row">
+                            <i class="fas fa-compress-arrows-alt text-amber-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>SM 占用大幅降低：</strong>V1 需要 24 个 SM 做通信，V2 仅需 4-6 个 SM（同等性能下），释放更多计算资源给 GEMM <a class="ref-link amber" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a> </span>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer flex-shrink-0" onclick="toggleFeatureDetail('v2-sm')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-v2-sm"></i>设计原理</span>
+                        </div>
+                        <div id="feature-v2-sm" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-amber-500/20">
+                            <h5 class="text-sm font-medium text-amber-300 mb-3"><i class="fas fa-cogs mr-2"></i>SM 占用优化详细设计原理</h5>
+                            <div class="space-y-3 text-sm text-slate-400">
+                                <div><strong class="text-slate-300">核心问题：</strong>在 MoE 训练/推理中，GPU 的 Streaming Multiprocessor (SM) 是 dispatch/combine 通信 kernel 和 GEMM 计算 kernel 的共享资源。V1 中通信 kernel 占用 24 个 SM（H100 共 132 个 SM，约占 18%），这意味着可用于 GEMM 的 SM 减少了 18%。对于 MoE 这种 compute-bound 的场景，通信 SM 占用直接影响 GEMM 吞吐。</div>
+                                <div><strong class="text-slate-300">优化手段：</strong>(1) <em>NCCL Gin 的零-copy 特性：</em>V1 使用 NVSHMEM 时，数据需要先拷贝到 NVSHMEM 的 staging buffer，再由 NVSHMEM 的 host proxy 或 SM 发起 RDMA。V2 使用 NCCL Gin 后，GPU kernel 直接发起 RDMA put/get，数据从用户 buffer 直接传输，消除了中间拷贝步骤和对应的 SM 开销。(2) <em>解析式 SM 计算：</em>V2 的 ElasticBuffer 根据消息大小、NIC 带宽、SM 频率等参数，通过解析公式计算出最优 SM 数量（而非 V1 的 heuristic 固定值）。例如 EP 8x4 + RDMA 场景计算出只需 6 个 SM 就能饱和 400 Gbps 带宽。(3) <em>Warp 级并行优化：</em>每个 SM 内的 warp 调度更高效——用更少的 warp 完成相同的传输量（通过更大的 per-warp 传输块大小和更好的 L2 cache 复用）。</div>
+                                <div><strong class="text-slate-300">适用场景：</strong>所有 MoE 训练和推理场景。特别是推理场景（如 vLLM + DeepEP），SM 资源直接决定每 GPU 的 token throughput。</div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="flex flex-col gap-1">
+                        <div class="feature-row">
+                            <i class="fas fa-layer-group text-blue-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>统一 API：</strong>High-throughput 和 low-latency 模式合并到单一 ElasticBuffer 接口，简化集成 <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></span>
+                        </div>
+                    </li>
+                    <li class="flex flex-col gap-1">
+                        <div class="feature-row">
+                            <i class="fas fa-expand-arrows-alt text-purple-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>规模扩展：</strong>支持最大 EP2048（2048 个 expert 并行域），适配超大模型训练 <a class="ref-link purple" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></span>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ==================== Architecture Tab ==================== -->
+        <section id="content-architecture" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-arch px-3 py-1 rounded text-xs text-white">架构</span> DeepEP 整体架构设计</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('arch-elasticbuffer')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-arch-elasticbuffer"></i><h3 class="font-semibold text-white">ElasticBuffer — 统一通信缓冲区</h3></div>
+                        <span class="text-xs bg-purple-700 px-2 py-1 rounded">V2 核心组件</span>
+                    </div>
+                    <div id="arch-elasticbuffer-summary" class="mt-3"><p class="text-sm text-slate-300">ElasticBuffer 是 DeepEP V2 的核心抽象，替代了 V1 中分散的 buffer 管理类。它统一管理 dispatch 和 combine 的内存分配、SM 调度、QP (Queue Pair) 管理，并通过解析式计算自动确定最优 SM/QP 数量，无需手动调优 <a class="ref-link purple" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></p></div>
+                    <div id="arch-elasticbuffer-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-purple-300 mb-2"><i class="fas fa-cogs mr-2"></i>技术细节</h4>
+                                <ul class="space-y-2 text-sm text-slate-400">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>解析式 SM/QP 计算：</strong>根据消息大小、NIC 数量、带宽、GPU SM 频率等参数，通过解析公式自动计算最优 SM 数量和 QP 数量，取代 V1 的 auto-tuning</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>统一 high/low-latency：</strong>单一接口支持高吞吐和低延迟两种模式，内部自动选择最优策略</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-exclamation-triangle text-amber-500 mt-1 flex-shrink-0"></i><span><strong>内存消耗增大：</strong>官方文档注明 V2 buffer size 消耗比 V1 更大（trade-off for performance）</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('arch-jit')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-arch-jit"></i><h3 class="font-semibold text-white">JIT 运行时编译</h3></div>
+                        <span class="text-xs bg-cyan-700 px-2 py-1 rounded">零编译安装</span>
+                    </div>
+                    <div id="arch-jit-summary" class="mt-3"><p class="text-sm text-slate-300">所有 CUDA kernel 在运行时通过轻量 JIT 模块编译，安装时无需 CUDA 工具链。根据传入的 hidden 维度、top-k、FP8/BF16 等参数动态生成最优 kernel 代码，并缓存到本地磁盘 <a class="ref-link cyan" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></p></div>
+                    <div id="arch-jit-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-cyan-300 mb-2"><i class="fas fa-code mr-2"></i>JIT 编译流程</h4>
+                                <div class="code-block text-slate-300">
+                                    <div class="text-slate-500"># V1 (预编译): 安装时 nvcc 编译所有参数组合 → 二进制巨大</div>
+                                    <div class="text-slate-500"># V2 (JIT): 运行时按需编译 → 安装零编译</div>
+                                    <div class="mt-2 text-green-400">用户安装:</div>
+                                    <div>pip install deep_ep &nbsp; # 无需 nvcc!</div>
+                                    <div class="mt-2 text-green-400">首次运行时:</div>
+                                    <div>buffer.dispatch(x, hidden=7168, topk=8, fp8=True)</div>
+                                    <div>&nbsp; → JIT 生成 kernel: hidden=7168, topk=8, fp8=True</div>
+                                    <div>&nbsp; → 编译为 PTX → SASS → 缓存到磁盘</div>
+                                    <div class="mt-2 text-green-400">再次运行 (相同配置):</div>
+                                    <div>→ 直接加载缓存的 binary, 零开销</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('arch-nccl-gin')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-arch-nccl-gin"></i><h3 class="font-semibold text-white">NCCL Gin 后端 — GPU 直接发起网络操作</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">V2 后端</span>
+                    </div>
+                    <div id="arch-nccl-gin-summary" class="mt-3"><p class="text-sm text-slate-300">NCCL Gin (GPU-Initiated Networking) 允许 GPU kernel 直接发起 RDMA put/get/signal 操作，无需 CPU 协调。V2 用它完全替代了 V1 的 NVSHMEM 后端，实现 header-only 轻量集成，复用 NCCL communicator <a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a> <a class="ref-link cyan" href="https://arxiv.org/html/2603.13606v3" target="_blank"><i class="fas fa-external-link-alt"></i>NCCL EP Paper</a></p></div>
+                    <div id="arch-nccl-gin-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-network-wired mr-2"></i>NCCL Gin 核心原语</h4>
+                                <ul class="space-y-2 text-sm text-slate-400">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-up text-green-500 mt-1 flex-shrink-0"></i><span><strong>ncclGin_Put：</strong>RDMA Write — 将本地 GPU 内存数据写入远程 GPU 内存地址（通过 memory window 寻址）</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-down text-blue-500 mt-1 flex-shrink-0"></i><span><strong>ncclGin_Get：</strong>RDMA Read — 从远程 GPU 内存读取数据到本地 GPU 内存</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-plus-circle text-amber-500 mt-1 flex-shrink-0"></i><span><strong>ncclGin_SignalAdd：</strong>原子操作 — 原子地增加远程信号值，用于同步通知</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-clock text-purple-500 mt-1 flex-shrink-0"></i><span><strong>ncclGin_WaitOnSignal：</strong>等待原语 — 阻塞等待远程信号达到阈值后继续执行</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('arch-zero-sm')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-arch-zero-sm"></i><h3 class="font-semibold text-white">实验特性：0 SM 模式</h3></div>
+                        <span class="text-xs bg-amber-700 px-2 py-1 rounded">Experimental</span>
+                    </div>
+                    <div id="arch-zero-sm-summary" class="mt-3"><p class="text-sm text-slate-300">DeepEP V2 在实验分支中提供 0 SM 模式——通信完全不占用 SM 资源。包括 0 SM Engram (RDMA)、0 SM PP (RDMA)、0 SM CP (Copy Engine)。这些模式利用硬件 copy engine 和 RDMA 引擎直接在后台传输，无需 SM 执行 kernel 代码 <a class="ref-link amber" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></p></div>
+                    <div id="arch-zero-sm-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-amber-300 mb-2"><i class="fas fa-flask mr-2"></i>0 SM 模式分析</h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">0 SM 模式的核心思想是将通信操作从 SM 转移到专用的硬件引擎：(1) <em>0 SM Engram：</em>使用 RDMA NIC 的 hardware engine 直接执行 put/get，GPU 侧只需设置一次 doorbell register，之后 NIC 自主完成传输。(2) <em>0 SM PP (Pipeline Parallel)：</em>类似 Engram 但针对 pipeline 场景优化，支持流水线式连续传输。(3) <em>0 SM CP (Copy Engine)：</em>使用 GPU 的 copy engine（如 Hopper 的 TMA, Tensor Memory Accelerator）执行设备内和设备间的数据搬运，完全不占用 SM。需要注意的是，这些模式目前仅在实验分支中，且需要特定硬件支持（ConnectX-7 + Hopper 及以上）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Dispatch Tab ==================== -->
+        <section id="content-dispatch" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-deepep px-3 py-1 rounded text-xs text-white">Dispatch</span> Token 分发机制深度解析</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('dispatch-overview')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-dispatch-overview"></i><h3 class="font-semibold text-white">Dispatch 流程概览</h3></div>
+                        <span class="text-xs bg-cyan-700 px-2 py-1 rounded">核心操作</span>
+                    </div>
+                    <div id="dispatch-overview-summary" class="mt-3">
+                        <p class="text-sm text-slate-300">Dispatch 阶段负责将每个 token 从源 GPU 路由到其被分配的 expert 所在的 GPU。在 MoE 中，每个 token 经 gate 网络计算后被分配给 top-k 个 expert（通常 k=8），这些 expert 可能分布在不同 GPU 上。DeepEP 的 dispatch 核心是 <strong>all-to-all 通信</strong>——每个 GPU 既是发送方也是接收方。</p>
+                    </div>
+                    <div id="dispatch-overview-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-cyan-300 mb-2"><i class="fas fa-route mr-2"></i>Dispatch 分步流程</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">1</div>
+                                        <div><strong class="text-slate-300">路由计算：</strong>Gate 网络输出每个 token 的 top-k expert 分配（topk_idx），以及对应的权重（topk_weights）。这决定了每个 token 需要发送到哪些 GPU。</div>
+                                    </div>
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">2</div>
+                                        <div><strong class="text-slate-300">布局计算：</strong>根据 topk_idx 统计每个目标 rank 需要接收的 token 数量，确定 dispatch 的内存布局。这涉及对 token 按目标 rank 排序和对齐（expert_alignment）。</div>
+                                    </div>
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">3</div>
+                                        <div><strong class="text-slate-300">通知阶段（Notify）：</strong>通过 NCCL Gin 的 Put 操作，将元数据（每 rank 发送的 token 数量）写入对端的小型协调缓冲区。对端收到通知后知道要从哪里拉多少数据。</div>
+                                    </div>
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">4</div>
+                                        <div><strong class="text-slate-300">数据传输：</strong>接收方 GPU 通过 NCCL Gin Get（RDMA Read / NVLink Load）从发送方拉取 token 数据。节点内使用 NVLink（~740 GB/s），节点间使用 RDMA（~90 GB/s）。</div>
+                                    </div>
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">5</div>
+                                        <div><strong class="text-slate-300">接收完成：</strong>接收方 GPU 将 token 数据按 expert 分组存入连续的 receive buffer，返回 recv_x, recv_topk_idx, recv_topk_weights 供后续 expert 计算使用。</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('dispatch-pull')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-dispatch-pull"></i><h3 class="font-semibold text-white">Dispatch 为什么用 Load (Pull) 而非 Store (Push)</h3></div>
+                        <span class="text-xs bg-purple-700 px-2 py-1 rounded">核心设计</span>
+                    </div>
+                    <div id="dispatch-pull-summary" class="mt-3">
+                        <p class="text-sm text-slate-300">Dispatch 阶段接收方采用 <strong>Load/Pull</strong> 语义——接收方主动从发送方拉取数据。这源于信息不对称：发送方知道每个 token 该去哪，但接收方不知道会收到多少 token、来自哪些源 GPU。</p>
+                    </div>
+                    <div id="dispatch-pull-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Dispatch Pull 详细设计原理</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>在 MoE dispatch 中，每个 token 的路由（去哪个 expert）是 gate 网络在运行时动态计算的。发送方 GPU 拥有完整的路由信息（topk_idx），但接收方 GPU 对此一无所知——它不知道会有多少 token 到达、来自哪些源 GPU、分配给哪些本地 expert。如果用 Store/Push，接收方必须预分配 worst-case buffer（假设所有源的所有 token都涌来），即 O(E × B × P) 的内存，而实际 token 分布极度不均衡（standard deviation 可达 0.05），浪费极大。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>采用两阶段 Pull 方案：(1) <em>元数据交换：</em>发送方通过 NCCL Gin Put（RDMA Write with immediate data）将路由元数据（每 rank 的 token 数量）写入接收方的小型协调缓冲区。这一步数据量极小（仅 count 信息）。(2) <em>按需拉取：</em>接收方收到元数据后，知道自己要从每个源拉多少数据，然后通过 NCCL Gin Get（RDMA Read / NVLink Load）精确拉取。拉取是连续的、大块的数据传输，带宽利用率远高于分散的 push write。(3) <em>内存优化：</em>接收方只需分配 O(N × B × P) 的实际需要缓冲区（N=目标 rank 数），而非 O(E × B × P) 的 worst case（E=expert 总数）。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>(1) 训练阶段——token 分布高度动态，无法预测；(2) 大规模 EP（EP64+）——源 GPU 多，worst-case buffer 爆炸性增长；(3) 不均衡 expert 负载——某些 expert 接收更多 token，pull 模式能自适应。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('dispatch-fp8')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-dispatch-fp8"></i><h3 class="font-semibold text-white">FP8 Dispatch — 低精度传输</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">性能优化</span>
+                    </div>
+                    <div id="dispatch-fp8-summary" class="mt-3"><p class="text-sm text-slate-300">DeepEP 支持 FP8 (E4M3/E5M2) 格式的 dispatch 数据传输，将 token activation 从 BF16 压缩到 8-bit，带宽需求减半 <a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></p></div>
+                    <div id="dispatch-fp8-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-green-300 mb-3"><i class="fas fa-cogs mr-2"></i>FP8 Dispatch 详细设计原理</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>Dispatch 是带宽密集型操作。以 DeepSeek-V3 为例：8K tokens × 7168 hidden × 2 bytes (BF16) = ~117 MB 每批次。在 RDMA（400 Gbps = 50 GB/s）下传输需要 ~2.3 ms。而 FP8 只需 58.5 MB，传输时间降到 ~1.2 ms，减少近一半。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>(1) <em>量化点：</em>FP8 将 activation 从 16-bit 压缩到 8-bit，使用 E4M3 (4 exponent, 3 mantissa) 或 E5M2 格式。在 MoE dispatch 场景下，activation 的数值范围有限（经过 layer norm 后），FP8 的精度损失可接受。(2) <em>反量化：</em>接收方 expert 在计算前将 FP8 反量化为计算所需的精度（通常是 FP8×FP4 用于 DeepGEMM 的 MegaMoE kernel，或 BF16 用于传统 GEMM）。反量化和 expert 计算可以 overlap 或在同一个 fused kernel 中完成。(3) <em>粒度：</em>DeepEP 支持 per-token 或 per-group 的 FP8 scaling，避免全局 scale factor 导致的精度损失。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>所有带宽受限的 MoE 通信场景。特别是跨节点 RDMA 传输，FP8 dispatch 可以显著降低通信时间占比。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('dispatch-nvlink')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-dispatch-nvlink"></i><h3 class="font-semibold text-white">NVLink 节点内优化</h3></div>
+                        <span class="text-xs bg-blue-700 px-2 py-1 rounded">节点内</span>
+                    </div>
+                    <div id="dispatch-nvlink-summary" class="mt-3"><p class="text-sm text-slate-300">节点内 token 传输使用 NVLink 而非 RDMA，带宽可达 740 GB/s（SM100 EP8）。同时使用 <code>ld.global.nc.L1::no_allocate.L2::256B</code> PTX 指令优化读取路径 <a class="ref-link" href="https://hub.baai.ac.cn/view/43680" target="_blank"><i class="fas fa-external-link-alt"></i>BAAI Hub</a></p></div>
+                    <div id="dispatch-nvlink-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-blue-300 mb-3"><i class="fas fa-cogs mr-2"></i>NVLink 优化详细设计原理</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>在 8-GPU 节点内，如果所有跨 GPU 通信都走 RDMA（需要通过 NIC → PCIe → NVLink 的迂回路径），会引入不必要的延迟。NVLink 提供 GPU 间的直接高速互连（H100 上 900 GB/s 双向带宽），但需要正确的内存访问模式才能饱和带宽。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>(1) <em>LDG.NC 指令：</em>DeepEP 在 NVLink 传输中使用 PTX 指令 <code>ld.global.nc.L1::no_allocate.L2::256B</code>。其中 <code>.nc</code> (non-coherent) 表示此 load 不参与 L1 cache coherence，适用于"读一次就丢弃"的通信数据，避免了 cache line 填充和 coherence traffic。<code>L1::no_allocate</code> 表示不分配 L1 cache 行，数据直接进入 register。<code>L2::256B</code> 指定 L2 传输粒度为 256B（匹配 NVLink 的 flit 大小）。(2) <em>带宽数据：</em>H800 测试中 NVLink dispatch 达到 160 GB/s（单方向），SM100 (Blackwell) 下双向可达 740 GB/s。(3) <em>路径选择：</em>DeepEP 自动判断传输是否在节点内——如果是，走 NVLink 路径；否则走 RDMA。这种分层策略减少了跨节点 RDMA 的负载。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>所有多 GPU 节点内的 MoE 通信。特别是 EP 规模 ≤ 8 时（单节点可容纳所有 expert），NVLink 性能优势最大。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Combine Tab ==================== -->
+        <section id="content-combine" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-deepep px-3 py-1 rounded text-xs text-white">Combine</span> 结果聚合机制深度解析</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('combine-overview')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-combine-overview"></i><h3 class="font-semibold text-white">Combine 流程概览</h3></div>
+                        <span class="text-xs bg-cyan-700 px-2 py-1 rounded">核心操作</span>
+                    </div>
+                    <div id="combine-overview-summary" class="mt-3">
+                        <p class="text-sm text-slate-300">Combine 阶段负责将 expert 计算结果从 expert 所在 GPU 返回给 token 的源 GPU，并按 gating 权重加权求和。与 dispatch 不同，combine 阶段的路由信息完全已知（来自 dispatch 阶段的缓存），因此采用 <strong>Store/Push</strong> 语义。</p>
+                    </div>
+                    <div id="combine_overview-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-cyan-300 mb-2"><i class="fas fa-route mr-2"></i>Combine 分步流程</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">1</div>
+                                        <div><strong class="text-slate-300">Expert 计算完成：</strong>每个 GPU 上的 expert 对其分配的 token 完成前向计算（通常是 Linear → SwiGLU → Linear 的 FFN 结构），输出 expert output。</div>
+                                    </div>
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">2</div>
+                                        <div><strong class="text-slate-300">缓存路由复用：</strong>Combine 直接使用 dispatch 阶段缓存的 handle（包含每个 token 的源 rank、在源 buffer 中的偏移、gating 权重），无需重新计算路由。</div>
+                                    </div>
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">3</div>
+                                        <div><strong class="text-slate-300">Scatter Write (Push)：</strong>Expert GPU 根据缓存的路由信息，将每个 token 的 expert output 通过 NCCL Gin Put（RDMA Write / NVLink Store）直接写入源 GPU 的预计算偏移位置。由于写入目标地址已知，不需要元数据交换——一步到位。</div>
+                                    </div>
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-cyan-400 font-bold text-sm">4</div>
+                                        <div><strong class="text-slate-300">加权求和：</strong>源 GPU 收到来自多个 expert 的结果（每个 token 有 top-k 个 expert 输出），按 dispatch 阶段缓存的 topk_weights 加权求和，得到最终的 combined_x。</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('combine-push')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-combine-push"></i><h3 class="font-semibold text-white">Combine 为什么用 Store (Push) 而非 Load (Pull)</h3></div>
+                        <span class="text-xs bg-purple-700 px-2 py-1 rounded">核心设计</span>
+                    </div>
+                    <div id="combine-push-summary" class="mt-3">
+                        <p class="text-sm text-slate-300">Combine 阶段发送方采用 <strong>Store/Push</strong> 语义——发送方直接推送数据到接收方的预计算地址。这是因为 dispatch 阶段已经缓存了完整的路由信息，发送方知道每个 expert output 该去哪里。</p>
+                    </div>
+                    <div id="combine-push-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Combine Push 详细设计原理</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>与 dispatch 不同，combine 阶段的信息状态完全反转——expert GPU 知道每个 token 的 expert output 应该返回给哪个源 GPU，且源 GPU 上的写入偏移已经在 dispatch 阶段预计算好了。如果此时还用 Pull 模式，接收方需要先告诉发送方"我要什么"，发送方再等待、再响应，白白多一次 round-trip 延迟。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>(1) <em>已知路由：</em>Dispatch 阶段返回的 handle 包含了完整的路由元数据：每个 token 的源 rank、目标偏移、gating 权重。Combine 直接使用这些信息，无需额外的元数据交换。(2) <em>Scatter Write：</em>Expert GPU 将 output 按目标 rank 分组，对每个目标 rank 执行一次 bulk RDMA Write（或 NVLink Store），直接写入接收方 buffer 的预计算偏移。这是一阶段操作——打包 + 写入，没有"等待-响应"循环。(3) <em>Buffer 复用：</em>Combine 的目标 buffer 就是 dispatch 时分配的 receive buffer——内存已经就位，combine 只需往已知地址写入。(4) <em>带宽优势：</em>Push 模式下写入是连续的、大块的（per-destination-rank 的 bulk write），带宽利用率高。Dispatch 的 Pull 模式因为要按源拉取，写入相对碎片化。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>所有 MoE combine 场景。特别是 top-k > 1 时，同一个 token 有多个 expert output 需要加权求和，push 模式可以高效地将多个输出写入同一位置（利用 RDMA 的原子操作或接收方的 accumulate 逻辑）。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('combine-backward')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-combine-backward"></i><h3 class="font-semibold text-white">Combine 也是 Dispatch 的反向 — 训练中的对称性</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">训练</span>
+                    </div>
+                    <div id="combine-backward-summary" class="mt-3"><p class="text-sm text-slate-300">在 MoE 训练中，dispatch 的反向传播等价于 combine，combine 的反向传播等价于 dispatch。DeepEP 利用这种对称性复用同一个 kernel 实现，减少代码量和维护成本 <a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></p></div>
+                    <div id="combine-backward-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-green-300 mb-3"><i class="fas fa-cogs mr-2"></i>训练对称性详细设计原理</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>MoE 的前向传播是 dispatch → expert compute → combine。反向传播需要计算 gradient 对 dispatch 和 combine 的偏导。数学上，dispatch 的 Jacobian transpose 就是 combine，combine 的 Jacobian transpose 就是 dispatch——它们互为转置操作。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>DeepEP 在前向 dispatch 时缓存 handle（路由信息），在反向传播时：(1) <em>Combine 的反向 = Dispatch：</em>gradient of combined_x 需要按 dispatch 的逆路径分发回 expert，等价于一次 dispatch 操作。(2) <em>Dispatch 的反向 = Combine：</em>gradient of expert output 需要按 combine 的逆路径聚合回源 token，等价于一次 combine 操作。因此 DeepEP 只需实现 dispatch 和 combine 两个 kernel，前向和反向通过交换角色复用，无需额外的 backward kernel。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>所有 MoE 训练场景。这种对称性在 PyTorch autograd 中通过 custom Function 的 backward() 方法实现。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== API Tab ==================== -->
+        <section id="content-api" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-api px-3 py-1 rounded text-xs text-white">API</span> DeepEP Python API 参考</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('api-elasticbuffer')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-api-elasticbuffer"></i><h3 class="font-semibold text-white">ElasticBuffer 初始化</h3></div>
+                        <span class="text-xs bg-amber-700 px-2 py-1 rounded">核心 API</span>
+                    </div>
+                    <div id="api-elasticbuffer-summary" class="mt-3">
+                        <div class="code-block">
+<span class="text-purple-400">from</span> deep_ep <span class="text-purple-400">import</span> ElasticBuffer
+
+buffer = ElasticBuffer(
+    group,                    <span class="text-slate-500"># ProcessGroup (NCCL communicator)</span>
+    num_max_tokens_per_rank,  <span class="text-slate-500"># 每 rank 最大 token 数</span>
+    hidden,                   <span class="text-slate-500"># hidden dimension</span>
+    num_topk,                 <span class="text-slate-500"># top-k 值</span>
+    use_fp8_dispatch=<span class="text-green-400">False</span>   <span class="text-slate-500"># 是否使用 FP8 dispatch</span>
+)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('api-dispatch')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-api-dispatch"></i><h3 class="font-semibold text-white">Dispatch 前向</h3></div>
+                        <span class="text-xs bg-cyan-700 px-2 py-1 rounded">核心 API</span>
+                    </div>
+                    <div id="api-dispatch-summary" class="mt-3">
+                        <div class="code-block">
+recv_x, recv_topk_idx, recv_topk_weights, handle, event = buffer.dispatch(
+    x,                          <span class="text-slate-500"># 输入 tensor [batch, hidden]</span>
+    topk_idx,                   <span class="text-slate-500"># top-k expert 索引 [batch, topk]</span>
+    topk_weights,               <span class="text-slate-500"># top-k 权重 [batch, topk]</span>
+    num_experts,                <span class="text-slate-500"># 总 expert 数量</span>
+    num_max_tokens_per_rank,    <span class="text-slate-500"># 每 rank 最大 token 数</span>
+    expert_alignment=<span class="text-green-400">1</span>,        <span class="text-slate-500"># expert 对齐粒度</span>
+    num_sms,                    <span class="text-slate-500"># 使用的 SM 数量 (自动计算可省略)</span>
+    async_with_compute_stream=<span class="text-green-400">True</span>  <span class="text-slate-500"># 与计算 stream 重叠</span>
+)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('api-combine')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-api-combine"></i><h3 class="font-semibold text-white">Combine 前向</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">核心 API</span>
+                    </div>
+                    <div id="api-combine-summary" class="mt-3">
+                        <div class="code-block">
+combined_x, _, event = buffer.combine(
+    x,                          <span class="text-slate-500"># expert output tensor</span>
+    handle,                     <span class="text-slate-500"># dispatch 返回的 handle (缓存路由信息)</span>
+    num_sms,                    <span class="text-slate-500"># SM 数量</span>
+    async_with_compute_stream=<span class="text-green-400">True</span>  <span class="text-slate-500"># 与计算 stream 重叠</span>
+)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('api-overlap')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-api-overlap"></i><h3 class="font-semibold text-white">通信-计算重叠</h3></div>
+                        <span class="text-xs bg-blue-700 px-2 py-1 rounded">async_with_compute_stream</span>
+                    </div>
+                    <div id="api-overlap-summary" class="mt-3"><p class="text-sm text-slate-300"><code>async_with_compute_stream=True</code> 使 DeepEP 的 dispatch/combine 与 GPU 计算 stream 重叠执行。DeepEP 内部使用 CUDA event 同步，确保数据传输和专家计算并发执行，隐藏通信延迟 <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></p></div>
+                    <div id="api-overlap-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-blue-300 mb-3"><i class="fas fa-cogs mr-2"></i>通信-计算重叠详细设计原理</h4>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>在 MoE 中，通信（dispatch/combine）和计算（expert GEMM）在同一个 GPU 上执行。如果串行执行（通信→计算→通信→计算），通信延迟会直接加到 total latency 中。但 GPU 有足够的 SM 资源同时执行通信 kernel 和计算 kernel——只要正确调度。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>(1) <em>CUDA Stream 模型：</em>PyTorch 默认使用一个 CUDA stream 做计算。当 async_with_compute_stream=True 时，DeepEP 的通信 kernel 也提交到同一个 stream（或通过 CUDA event 与 compute stream 同步）。(2) <em>硬件级重叠：</em>在 Hopper/Blackwell GPU 上，SM 可以同时调度不同的 kernel block。DeepEP 的通信 kernel 只占用 4-6 个 SM，剩余的 126-128 个 SM 可以同时执行 GEMM kernel。此外，GPU 的 copy engine（DMA engine）可以独立于 SM 执行数据传输，与 SM 上的计算并行。(3) <em>Event 同步：</em>DeepEP 返回的 CUDA event 可以在 PyTorch 侧用于同步——compute stream 等待 dispatch event 完成后再启动 expert GEMM，而 dispatch 的传输过程（由 copy engine 或空闲 SM 执行）与 compute stream 的其他操作重叠。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>所有 MoE 训练和推理场景。通信-计算重叠是 MoE 性能优化的关键——理想情况下通信完全被计算隐藏，total latency ≈ max(通信时间, 计算时间)。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Performance Tab ==================== -->
+        <section id="content-performance" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-perf px-3 py-1 rounded text-xs text-white">性能</span> DeepEP V2 性能基准数据</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('perf-benchmark')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-perf-benchmark"></i><h3 class="font-semibold text-white">官方 Benchmark 数据</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">8K tokens, hidden=7168, topk=8</span>
+                    </div>
+                    <div id="perf-benchmark-summary" class="mt-3">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-700">
+                                        <th class="text-left py-2 px-3 text-slate-400">架构</th>
+                                        <th class="text-left py-2 px-3 text-slate-400">NIC</th>
+                                        <th class="text-left py-2 px-3 text-slate-400">拓扑</th>
+                                        <th class="text-left py-2 px-3 text-slate-400">Dispatch 带宽</th>
+                                        <th class="text-left py-2 px-3 text-slate-400">Combine 带宽</th>
+                                        <th class="text-left py-2 px-3 text-slate-400">SM 数</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-300">
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3">SM90 (Hopper)</td>
+                                        <td class="py-2 px-3">CX7</td>
+                                        <td class="py-2 px-3">EP 8×2</td>
+                                        <td class="py-2 px-3 text-green-400">90 GB/s (RDMA)</td>
+                                        <td class="py-2 px-3 text-green-400">81 GB/s (RDMA)</td>
+                                        <td class="py-2 px-3">12</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3">SM90 (Hopper)</td>
+                                        <td class="py-2 px-3">CX7</td>
+                                        <td class="py-2 px-3">EP 8×4</td>
+                                        <td class="py-2 px-3 text-green-400">61 GB/s (RDMA)</td>
+                                        <td class="py-2 px-3 text-green-400">61 GB/s (RDMA)</td>
+                                        <td class="py-2 px-3">6</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3">SM100 (Blackwell)</td>
+                                        <td class="py-2 px-3">CX7</td>
+                                        <td class="py-2 px-3">EP 8×2</td>
+                                        <td class="py-2 px-3 text-green-400">90 GB/s (RDMA)</td>
+                                        <td class="py-2 px-3 text-green-400">91 GB/s (RDMA)</td>
+                                        <td class="py-2 px-3">12</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3">SM100 (Blackwell)</td>
+                                        <td class="py-2 px-3">—</td>
+                                        <td class="py-2 px-3">EP 8 (NVLink)</td>
+                                        <td class="py-2 px-3 text-green-400">726 GB/s (NVLink)</td>
+                                        <td class="py-2 px-3 text-green-400">740 GB/s (NVLink)</td>
+                                        <td class="py-2 px-3">64</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-800">
+                                        <td class="py-2 px-3">SM100 (Blackwell)</td>
+                                        <td class="py-2 px-3">—</td>
+                                        <td class="py-2 px-3">EP 8 (NVLink)</td>
+                                        <td class="py-2 px-3 text-green-400">643 GB/s (NVLink)</td>
+                                        <td class="py-2 px-3 text-green-400">675 GB/s (NVLink)</td>
+                                        <td class="py-2 px-3">24</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-3">数据来源: <a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>DeepEP GitHub README</a></p>
+                    </div>
+                    <div id="perf-benchmark-detail" class="hidden detail-section mt-4 pt-4 border-t border-slate-700">
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-medium text-green-300 mb-2"><i class="fas fa-chart-bar mr-2"></i>性能数据分析</h4>
+                                <ul class="space-y-2 text-sm text-slate-400">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>V2 vs V1：</strong>V2 达到 V1 1.3x 峰值性能，同时 SM 占用降低 4 倍（24 → 4-6 SM）</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>RDMA 扩展：</strong>EP 8×2（2 节点）RDMA dispatch 90 GB/s，EP 8×4（4 节点）降至 61 GB/s——跨节点增加带来带宽衰减，但在预期范围内</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong>NVLink 优势：</strong>SM100 节点内 NVLink dispatch 726 GB/s，combine 740 GB/s——接近 Blackwell NVLink 理论带宽的 80%+</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-info-circle text-blue-500 mt-1 flex-shrink-0"></i><span><strong>SM 数量权衡：</strong>64 SM 时 NVLink 带宽最高（740 GB/s），24 SM 时降至 675 GB/s。实际应用中可根据 GEMM 的 SM 需求调整通信 SM 数量</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('perf-scale')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-perf-scale"></i><h3 class="font-semibold text-white">大规模扩展能力</h3></div>
+                        <span class="text-xs bg-blue-700 px-2 py-1 rounded">支持 EP2048</span>
+                    </div>
+                    <div id="perf-scale-summary" class="mt-3"><p class="text-sm text-slate-300">DeepEP V2 支持最大 EP2048（2048 expert 并行域），相比 V1 的规模有显著提升。更大的 scale-up 和 scale-out 域支持，适配超大规模 MoE 模型训练 <a class="ref-link" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>GitHub</a></p></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Comparison Tab ==================== -->
+        <section id="content-comparison" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-compare px-3 py-1 rounded text-xs text-white">对比</span> DeepEP vs 竞品横向对比</h2>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm glass-card rounded-lg">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="text-left py-3 px-4 text-slate-400 font-medium">特性</th>
+                                <th class="text-left py-3 px-4 text-cyan-400 font-medium">DeepEP V2</th>
+                                <th class="text-left py-3 px-4 text-purple-400 font-medium">NCCL EP</th>
+                                <th class="text-left py-3 px-4 text-amber-400 font-medium">NVSHMEM</th>
+                                <th class="text-left py-3 px-4 text-blue-400 font-medium">UCCL-EP</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-300">
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">后端</td>
+                                <td class="py-2 px-4">NCCL Gin</td>
+                                <td class="py-2 px-4">NCCL GIN</td>
+                                <td class="py-2 px-4">NVSHMEM PGAS</td>
+                                <td class="py-2 px-4">Host Proxy (Rust)</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">设备发起</td>
+                                <td class="py-2 px-4 text-green-400">GPU (NCCL Gin)</td>
+                                <td class="py-2 px-4 text-green-400">GPU (NCCL GIN)</td>
+                                <td class="py-2 px-4 text-green-400">GPU (IBGDA)</td>
+                                <td class="py-2 px-4 text-amber-400">Host proxy</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">RDMA dispatch 带宽</td>
+                                <td class="py-2 px-4">90 GB/s (CX7)</td>
+                                <td class="py-2 px-4">匹配/超过 DeepEP</td>
+                                <td class="py-2 px-4">较低</td>
+                                <td class="py-2 px-4">116 Gbps (256 KiB)</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">NVLink dispatch 带宽</td>
+                                <td class="py-2 px-4">740 GB/s (SM100)</td>
+                                <td class="py-2 px-4">—</td>
+                                <td class="py-2 px-4">—</td>
+                                <td class="py-2 px-4">—</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">SM 占用</td>
+                                <td class="py-2 px-4 text-green-400">4-6 (同等性能)</td>
+                                <td class="py-2 px-4">—</td>
+                                <td class="py-2 px-4 text-red-400">较高</td>
+                                <td class="py-2 px-4">Host 端</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">EFA 支持</td>
+                                <td class="py-2 px-4 text-red-400">不支持</td>
+                                <td class="py-2 px-4 text-red-400">不支持</td>
+                                <td class="py-2 px-4 text-red-400">不支持</td>
+                                <td class="py-2 px-4 text-green-400">支持 (SRD)</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">API 复杂度</td>
+                                <td class="py-2 px-4 text-green-400">统一 ElasticBuffer</td>
+                                <td class="py-2 px-4 text-green-400">统一 ncclEpDispatch</td>
+                                <td class="py-2 px-4 text-red-400">PGAS 复杂</td>
+                                <td class="py-2 px-4 text-amber-400">中等</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">JIT 编译</td>
+                                <td class="py-2 px-4 text-green-400">全 JIT</td>
+                                <td class="py-2 px-4 text-red-400">预编译</td>
+                                <td class="py-2 px-4 text-red-400">预编译</td>
+                                <td class="py-2 px-4 text-red-400">预编译</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">最大 EP 规模</td>
+                                <td class="py-2 px-4">EP2048</td>
+                                <td class="py-2 px-4">—</td>
+                                <td class="py-2 px-4">—</td>
+                                <td class="py-2 px-4">—</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">低精度支持</td>
+                                <td class="py-2 px-4 text-green-400">FP8/BF16</td>
+                                <td class="py-2 px-4 text-green-400">FP8/BF16</td>
+                                <td class="py-2 px-4 text-amber-400">有限</td>
+                                <td class="py-2 px-4 text-amber-400">FP8 转换</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">MoE Decode 速度</td>
+                                <td class="py-2 px-4">73.8 tok/s (CX7, batch=2)</td>
+                                <td class="py-2 px-4">78.4 tok/s (超越)</td>
+                                <td class="py-2 px-4 text-red-400">较低</td>
+                                <td class="py-2 px-4 text-green-400">66.8 tok/s (EFA)</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 px-4 font-medium">License</td>
+                                <td class="py-2 px-4">MIT</td>
+                                <td class="py-2 px-4">BSD</td>
+                                <td class="py-2 px-4">BSD</td>
+                                <td class="py-2 px-4">Apache-2.0</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 px-4 font-medium">GPU 支持</td>
+                                <td class="py-2 px-4">SM90/SM100 + MORI 实验</td>
+                                <td class="py-2 px-4">SM90+</td>
+                                <td class="py-2 px-4">NVIDIA GPU</td>
+                                <td class="py-2 px-4 text-green-400">NVIDIA + AMD 异构</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">数据来源: <a class="ref-link cyan" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fas fa-external-link-alt"></i>DeepEP GitHub</a> <a class="ref-link" href="https://arxiv.org/html/2603.13606v3" target="_blank"><i class="fas fa-external-link-alt"></i>NCCL EP Paper</a> <a class="ref-link green" href="https://arxiv.org/html/2510.27656v2" target="_blank"><i class="fas fa-external-link-alt"></i>Low-Latency MoE Paper</a></p>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-balance-scale-right text-purple-400"></i> 各方案核心差异分析</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500">
+                        <h3 class="font-semibold text-cyan-400 mb-3"><i class="fas fa-rocket mr-2"></i>DeepEP V2 优势</h3>
+                        <ul class="space-y-2 text-sm text-slate-400">
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>极致性能：</strong>NVLink 740 GB/s dispatch/combine，RDMA 90 GB/s</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>极低 SM 占用：</strong>4-6 SM，释放 126+ SM 给 GEMM</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>零编译部署：</strong>JIT 运行时编译，pip install 即可</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>生产验证：</strong>DeepSeek-V3/R1 训练和推理已验证</span></li>
+                        </ul>
+                    </div>
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-red-500">
+                        <h3 class="font-semibold text-red-400 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>DeepEP V2 局限</h3>
+                        <ul class="space-y-2 text-sm text-slate-400">
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1 flex-shrink-0"></i><span><strong>EFA 不支持：</strong>仅支持 InfiniBand/RoCE，不支持 AWS EFA</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1 flex-shrink-0"></i><span><strong>ConnectX 绑定：</strong>NCCL Gin 依赖特定 NIC 能力</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1 flex-shrink-0"></i><span><strong>Buffer 消耗增大：</strong>V2 比 V1 需要更多 GPU 内存</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1 flex-shrink-0"></i><span><strong>生态孤立：</strong>独立于 NCCL 标准 collective 栈</span></li>
+                        </ul>
+                    </div>
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500">
+                        <h3 class="font-semibold text-purple-400 mb-3"><i class="fas fa-microchip mr-2"></i>NCCL EP 优势</h3>
+                        <ul class="space-y-2 text-sm text-slate-400">
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>统一栈：</strong>与 NCCL all-reduce/broadcast 共享 communicator</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>拓扑感知：</strong>复用 NCCL 的硬件拓扑检测</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>弹性容错：</strong>继承 NCCL 的 fault-tolerance</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>内存效率：</strong>比 DeepEP 原始 buffer layout 减少一个数量级</span></li>
+                        </ul>
+                    </div>
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500">
+                        <h3 class="font-semibold text-blue-400 mb-3"><i class="fas fa-globe mr-2"></i>UCCL-EP 优势</h3>
+                        <ul class="space-y-2 text-sm text-slate-400">
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>EFA 支持：</strong>唯一支持 AWS EFA (SRD 协议) 的高性能方案</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>异构 GPU：</strong>同时支持 NVIDIA 和 AMD GPU</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>可移植性：</strong>Host proxy 架构，不依赖特定 NIC 能力</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1 flex-shrink-0"></i><span><strong>RL 权重传输：</strong>万亿参数模型权重传输仅 1.3 秒</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Trends Tab ==================== -->
+        <section id="content-trends" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-trend px-3 py-1 rounded text-xs text-white">趋势</span> MoE 通信库技术趋势展望</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500">
+                        <h3 class="font-semibold text-cyan-400 mb-3"><i class="fas fa-bolt mr-2"></i>短期趋势 (3-6 个月)</h3>
+                        <ul class="space-y-3 text-sm text-slate-300">
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-cyan-500 mt-1 flex-shrink-0"></i><span><strong>NCCL EP 持续追赶：</strong>NCCL EP 论文（arXiv:2603.13606）已展示在低延迟 dispatch 上匹配/超过 DeepEP 的性能。预计 NVIDIA 会在后续版本中集成 ncclEpDispatch/ncclEpCombine 原语，形成 DeepEP 的直接竞争对手</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-cyan-500 mt-1 flex-shrink-0"></i><span><strong>UCCL-EP EFA 生态：</strong>UCCL-EP 在 EFA 支持上的独特优势将推动 AWS 生态的 MoE 训练。ConnectX 到 EFA 的 bridge 需求持续增长</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-cyan-500 mt-1 flex-shrink-0"></i><span><strong>0 SM 模式成熟：</strong>DeepEP 的 0 SM Engram/PP/CP 实验分支将逐步成熟，最终合并到主线——完全消除通信 SM 占用</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-cyan-500 mt-1 flex-shrink-0"></i><span><strong>MegaMoE 融合：</strong>DeepGEMM 的 MegaMoE（dispatch+GEMM+combine 单 kernel）将继续发展，推动通信和计算的深度融合</span></li>
+                        </ul>
+                    </div>
+                    <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500">
+                        <h3 class="font-semibold text-purple-400 mb-3"><i class="fas fa-telescope mr-2"></i>中期趋势 (6-18 个月)</h3>
+                        <ul class="space-y-3 text-sm text-slate-300">
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-purple-500 mt-1 flex-shrink-0"></i><span><strong>统一通信栈：</strong>NCCL + NIXL + NVSHMEM 的分层定位将逐渐清晰——NCCL 负责标准 collective，NIXL 负责跨框架数据移动，NVSHMEM 负责 fine-grained RMA。DeepEP 可能被 NCCL EP 吸收为原生原语</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-purple-500 mt-1 flex-shrink-0"></i><span><strong>异构通信：</strong>随着 AMD MI300/MI400 系列和 Intel GPU 的竞争，跨厂商 GPU 的 MoE 通信需求增加。UCCL-EP 的异构方案将成为重要选项</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-purple-500 mt-1 flex-shrink-0"></i><span><strong>FP4 普及：</strong>DeepGEMM 已提出 FP4 (E2M1) activation dispatch。随着 Blackwell 原生支持 FP4，FP4 dispatch 将成为标准配置</span></li>
+                            <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-purple-500 mt-1 flex-shrink-0"></i><span><strong>推理优先：</strong>MoE 推理（vLLM + DeepEP）将比训练更快采纳新通信优化——推理对延迟更敏感，且部署环境更标准化</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-line text-green-400"></i> 竞争格局总结</h2>
+                <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+                    <p>DeepEP V2 目前代表 MoE Expert Parallel 通信的最高性能标杆——NVLink 740 GB/s、RDMA 90 GB/s、SM 占用仅 4-6 个。但它面临着来自两个方向的竞争压力：</p>
+                    <p>一方面，<strong class="text-purple-400">NCCL EP</strong> 以统一通信栈为核心优势（与 NCCL 共享 communicator、拓扑感知、容错），性能已接近甚至在某些场景超过 DeepEP，预计将成为 NVIDIA 的官方 MoE 通信方案。</p>
+                    <p>另一方面，<strong class="text-blue-400">UCCL-EP</strong> 以 EFA 支持和异构 GPU 能力开辟了差异化赛道，为 AWS 生态和跨厂商部署提供了 DeepEP 无法覆盖的选项。</p>
+                    <p>整体而言，MoE 通信领域正从"DeepEP 一家独大"向"多方案分层竞争"演进——极致性能选 DeepEP，统一栈选 NCCL EP，异构/EFA 选 UCCL-EP，深度融合选 MegaMoE。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="max-w-7xl mx-auto px-4 pb-8">
+        <div class="glass-card rounded-xl p-6 text-center text-sm text-slate-500">
+            <p>DeepEP 技术深度报告 | 基于 GitHub 源码、官方文档、第三方分析综合整理</p>
+            <p class="mt-1">数据来源: <a href="https://github.com/deepseek-ai/DeepEP" target="_blank" class="text-cyan-400">DeepEP GitHub</a> · <a href="https://arxiv.org/html/2603.13606v3" target="_blank" class="text-cyan-400">NCCL EP Paper</a> · <a href="https://arxiv.org/html/2510.27656v2" target="_blank" class="text-cyan-400">Low-Latency MoE Paper</a> · <a href="https://deepep.org/" target="_blank" class="text-cyan-400">deepep.org</a></p>
+            <p class="mt-1">生成时间: 2026-05-25</p>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            const tabs = ['overview', 'architecture', 'dispatch', 'combine', 'api', 'performance', 'comparison', 'trends'];
+            tabs.forEach(t => {
+                const content = document.getElementById('content-' + t);
+                const tab = document.getElementById('tab-' + t);
+                if (t === tabName) {
+                    content.classList.remove('hidden');
+                    tab.classList.remove('tab-inactive');
+                    tab.classList.add('tab-active');
+                } else {
+                    content.classList.add('hidden');
+                    tab.classList.remove('tab-active');
+                    tab.classList.add('tab-inactive');
+                }
+            });
+        }
+
+        function toggleDetail(id) {
+            const summary = document.getElementById(id + '-summary');
+            const detail = document.getElementById(id + '-detail');
+            const icon = document.getElementById('icon-' + id);
+            if (detail.classList.contains('hidden')) {
+                detail.classList.remove('hidden');
+                icon.classList.add('expanded');
+            } else {
+                detail.classList.add('hidden');
+                icon.classList.remove('expanded');
+            }
+        }
+
+        function toggleFeatureDetail(featureId) {
+            const el = document.getElementById('feature-' + featureId);
+            const icon = document.getElementById('icon-feature-' + featureId);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                icon.classList.add('expanded');
+            } else {
+                el.classList.add('hidden');
+                icon.classList.remove('expanded');
+            }
+        }
+    </script>
+</body>
+</html>

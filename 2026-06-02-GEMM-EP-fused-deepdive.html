@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEMM-EP Fused 技术深度调研 - 通信计算并行</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .badge-paper { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .badge-patent { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .badge-lib { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .badge-tech { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .badge-compare { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .badge-trend { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        .metric-card { background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); }
+        .update-card { transition: all 0.3s ease; }
+        .update-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .detail-section { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        .ref-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-radius: 4px; text-decoration: none; margin-left: 6px; white-space: nowrap; transition: all 0.15s; }
+        .ref-link:hover { background: rgba(59, 130, 246, 0.3); }
+        .ref-link.green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .ref-link.green:hover { background: rgba(16, 185, 129, 0.3); }
+        .ref-link.cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; }
+        .ref-link.cyan:hover { background: rgba(6, 182, 212, 0.3); }
+        .ref-link.purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .ref-link.purple:hover { background: rgba(139, 92, 246, 0.3); }
+        .ref-link.amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .ref-link.amber:hover { background: rgba(245, 158, 11, 0.3); }
+        .ref-link.red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .ref-link.red:hover { background: rgba(239, 68, 68, 0.3); }
+        .ref-link.blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .ref-link.blue:hover { background: rgba(59, 130, 246, 0.3); }
+        .feature-expand-btn { cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 11px; flex-shrink: 0; }
+        .feature-expand-btn:hover { background: rgba(59, 130, 246, 0.15); }
+        .feature-expand-icon { transition: transform 0.3s ease; display: inline-block; font-size: 10px; }
+        .feature-expand-icon.expanded { transform: rotate(90deg); }
+        .feature-detail { animation: slideDown 0.3s ease-out; }
+        .feature-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
+        .code-block { font-family: 'JetBrains Mono', monospace; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.6; overflow-x: auto; }
+        .table-row-hover:hover { background: rgba(59, 130, 246, 0.1); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="text-slate-200">
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-violet-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-layer-group text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">GEMM-EP Fused 技术深度调研</h1>
+                        <p class="text-xs text-slate-400">GEMM 与 Expert Parallel 通信计算并行 · 论文 · 专利 · 通信库实现 | 2026-06-02</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="metric-card px-4 py-2 rounded-lg">
+                        <div class="text-2xl font-bold text-violet-400">13+</div>
+                        <div class="text-xs text-slate-400">论文/专利/库</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('overview')" id="tab-overview" class="tab-active px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-chart-line"></i> 总览与分类
+            </button>
+            <button onclick="showTab('papers')" id="tab-papers" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-file-alt"></i> 论文 <span class="ml-1 bg-blue-500/20 text-blue-400 text-xs px-1.5 py-0.5 rounded">10篇</span>
+            </button>
+            <button onclick="showTab('patents')" id="tab-patents" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-lightbulb"></i> 专利
+            </button>
+            <button onclick="showTab('libs')" id="tab-libs" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-code"></i> 通信库 <span class="ml-1 bg-green-500/20 text-green-400 text-xs px-1.5 py-0.5 rounded">6个</span>
+            </button>
+            <button onclick="showTab('techniques')" id="tab-techniques" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-cogs"></i> 技术详解
+            </button>
+            <button onclick="showTab('comparison')" id="tab-comparison" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-balance-scale"></i> 对比表
+            </button>
+            <button onclick="showTab('trends')" id="tab-trends" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-rocket"></i> 趋势展望
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <!-- ==================== Overview Tab ==================== -->
+        <section id="content-overview" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-file-alt text-blue-400"></i></div>
+                        <div class="text-sm text-slate-400">核心论文</div>
+                    </div>
+                    <div class="text-3xl font-bold text-blue-400">10</div>
+                    <div class="text-xs text-slate-500 mt-1">MegaScale-MoE / NCCL EP / Comet / Hybrid-EP / SonicMoE / ClusterFusion / X-MoE / Lancet / Megatron Core / Triton GEMM</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-code text-green-400"></i></div>
+                        <div class="text-sm text-slate-400">通信库实现</div>
+                    </div>
+                    <div class="text-3xl font-bold text-green-400">6</div>
+                    <div class="text-xs text-slate-500 mt-1">NCCL EP / DeepEP / DeepGEMM / Hybrid-EP / NIXL / NeMo Megatron</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-lightbulb text-amber-400"></i></div>
+                        <div class="text-sm text-slate-400">专利 & 行业</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">30+</div>
+                    <div class="text-xs text-slate-500 mt-1">MoE 通信相关专利（Google / NVIDIA / Meta / 国内高校）</div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-sitemap text-violet-400"></i> GEMM-EP Fused 三大技术分类</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-card rounded-lg p-5 border-t-4 border-blue-500">
+                        <h3 class="font-semibold text-blue-300 mb-3"><i class="fas fa-random mr-2"></i>分类 1: 计算-通信 Overlap（流水线）</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-3">Dispatch/Combine 与 GEMM 在不同 CUDA stream 或 thread block 中并行执行。GPU 同时进行计算和网络传输。</p>
+                        <ul class="text-xs text-slate-500 space-y-1">
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>代表：MegaScale-MoE, Comet, Lancet</li>
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>核心：tile-level barrier + double buffer</li>
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>延迟隐藏率：86.5% (Comet)</li>
+                        </ul>
+                    </div>
+                    <div class="glass-card rounded-lg p-5 border-t-4 border-green-500">
+                        <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-puzzle-piece mr-2"></i>分类 2: 算子 Fused（单一 kernel）</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-3">将 Dispatch + GEMM + SwiGLU + Combine 融合为单个 CUDA kernel，消除 kernel launch 和中间 buffer 开销。</p>
+                        <ul class="text-xs text-slate-500 space-y-1">
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>代表：DeepGEMM Mega MoE, SonicMoE, ClusterFusion</li>
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>核心：FP8 tensor core + NVLink symmetric buffer</li>
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>峰值性能：1550 TFLOPS (H800)</li>
+                        </ul>
+                    </div>
+                    <div class="glass-card rounded-lg p-5 border-t-4 border-cyan-500">
+                        <h3 class="font-semibold text-cyan-300 mb-3"><i class="fas fa-project-diagram mr-2"></i>分类 3: 通信感知优化（算法层）</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-3">在 MoE 路由、token 放置、expert 分组等算法层面优化，减少通信量或提升通信效率。</p>
+                        <ul class="text-xs text-slate-500 space-y-1">
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>代表：Occult, X-MoE, NCCL EP</li>
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>核心：expert placement + redundancy bypass</li>
+                            <li><i class="fas fa-check text-green-500 mr-1"></i>all-to-all 延迟减少：50.7% (X-MoE)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-blue-400"></i> 关键技术演进时间线</h2>
+                <div class="h-80"><canvas id="timelineChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ==================== Papers Tab ==================== -->
+        <section id="content-papers" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-paper px-3 py-1 rounded text-xs text-white">论文</span> GEMM-EP Fused 核心论文</h2>
+
+                <!-- MegaScale-MoE -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-mega')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-mega"></i><h3 class="font-semibold text-white">MegaScale-MoE: 大规模通信高效 MoE 训练</h3></div>
+                        <span class="text-xs bg-blue-700 px-2 py-1 rounded">arxiv 2505.11432 | 字节跳动</span>
+                    </div>
+                    <div id="paper-mega-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-blue-400">核心:</strong> 实现两类 Overlap 内核：all-gather+scatter+GroupedGEMM 融合和 all-to-all+GroupedGEMM 融合。使用 tile-level barrier 实现通信与计算的细粒度流水线，迭代时间降低 7.1%-12.9%。</p><a class="ref-link blue" href="https://arxiv.org/html/2505.11432v3" target="_blank"><i class="fas fa-external-link-alt"></i>论文原文</a> <a class="ref-link" href="https://arxiv.org/pdf/2505.11432" target="_blank"><i class="fas fa-file-pdf"></i>PDF</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('mega')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-mega"></i>设计原理</span></div>
+                    <div id="feature-mega" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-blue-500/20">
+                        <h5 class="text-sm font-medium text-blue-300 mb-3"><i class="fas fa-cogs mr-2"></i>MegaScale-MoE GEMM-EP 融合详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>MoE 训练中，每层需要执行 Dispatch（token 路由到 expert）→ GEMM（expert 计算）→ Combine（结果聚合）三个操作。传统实现中这三个操作串行执行：Dispatch 完成所有 token 传输后才开始 GEMM，GEMM 完成所有 expert 计算后才开始 Combine。这导致 GPU 的 Tensor Core 和网络 NIC 无法同时工作，通信时间完全浪费。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Tile-level Barrier：</em>将输入 tensor 切分为多个 tile（如 128x128 的小块），每个 tile 独立管理通信和计算状态。GPU 使用 warp-level barrier 同步——当一个 tile 的通信完成后，立即触发该 tile 的计算，无需等待其他 tile。这实现了 tile 粒度的流水线。(2) <em>All-gather+Scatter+GroupedGEMM 融合：</em>传统 GroupedGEMM 需要先将所有 expert 的输入 all-gather 到每个 GPU，然后 scatter 到各自的 expert。MegaScale 将 all-gather 的每个 slice 与 scatter+GEMM 融合——每次 all-gather 接收一个 slice 后，立即对已接收的数据执行 scatter 和 GEMM，无需等待完整 all-gather。(3) <em>Token 重排序：</em>为 GroupedGEMM 重新排列 token 顺序，最小化跨 rank 的依赖——同一 GPU 上的 token 优先计算，跨 GPU 的 token 在通信完成后计算。这减少了 barrier 等待时间。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>在 352B MoE 模型上，相比 Megatron-LM 基线，迭代时间降低 7.1%-12.9%；combined operator（all-gather+scatter+GEMM）加速 1.2-4.7x；在 128 GPU 上达到 1.88x 整体加速。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) 大规模 MoE 训练——128+ GPU 的集群效果最佳；(2) 高通信带宽场景——NVLink/IB 带宽充足时 overlap 效果更好；(3) 深 MoE 模型——层数越多，每层节省的时间累积越大。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NCCL EP -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-nccl-ep')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-nccl-ep"></i><h3 class="font-semibold text-white">NCCL EP: 统一 Expert Parallel 通信 API</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">arxiv 2603.13606 | NVIDIA</span>
+                    </div>
+                    <div id="paper-nccl-ep-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-green-400">核心:</strong> NVIDIA 推出 NCCL EP 统一 API，融合 DeepEP（低延迟 LL）和 Hybrid-EP（高吞吐 HT）内核。通过 staged execution（send_only=1）实现 GEMM 与 dispatch/combine 的 overlap。内存占用比 DeepEP 降低 ~14x。</p><a class="ref-link green" href="https://arxiv.org/html/2603.13606v1" target="_blank"><i class="fas fa-external-link-alt"></i>论文原文</a> <a class="ref-link" href="https://www.cnblogs.com/mumujun12345/p/19818841" target="_blank"><i class="fas fa-external-link-alt"></i>中文解读</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nccl-ep')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nccl-ep"></i>设计原理</span></div>
+                    <div id="feature-nccl-ep" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-green-500/20">
+                        <h5 class="text-sm font-medium text-green-300 mb-3"><i class="fas fa-cogs mr-2"></i>NCCL EP GEMM-EP 融合详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>MoE 训练/推理中，dispatch 和 combine 是两个 all-to-all 通信操作。传统 NCCL 的 ncclAllToAll 是同步阻塞的——通信完成前无法执行 GEMM。DeepEP 虽然提供了非阻塞的 dispatch/combine，但依赖 NVSHMEM 后端（v1）或 NCCL GIN（v2），与标准 NCCL API 不兼容。NCCL EP 的目标是在 NCCL 生态内提供统一的 EP API。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>双层内核架构：</em>NCCL EP 融合两种内核设计——LL（Low-Latency）模式使用 full all-to-all mesh + double-buffering，通过 NCCL GIN 实现 GPU-initiated RDMA；HT（High-Throughput）模式使用 hierarchical aggregation（先 NVLink 域内聚合，再 inter-node RDMA），采用 warp-specialized persistent kernel（不同 warp 负责 load/network/store）。(2) <em>Staged Execution：</em>API 层面，ncclEpDispatch 支持 send_only=1 标志——先发起网络传输（send），然后 GPU 立即执行 GEMM（计算已到达的 token），最后再执行 receive。这使得 GEMM 与网络传输完全 overlap。(3) <em>Handle 复用：</em>训练场景中，同一个 dispatch handle 在 forward 和 backward 之间复用——forward 的 routing 信息（topk_idx, token 分布）被缓存，backward 直接使用，避免重新计算 routing。</div>
+                            <div><strong class="text-slate-300">GEMM-EP Overlap 流水线：</strong>LL 模式：<code>dispatch(send_only=1) → GEMM(local tokens) → dispatch(complete) → GEMM(remote tokens) → combine</code>。HT 模式：micro-batch 流水线——dispatch(micro-batch-0) → combine(micro-batch-0) || dispatch(micro-batch-1) → combine(micro-batch-1)。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>LL Dispatch：多节点（2-8）持平或超过 DeepEP；单节点略低约 4%。LL Combine：1-4 节点落后 DeepEP 5-12%，8 节点收敛。vLLM 集成：端到端吞吐比 DeepEP+NVSHMEM 低 7-10%。内存：LL 内核设计实现内存占用降低 ~14x。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) 训练——NCCL EP 的 handle 复用在训练中效果显著，避免每次 forward/backward 重新 routing；(2) 推理——micro-batch 流水线适合 decode 阶段的小 batch 推理；(3) 可移植性——替换 NVSHMEM/IBGDA 后端为 NCCL GIN，跨平台兼容性更好。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comet -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-violet-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-comet')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-comet"></i><h3 class="font-semibold text-white">Comet: 细粒度计算-通信重叠</h3></div>
+                        <span class="text-xs bg-violet-700 px-2 py-1 rounded">arxiv 2502.19811 | 清华大学</span>
+                    </div>
+                    <div id="paper-comet-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-violet-400">核心:</strong> 使用 shared tensor decomposition 实现细粒度 GEMM-通信重叠。Layer0 按 source rank 重排 token，Layer1 按 column-wise 计算，隐藏 86.5% 通信延迟。自适应 thread block 分配，layer 加速 1.96x，端到端加速 1.71x。</p><a class="ref-link purple" href="https://arxiv.org/html/2502.19811v2" target="_blank"><i class="fas fa-external-link-alt"></i>论文原文</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('comet')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-comet"></i>设计原理</span></div>
+                    <div id="feature-comet" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-violet-500/20">
+                        <h5 class="text-sm font-medium text-violet-300 mb-3"><i class="fas fa-cogs mr-2"></i>Comet GEMM-通信重叠详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>传统 MoE 的 GEMM-通信 overlap 是粗粒度的——整个 dispatch 完成后再开始 GEMM，或整个 GEMM 完成后再开始 combine。这导致 overlap 效率低下：(1) dispatch 的尾延迟（straggler）阻塞整个 GEMM；(2) GEMM 的最后一个 token 计算完成后才触发 combine。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Shared Tensor Decomposition：</em>将 MoE 的输入 tensor 按 source rank（token 来自哪个 GPU）和 expert（token 要去哪个 expert）两个维度分解为多个 sub-tensor。每个 sub-tensor 独立管理通信和计算状态。(2) <em>Layer0 优化（Dispatch 侧）：</em>按 source rank 重排 token——先处理已到达的 token（来自本地 GPU），后处理未到达的 token（来自远程 GPU）。这样 GEMM 可以先计算本地 token，远程 token 的通信与本地计算 overlap。(3) <em>Layer1 优化（Combine 侧）：</em>按 column-wise 计算——GEMM 的每个输出列独立，先完成的列立即触发对应的 combine 传输，无需等待整行计算完成。(4) <em>自适应 Thread Block 分配：</em>根据每个 expert 的 token 数量动态分配 CUDA thread block——token 多的 expert 分配更多 thread block，避免 thread block 饥饿。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>隐藏 86.5% 通信延迟；layer 级加速 1.96x；端到端训练加速 1.71x。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) 训练场景——forward 和 backward 都需要 dispatch/combine，Comet 的两层优化同时适用；(2) 高通信延迟环境——inter-node 通信延迟高时，细粒度 overlap 收益更大；(3) 不均匀 token 分布——MoE 的 token 分布天然不均匀，自适应 thread block 分配减少负载不均衡。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hybrid-EP -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-emerald-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-hybrid')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-hybrid"></i><h3 class="font-semibold text-white">Hybrid-EP: NVIDIA 混合 Expert Parallel 通信</h3></div>
+                        <span class="text-xs bg-emerald-700 px-2 py-1 rounded">NVIDIA Blog | 2025</span>
+                    </div>
+                    <div id="paper-hybrid-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-emerald-400">核心:</strong> Hybrid-EP 将 GEMM 与 EP 通信融合，使用 CUDA block 实现计算-通信 overlap。在 DeepSeek-V3 上实现 514% 吞吐提升，仅用 416 SM 即可饱和带宽。在 DGX Hopper 和 Grace Blackwell 上验证。</p><a class="ref-link green" href="https://developer.nvidia.com/blog/optimizing-communication-for-mixture-of-experts-training-with-hybrid-expert-parallel/" target="_blank"><i class="fas fa-external-link-alt"></i>NVIDIA Blog</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('hybrid')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-hybrid"></i>设计原理</span></div>
+                    <div id="feature-hybrid" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-emerald-500/20">
+                        <h5 class="text-sm font-medium text-emerald-300 mb-3"><i class="fas fa-cogs mr-2"></i>Hybrid-EP GEMM-EP 融合详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>传统 MoE EP 通信使用独立的 NCCL all-to-all kernel，完全占用 SM（通常 64-128 SM），导致 GEMM 无法同时进行。在 DeepSeek-V3 这样的大规模 MoE（256 experts, top-8）中，每层两次 all-to-all 的通信时间占总时间的 40-60%。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Warp-Specialized Persistent Kernel：</em>Hybrid-EP 使用 persistent kernel 设计——一个长期运行的 CUDA kernel 占据固定数量的 SM（如 416 个 SM 中的 64 个），内部使用 warp specialization：部分 warp 负责从 shared memory 加载 token（load warp），部分 warp 负责 RDMA 传输（network warp），部分 warp 负责写入结果（store warp）。这种设计使通信和计算在同一 kernel 内 overlap。(2) <em>Hierarchical Aggregation：</em>在 NVLink 域内先做 local aggregation（多个 GPU 的 token 在域内聚合），减少 inter-node 传输量。例如 8 GPU 节点中，先将 8 个 GPU 的 token 通过 NVLink 聚合到 2 个 GPU 上，再通过 IB 发送到其他节点——IB 传输量减少 4x。(3) <em>CUDA Block 级 Overlap：</em>将 GEMM 按 CUDA block 切分，每个 CUDA block 的 GEMM 完成后立即触发对应的通信——而非整个 GEMM 完成后才触发。这实现了 block 粒度的流水线。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>DeepSeek-V3 吞吐提升 514%；仅 416 SM 即可饱和网络带宽；DGX Hopper 和 Grace Blackwell 双平台验证。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) 大规模 MoE 训练——256+ experts 的场景；(2) 多节点训练——inter-node 通信是瓶颈时，hierarchical aggregation 效果显著；(3) Blackwell 架构——Grace Blackwell 的 NVLink 5.0 使 hierarchical aggregation 更高效。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SonicMoE -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-rose-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-sonic')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-sonic"></i><h3 class="font-semibold text-white">SonicMoE: Blackwell IO 与 Tile-aware 优化</h3></div>
+                        <span class="text-xs bg-rose-700 px-2 py-1 rounded">tridao.me | 2026</span>
+                    </div>
+                    <div id="paper-sonic-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-rose-400">核心:</strong> SonicMoE 利用 Blackwell 的 TMEM double-buffering 隐藏 IO/compute 延迟，将 gather 操作融合进 GEMM 减少 24% HBM 流量。使用 CLC schedulers 和 2CTA MMA，在 B300 上比 DeepGEMM 高 54-35% TFLOPS。</p><a class="ref-link red" href="https://tridao.me/blog/2026/sonicmoe-blackwell/" target="_blank"><i class="fas fa-external-link-alt"></i>SonicMoE Blog</a> <a class="ref-link" href="https://openreview.net/forum?id=KzTJ1raEgB" target="_blank"><i class="fas fa-external-link-alt"></i>OpenReview</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('sonic')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-sonic"></i>设计原理</span></div>
+                    <div id="feature-sonic" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-rose-500/20">
+                        <h5 class="text-sm font-medium text-rose-300 mb-3"><i class="fas fa-cogs mr-2"></i>SonicMoE GEMM-EP 融合详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>Blackwell 架构引入了 TMEM（Tensor Memory）——一种专用的 SRAM 用于存储 GEMM 的中间结果。但 TMEM 的容量有限，当 MoE 的 expert 数量多（如 256 experts）时，每个 expert 的权重矩阵需要分多次加载到 TMEM，导致 IO 瓶颈。传统 GroupedGEMM 在每个 expert 的 GEMM 之间没有 overlap IO 和 compute。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>TMEM Double-Buffering：</em>使用两个 TMEM buffer——buffer A 正在被 tensor core 计算时，buffer B 同时在加载下一个 expert 的权重。这隐藏了 HBM → TMEM 的加载延迟。(2) <em>Gather-Fused GEMM：</em>传统流程是 dispatch → gather（将 token 从各 GPU 收集到本地）→ GEMM。SonicMoE 将 gather 融合进 GEMM 的 prologue——在加载 A 矩阵（token）时直接通过 NVLink 从远程 GPU gather，而非先全部 gather 到本地再计算。这减少 24% HBM 流量（因为 gather 的数据直接进 shared memory 而非 HBM）。(3) <em>CLC Scheduler + 2CTA MMA：</em>Blackwell 的 CLC（Cluster Level Compute）scheduler 允许一个 CTA cluster 内的多个 CTA 协同工作。SonicMoE 使用 2CTA MMA——两个 CTA 共同完成一个 GEMM tile，提升 tensor core 利用率。(4) <em>Epilogue 优化：</em>对于 dH（hidden 维度梯度）等重型 epilogue，利用 Blackwell 的 double-buffering 隐藏 epilogue 延迟。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>B300 上比 DeepGEMM 高 54-35% TFLOPS；HBM 流量减少 24%；TFLOPS 仅下降 11%（vs 理论峰值）。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) Blackwell GPU——B200/B300 专属优化，Hopper 架构不适用；(2) 大规模 MoE 推理——256 experts 的场景，IO 是主要瓶颈；(3) FP4/FP8 精度——SonicMoE 支持 Blackwell 的 NVFP4 精度。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ClusterFusion -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-teal-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-cluster')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-cluster"></i><h3 class="font-semibold text-white">ClusterFusion: 集群级 Collective 算子融合</h3></div>
+                        <span class="text-xs bg-teal-700 px-2 py-1 rounded">NeurIPS 2025</span>
+                    </div>
+                    <div id="paper-cluster-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-teal-400">核心:</strong> 通过 ClusterReduce/Gather 将 QKV、Attention、Output 的 GEMM 与 all-reduce/all-gather 融合为单一算子。利用 H100 的 DSMEM（Distributed Shared Memory）实现集群级通信。加速 1.61x vs SOTA。</p><a class="ref-link cyan" href="https://arxiv.org/html/2508.18850v1" target="_blank"><i class="fas fa-external-link-alt"></i>论文原文</a> <a class="ref-link" href="https://github.com/xinhao-luo/ClusterFusion" target="_blank"><i class="fab fa-github"></i>GitHub</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('cluster')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-cluster"></i>设计原理</span></div>
+                    <div id="feature-cluster" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-teal-500/20">
+                        <h5 class="text-sm font-medium text-teal-300 mb-3"><i class="fas fa-cogs mr-2"></i>ClusterFusion GEMM-Collective 融合详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>传统 Transformer 中，QKV projection → Attention → Output projection 之间需要 all-reduce（TP）或 all-gather（SP）通信。每次通信都是独立的 kernel launch，引入 kernel launch overhead（~5μs）和全局内存往返（HBM write then read）。在 decode 阶段，由于 batch size 小，GEMM 的算术强度低，通信时间占比高达 30-50%。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>ClusterReduce：</em>将 all-reduce 融合进 GEMM 的 epilogue——GEMM 的每个输出 tile 计算完成后，立即通过 DSMEM 与其他 GPU 的对应 tile 做 reduce，而非写入 HBM 后再 all-reduce。这消除了 HBM 的中间写入。(2) <em>ClusterGather：</em>将 all-gather 融合进 GEMM 的 prologue——GEMM 在加载输入时直接通过 DSMEM 从其他 GPU gather 需要的 slice，而非先 all-gather 到本地 HBM。(3) <em>DSMEM 利用：</em>H100 的 NVLink 支持 GPU 之间的 distributed shared memory（DSMEM）——一个 GPU 的 shared memory 可以被另一个 GPU 直接访问。ClusterFusion 利用 DSMEM 实现 GPU 之间的细粒度通信，避免了 HBM 的中间存储。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) LLM 推理——decode 阶段 batch size 小，GEMM 算术强度低，融合收益大；(2) Tensor Parallel 训练——TP 中的 all-reduce 可以通过 ClusterReduce 融合；(3) MLA（Multi-head Latent Attention）——DeepSeek 的 MLA 需要特殊的 all-gather 模式，ClusterFusion 支持 MLA。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- X-MoE -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-xmoe')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-xmoe"></i><h3 class="font-semibold text-white">X-MoE: 可扩展 MoE 训练通信优化</h3></div>
+                        <span class="text-xs bg-amber-700 px-2 py-1 rounded">arxiv 2508.13337</span>
+                    </div>
+                    <div id="paper-xmoe-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-amber-400">核心:</strong> 三大技术：Padding-Free Token 存储消除 zero-padding 通信；Redundancy-Bypassing Dispatch 仅发送 pilot token 跨节点再本地复制；Sequence-Sharded MoE Blocks 将序列分片减少 dispatch/combine 内存。All-to-all 延迟降低 50.7%，吞吐提升 1.42x。</p><a class="ref-link amber" href="https://arxiv.org/html/2508.13337v1" target="_blank"><i class="fas fa-external-link-alt"></i>论文原文</a> <a class="ref-link" href="https://github.com/Supercomputing-System-AI-Lab/X-MoE" target="_blank"><i class="fab fa-github"></i>GitHub</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('xmoe')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-xmoe"></i>设计原理</span></div>
+                    <div id="feature-xmoe" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-amber-500/20">
+                        <h5 class="text-sm font-medium text-amber-300 mb-3"><i class="fas fa-cogs mr-2"></i>X-MoE 通信优化详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>传统 MoE 系统中，token 需要 padding 到固定大小（为了对齐 GEMM 的 tile size），导致大量 zero-padding 通信（发送无用的 0 数据）。同时，dispatch 需要将所有 token 通过 all-to-all 发送到目标 expert 所在的 GPU，即使某些 token 的目标 expert 在本地 GPU 上已有副本。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Padding-Free Token (PFT) 存储：</em>使用 cross-platform Triton kernel 实现变长 token 存储——token 之间无 padding，紧密排列。通信时只发送有效 token 数据，消除 zero-padding 的带宽浪费。(2) <em>Redundancy-Bypassing Dispatch (RBD)：</em>在 MoE 中，top-k routing 意味着每个 token 被发送到 k 个 expert。如果多个 expert 在同一 GPU 上（如 EP size < total experts），传统方案会将 token 复制 k 份分别发送。RBD 只发送 1 份 "pilot token" 到目标 GPU，目标 GPU 收到后在本地复制 k 份——跨节点通信量减少 k/x（x 为本地 expert 数）。(3) <em>Sequence-Sharded MoE Blocks (SSMB)：</em>在 MoE 层内将序列维度分片到多个 GPU——每个 GPU 只处理序列的 1/TP_size 部分。这减少了 dispatch/combine 的内存占用（因为每个 GPU 只需要存储部分 token 的 routing 信息）。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>在 1024 AMD MI250X GPU 上扩展到 545B 参数——比先前系统大 10x。All-to-all 延迟降低 50.7%；RBD 减少 52.5% dispatch 时间；吞吐提升 1.42x。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) 超大规模 MoE——500B+ 参数，1000+ GPU；(2) AMD GPU 集群——X-MoE 基于 Triton，跨平台兼容 AMD/Intel GPU；(3) 高 EP size——256+ experts 的场景，RBD 的冗余 bypass 效果显著。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lancet -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-sky-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-lancet')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-lancet"></i><h3 class="font-semibold text-white">Lancet: 全图计算-通信重叠</h3></div>
+                        <span class="text-xs bg-sky-700 px-2 py-1 rounded">MLSys 2024</span>
+                    </div>
+                    <div id="paper-lancet-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-sky-400">核心:</strong> Lancet 将 overlap 范围从单个 MoE 层扩展到整个计算图——非 MoE 计算（如 attention、FFN）与 MoE 的 all-to-all 通信重叠。前向传播中启用非 MoE 计算与 dispatch/combine overlap，反向传播中启用 gradient 计算与通信 overlap。</p><a class="ref-link cyan" href="https://arxiv.org/abs/2404.19429" target="_blank"><i class="fas fa-external-link-alt"></i>论文原文</a> <a class="ref-link" href="https://proceedings.mlsys.org/paper_files/paper/2024/file/339caf45a6fa281cae8adc6465343464-Paper-Conference.pdf" target="_blank"><i class="fas fa-file-pdf"></i>PDF</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lancet')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lancet"></i>设计原理</span></div>
+                    <div id="feature-lancet" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-sky-500/20">
+                        <h5 class="text-sm font-medium text-sky-300 mb-3"><i class="fas fa-cogs mr-2"></i>Lancet 全图 Overlap 详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>之前的 GEMM-EP overlap 工作（如 Megatron-LM）仅在单个 MoE 层内做 overlap——dispatch 与 GEMM 重叠。但 MoE 层之外还有大量计算（attention、residual add、layernorm）可以与 all-to-all 通信重叠。传统方案中这些计算与 all-to-all 是串行的。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Whole-Graph Scheduling：</em>Lancet 分析整个训练计算图，识别出所有可以与 all-to-all 通信重叠的计算节点。在 MoE 层中，dispatch 可以与上一层的 attention 计算重叠；combine 可以与下一层的 pre-computation 重叠。(2) <em>Dependency-Aware Overlap：</em>Lancet 使用细粒度的 dependency analysis——不是整个 all-to-all 与整个 attention 重叠，而是将 all-to-all 切分为多个 micro-batch，每个 micro-batch 的通信与对应的 attention slice 重叠。这确保了数据依赖的正确性。(3) <em>Backward Overlap：</em>反向传播中，gradient 计算（如 weight gradient、data gradient）可以与 dispatch/combine 重叠。Lancet 将 weight gradient 计算分为多个 stage，每个 stage 与通信 stage 流水线执行。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) 深层 MoE 模型——层数越多，非 MoE 计算越多，可重叠的资源越多；(2) 大 batch 训练——batch 越大，attention 等计算的时间越长，与通信重叠的空间越大；(3) 混合并行——TP+EP 场景中，TP 的 all-reduce 也可以与 EP 的 all-to-all 重叠。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Megatron Core -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-indigo-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-megatron')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-megatron"></i><h3 class="font-semibold text-white">Megatron Core: 可扩展 MoE 训练系统</h3></div>
+                        <span class="text-xs bg-indigo-700 px-2 py-1 rounded">arxiv 2603.07685 | NVIDIA</span>
+                    </div>
+                    <div id="paper-megatron-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-indigo-400">核心:</strong> Megatron-Core 使用 DeepEP 和 HybridEP 最大化 EP 带宽，通过"计算-通信 Overlap"隐藏 all-to-all 延迟——在路由其他 token 的同时计算本地 token。在 GB200/GB300 上 DeepSeek-V3-685B 达到 1233 TFLOPS/GPU，Qwen3-235B 达到 974 TFLOPS/GPU。</p><a class="ref-link purple" href="https://arxiv.org/html/2603.07685v2" target="_blank"><i class="fas fa-external-link-alt"></i>论文原文</a> <a class="ref-link" href="https://docs.nvidia.com/nemo/megatron-bridge/latest/skills/perf-techniques/expert-parallel-overlap/SKILL.html" target="_blank"><i class="fas fa-external-link-alt"></i>NeMo Skill</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('megatron')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-megatron"></i>设计原理</span></div>
+                    <div id="feature-megatron" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-indigo-500/20">
+                        <h5 class="text-sm font-medium text-indigo-300 mb-3"><i class="fas fa-cogs mr-2"></i>Megatron Core GEMM-EP Overlap 详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>在生产级 MoE 训练中，需要同时考虑 TP、PP、EP、CP 多种并行维度的通信重叠。如何在不影响正确性的前提下最大化 overlap 是一个工程挑战。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>DeepEP 后端集成：</em>Megatron-Core 通过 <code>apply_flex_dispatcher_backend(cfg.model, moe_flex_dispatcher_backend="deepep")</code> 启用 DeepEP 后端。DeepEP 提供非阻塞的 dispatch/combine，与 GEMM 在不同 CUDA stream 上并行。(2) <em>Delay Wgrad Compute：</em>配置 <code>cfg.comm_overlap.delay_wgrad_compute = True</code>——在 backward 中，延迟 weight gradient 的计算，先完成 all-to-all 通信，然后同时执行 wgrad 计算和通信。这避免了 wgrad 与 all-to-all 争抢 SM 资源。(3) <em>Token Dispatcher 类型：</em>支持 alltoall（标准）和 deepep/hybrid-ep（高性能）两种 dispatcher。alltoall 模式使用 ncclAllToAll，deepep 模式使用 DeepEP 的非阻塞 API。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>GB200/GB300 上 DeepSeek-V3-685B 达到 1233 TFLOPS/GPU；Qwen3-235B 达到 974 TFLOPS/GPU。</div>
+                            <div><strong class="text-slate-300">配置约束：</strong>需要 expert_model_parallel_size > 1；支持 BF16/FP16；PyTorch >= 2.6.0；shared expert overlap 必须为 False。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Triton Persistent GEMM -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-pink-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('paper-triton')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-paper-triton"></i><h3 class="font-semibold text-white">Triton Persistent Cache-Aware Grouped GEMM</h3></div>
+                        <span class="text-xs bg-pink-700 px-2 py-1 rounded">PyTorch Blog | 2025</span>
+                    </div>
+                    <div id="paper-triton-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-pink-400">核心:</strong> 使用 persistent kernel + grouped launch ordering 优化 MoE GroupedGEMM。Device-side TMA descriptor 创建支持动态 expert routing。端到端训练加速 2.62x（DeepSeek-V3-16B on 8xH100），L2 cache hit 率提升 60%。</p><a class="ref-link red" href="https://pytorch.org/blog/accelerating-moes-with-a-triton-persistent-cache-aware-grouped-gemm-kernel/" target="_blank"><i class="fas fa-external-link-alt"></i>PyTorch Blog</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('triton')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-triton"></i>设计原理</span></div>
+                    <div id="feature-triton" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-pink-500/20">
+                        <h5 class="text-sm font-medium text-pink-300 mb-3"><i class="fas fa-cogs mr-2"></i>Triton Persistent Grouped GEMM 详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>传统 GroupedGEMM 为每个 expert 启动一个独立的 GEMM kernel，引入大量 kernel launch overhead。同时，由于 MoE 的 token 路由是动态的（运行时才知道每个 expert 分到多少 token），传统的 static-shape kernel 无法高效处理变长输入。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Persistent Kernel：</em>设置 grid size = NUM_SMS（H100 上 132 个 SM），每个 SM 运行一个 Triton program。Program 在 loop 中处理多个 tile——<code>for tile_id in tl.range(...)</code>，避免了 wave quantization 和 launch overhead。(2) <em>Grouped Launch Ordering：</em>按 column-major 分组（如 GROUP_SIZE_M=2）安排 tile 处理顺序——C(0,0) → C(1,0) → C(0,1) → C(1,1)。这使相邻 SM 访问的 A 矩阵行在 L2 cache 中保持 hot，L2 hit 率提升 60%。(3) <em>Device-Side TMA Descriptor：</em>对于动态 expert routing，kernel 在 device 端创建 TMA descriptor——每个 SM 在预分配的 workspace 中声明一个 slot，使用 <code>tl.extra.cuda.experimental_device_tensormap_create2d</code> 创建指向特定 expert 权重的 tensor map。这避免了 host-side 的同步开销。(4) <em>通信重叠：</em>虽然本文主要关注 GEMM kernel 优化，但 persistent kernel 的设计天然支持通信重叠——kernel 在 loop 中处理 tile 时，可以在 tile 间隙插入通信操作（如 all-gather 的下一个 slice）。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>端到端训练加速 2.62x（DeepSeek-V3-16B on 8xH100）；microbenchmark 加速 1.50x（vs baseline Triton Group GEMM）；L2 cache hit 率提升 60%。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) FSDP2 训练——FSDP2 中 expert 权重需要 all-gather，persistent kernel 的 cache-aware 设计减少 all-gather 延迟；(2) 动态 routing——运行时才知道 expert 分配的场景；(3) H100/Blackwell——TMA 和 persistent kernel 依赖 Hopper+ 架构特性。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Patents Tab ==================== -->
+        <section id="content-patents" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-patent px-3 py-1 rounded text-xs text-white">专利</span> GEMM-EP Fused 相关专利</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('patent-google')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-patent-google"></i><h3 class="font-semibold text-white">Google US20230419079A1: MoE 神经网络系统</h3></div>
+                        <span class="text-xs bg-amber-700 px-2 py-1 rounded">Google | 2023</span>
+                    </div>
+                    <div id="patent-google-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-amber-400">专利:</strong> 描述了一种 MoE 神经网络系统，包括路由器和多个 expert。路由器将 token 分配到不同 expert，涉及跨设备通信与 expert 计算的重叠调度。专利涵盖 communication-computation overlap 的基本方法。</p><a class="ref-link amber" href="https://patents.google.com/patent/US20230419079A1/en" target="_blank"><i class="fas fa-external-link-alt"></i>Google Patents</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('pat-google')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-pat-google"></i>设计原理</span></div>
+                    <div id="feature-pat-google" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-amber-500/20">
+                        <h5 class="text-sm font-medium text-amber-300 mb-3"><i class="fas fa-cogs mr-2"></i>Google MoE 专利详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>MoE 训练中 expert parallel 的 all-to-all 通信是瓶颈——token 需要从源 GPU 发送到目标 expert 所在的 GPU，然后执行 GEMM 计算，再将结果发送回来。传统串行实现导致 GPU 利用率低。</div>
+                            <div><strong class="text-slate-300">专利方案：</strong>(1) 路由器将 token 分配到 expert，同时启动跨设备通信（all-to-all dispatch）；(2) 在等待远程 token 到达的同时，GPU 先执行本地 token 的 GEMM 计算；(3) 远程 token 到达后立即执行对应的 GEMM；(4) 所有 expert 计算完成后，启动 combine all-to-all 将结果返回源 GPU。这构成了 GEMM-EP overlap 的基本范式。</div>
+                            <div><strong class="text-slate-300">影响：</strong>此专利确立了 MoE 训练通信优化的一般性框架，后续的 MegaScale-MoE、Comet、NCCL EP 等工作都是在此框架下的具体实现。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-orange-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('patent-patsnap')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-patent-patsnap"></i><h3 class="font-semibold text-white">PatSnap 分析: 30+ MoE 推理成本专利</h3></div>
+                        <span class="text-xs bg-orange-700 px-2 py-1 rounded">PatSnap | 2025</span>
+                    </div>
+                    <div id="patent-patsnap-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-orange-400">分析:</strong> PatSnap 分析了 30+ 项 MoE 推理成本相关专利，涵盖 NVIDIA（GEMM-通信 overlap）、Google（expert placement）、Meta（dynamic routing）、国内公司（量化压缩）等。All-to-all 通信被识别为主要成本来源。</p><a class="ref-link orange" href="https://www.patsnap.com/resources/blog/articles/moe-inference-cost-30-patents-analyzed/" target="_blank"><i class="fas fa-external-link-alt"></i>PatSnap Analysis</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('pat-patsnap')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-pat-patsnap"></i>设计原理</span></div>
+                    <div id="feature-pat-patsnap" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-orange-500/20">
+                        <h5 class="text-sm font-medium text-orange-300 mb-3"><i class="fas fa-cogs mr-2"></i>MoE 专利格局详细分析</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心发现：</strong>(1) NVIDIA 专利集中在 GEMM-通信 overlap 和 tensor core 优化；(2) Google 专利集中在 expert placement 和 routing 优化；(3) Meta 专利集中在 dynamic routing 和 load balancing；(4) 国内公司（华为、阿里、字节）专利集中在 MoE 量化压缩和通信拓扑优化。</div>
+                            <div><strong class="text-slate-300">技术趋势：</strong>2024-2025 年 GEMM-EP fusion 相关专利申请数量激增——从 2023 年的 ~5 件增长到 2025 年的 ~30 件。主要驱动因素：DeepSeek-V3 的成功展示了 MoE 的商业价值，各公司加速布局。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>专利分析帮助企业了解技术布局，避免侵权风险，并识别技术空白（如跨平台 GEMM-EP fusion 的专利较少）。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Libraries Tab ==================== -->
+        <section id="content-libs" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-lib px-3 py-1 rounded text-xs text-white">通信库</span> GEMM-EP Fused 通信库实现</h2>
+
+                <!-- NCCL EP -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('lib-nccl-ep')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-lib-nccl-ep"></i><h3 class="font-semibold text-white">NCCL EP: 统一 EP API</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">NVIDIA | 2026</span>
+                    </div>
+                    <div id="lib-nccl-ep-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-green-400">实现:</strong> 提供 C 和 Python API（ncclEpCreateGroup, ncclEpDispatch, ncclEpCombine）。LL 模式使用 full mesh + double-buffering + GIN RDMA；HT 模式使用 hierarchical aggregation + warp-specialized persistent kernel。支持 send_only=1 staged execution 实现 GEMM overlap。内存比 DeepEP 降低 ~14x。</p><a class="ref-link green" href="https://arxiv.org/html/2603.13606v1" target="_blank"><i class="fas fa-external-link-alt"></i>论文</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lib-nccl-ep')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lib-nccl-ep"></i>设计原理</span></div>
+                    <div id="feature-lib-nccl-ep" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-green-500/20">
+                        <h5 class="text-sm font-medium text-green-300 mb-3"><i class="fas fa-cogs mr-2"></i>NCCL EP 实现详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">API 设计：</strong><code>ncclEpCreateGroup</code> 创建资源组；<code>ncclEpCreateHandle</code> 为每个 pass 创建路由句柄（缓存 topk_idx, token 分布）；<code>ncclEpDispatch</code>/<code>ncclEpCombine</code> 执行数据移动。Handle 在 forward/backward 间复用，避免重复 routing 计算。</div>
+                            <div><strong class="text-slate-300">GEMM Overlap 机制：</strong>LL 模式：dispatch(send_only=1) 发起 RDMA → GPU 执行 local GEMM → dispatch(complete) 等待远程数据 → GPU 执行 remote GEMM → combine。HT 模式：micro-batch 流水线——dispatch(micro-batch-0) → combine(micro-batch-0) || dispatch(micro-batch-1) → combine(micro-batch-1)。</div>
+                            <div><strong class="text-slate-300">内存优化：</strong>统一 buffer indexing——所有 rank 使用相同的全局 index 管理 buffer，避免 DeepEP 中每个 rank 独立管理导致的 index 不一致问题。内存降低 ~14x。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DeepEP -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('lib-deepep')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-lib-deepep"></i><h3 class="font-semibold text-white">DeepEP: DeepSeek Expert Parallel 通信库</h3></div>
+                        <span class="text-xs bg-cyan-700 px-2 py-1 rounded">DeepSeek | V2</span>
+                    </div>
+                    <div id="lib-deepep-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-cyan-400">实现:</strong> V2 完全重构，弃用 NVSHMEM 转向 NCCL Gin 后端。全 JIT 编译，零 SM 占用模式。支持 EP2048，Hopper + Blackwell，实验性 ROCm MORI 支持。Mega MoE 内核融合 dispatch + Linear-1 + SwiGLU + Linear-2 + combine。</p><a class="ref-link cyan" href="https://github.com/deepseek-ai/DeepEP" target="_blank"><i class="fab fa-github"></i>GitHub</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lib-deepep')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lib-deepep"></i>设计原理</span></div>
+                    <div id="feature-lib-deepep" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-cyan-500/20">
+                        <h5 class="text-sm font-medium text-cyan-300 mb-3"><i class="fas fa-cogs mr-2"></i>DeepEP GEMM-EP 融合详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>DeepEP V1 依赖 NVSHMEM 作为底层 RMA 传输层，但 NVSHMEM 的重量级 PGAS 运行时引入显著启动开销（>100ms）和 SM 占用（8-16 SMs）。V2 转向 NCCL Gin 后端实现零 SM 占用。</div>
+                            <div><strong class="text-slate-300">Mega MoE 融合：</strong>DeepEP 的 Mega MoE 内核将 dispatch → Linear-1 → SwiGLU → Linear-2 → combine 五个操作融合为单一 kernel。Dispatch 和 combine 通过 NCCL GIN 的 symmetric kernel 执行——GPU 直接发起 RDMA，不占用 SM。Linear-1/SwiGLU/Linear-2 在 tensor core 上执行，与 dispatch/combine 的 RDMA 传输完全 overlap（因为它们不占用 SM，可以使用 GPU 的 copy engine）。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>峰值 1.3x 提升（vs V1）；SM 占用降低 4x；支持 EP2048。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DeepGEMM -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-emerald-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('lib-deepgemm')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-lib-deepgemm"></i><h3 class="font-semibold text-white">DeepGEMM: FP8 GEMM + Mega MoE</h3></div>
+                        <span class="text-xs bg-emerald-700 px-2 py-1 rounded">DeepSeek | 2025</span>
+                    </div>
+                    <div id="lib-deepgemm-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-emerald-400">实现:</strong> 统一 FP8/FP4/BF16 GEMM kernel 库。Mega MoE 融合 EP dispatch + linear + SwiGLU + combine。使用 symmetric memory buffer 实现 NVLink 通信与 tensor core 计算重叠。H800 峰值 1550 TFLOPS。JIT 编译，无需 install-time CUDA build。</p><a class="ref-link green" href="https://github.com/deepseek-ai/DeepGEMM" target="_blank"><i class="fab fa-github"></i>GitHub</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lib-deepgemm')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lib-deepgemm"></i>设计原理</span></div>
+                    <div id="feature-lib-deepgemm" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-emerald-500/20">
+                        <h5 class="text-sm font-medium text-emerald-300 mb-3"><i class="fas fa-cogs mr-2"></i>DeepGEMM Mega MoE 详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>MoE 推理中，每次 forward 需要执行 dispatch → GEMM-1 → SwiGLU → GEMM-2 → combine 五个操作。传统实现每个操作独立 kernel launch，引入 5 次 kernel launch overhead（~25μs）和中间 buffer 的 HBM 读写。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Mega MoE 融合：</em>将五个操作融合为单一 kernel。Dispatch 通过 NVLink symmetric memory 执行——GPU 直接从远程 GPU 读取 token（而非 all-to-all 传输），读取完成后立即执行 GEMM-1。SwiGLU 的激活值直接在 register file 中计算（不写回 shared memory）。GEMM-2 的输出直接通过 NVLink 写回源 GPU（combine）。(2) <em>FP8 Tensor Core：</em>使用 FP8 精度（E4M3/E5M2）执行 GEMM，相比 BF16 吞吐提升 2x。SM90 使用 FP32 scaling；SM100 使用 packed UE8M0 scaling。(3) <em>JIT 编译：</em>kernel 根据实际的 M（token 数）、N（expert 维度）、K（hidden 维度）在运行时 JIT 编译为特化的 PTX，避免通用 kernel 的分支和 padding 开销。</div>
+                            <div><strong class="text-slate-300">性能数字：</strong>H800 峰值 1550 TFLOPS（FP8）；Mega MoE 融合减少 ~80% kernel launch overhead。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NeMo Megatron -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('lib-nemo')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-lib-nemo"></i><h3 class="font-semibold text-white">NeMo Megatron: EP Overlap Skill</h3></div>
+                        <span class="text-xs bg-purple-700 px-2 py-1 rounded">NVIDIA | 2025-2026</span>
+                    </div>
+                    <div id="lib-nemo-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-purple-400">实现:</strong> NeMo 提供 <code>overlap_moe_expert_parallel_comm = True</code> 配置，支持 alltoall、DeepEP、HybridEP 三种后端。通过 delay_wgrad_compute 实现 backward 中的通信-计算重叠。需要 PyTorch >= 2.6.0。</p><a class="ref-link purple" href="https://docs.nvidia.com/nemo/megatron-bridge/latest/skills/perf-techniques/expert-parallel-overlap/SKILL.html" target="_blank"><i class="fas fa-external-link-alt"></i>NeMo Docs</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lib-nemo')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lib-nemo"></i>设计原理</span></div>
+                    <div id="feature-lib-nemo" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                        <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NeMo EP Overlap 配置详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">配置方式：</strong>(1) Alltoall 后端：<code>cfg.comm_overlap.overlap_moe_expert_parallel_comm = True</code> + <code>cfg.model.moe_token_dispatcher_type = "alltoall"</code>。(2) DeepEP 后端：<code>apply_flex_dispatcher_backend(cfg.model, moe_flex_dispatcher_backend="deepep")</code> + <code>cfg.comm_overlap.delay_wgrad_compute = True</code>。</div>
+                            <div><strong class="text-slate-300">GEMM-EP Overlap 机制：</strong>Alltoall 模式下，dispatch alltoall 与上一层 attention 计算 overlap（因为 alltoall 是异步的）。DeepEP 模式下，dispatch 与 local token GEMM overlap，combine 与 next-layer pre-computation overlap。delay_wgrad 模式下，backward 中先完成 allto-all，然后 wgrad 计算与 alltoall overlap。</div>
+                            <div><strong class="text-slate-300">约束和陷阱：</strong>(1) expert_model_parallel_size 必须 > 1；(2) 仅支持 BF16/FP16；(3) shared expert overlap 必须为 False（与 EP overlap 冲突）；(4) CUDA graphs 需要额外约束（overlap 操作不能在 graph capture 内）；(5) TP/CP tuning 可能与 DeepEP launch 设置冲突。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NIXL -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('lib-nixl')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-lib-nixl"></i><h3 class="font-semibold text-white">NIXL: 推理数据移动层</h3></div>
+                        <span class="text-xs bg-blue-700 px-2 py-1 rounded">NVIDIA | v1.2.0</span>
+                    </div>
+                    <div id="lib-nixl-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-blue-400">实现:</strong> NIXL 专注于 disaggregated inference 的数据传输（KV cache、weight、EP dispatch/combine）。NIXL-EP 提供高吞吐 dispatch/combine 内核路径。支持 RDMA（IB/RoCE/EFA）、GPU Direct Storage、S3 后端。</p><a class="ref-link blue" href="https://github.com/ai-dynamo/nixl" target="_blank"><i class="fab fa-github"></i>GitHub</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lib-nixl')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lib-nixl"></i>设计原理</span></div>
+                    <div id="feature-lib-nixl" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-blue-500/20">
+                        <h5 class="text-sm font-medium text-blue-300 mb-3"><i class="fas fa-cogs mr-2"></i>NIXL GEMM-EP 融合详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">NIXL-EP Dispatch/Combine：</strong>NIXL v1.1.0 引入 NIXL-EP 高吞吐内核——将多个 token 的 dispatch 合并为单个 CUDA kernel。kernel 内部使用 warp-level primitive 在 warp 内完成 token routing，然后通过 RDMA 批量发送到目标 expert 所在 GPU。Combine 内核使用 shared memory reduce-scatter 模式聚合 expert 输出。</div>
+                            <div><strong class="text-slate-300">与 GEMM 的 Overlap：</strong>NIXL 的 dispatch 支持 send_only 模式——先发起网络传输，GPU 立即执行 local GEMM，然后 dispatch complete。在 vLLM/SGLang 集成中，NIXL-EP 与 expert GEMM 在不同 CUDA stream 上并行。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) MoE disaggregated inference——prefill 和 decode 分离；(2) 弹性 EP——动态扩缩容时 NIXL 的 metadata exchange 自动更新；(3) 多后端——IB/RoCE/EFA/S3 自动选择最优路径。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- vLLM DBO -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-rose-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('lib-vllm')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-lib-vllm"></i><h3 class="font-semibold text-white">vLLM DBO: Dual Batch Overlap</h3></div>
+                        <span class="text-xs bg-rose-700 px-2 py-1 rounded">vLLM | 2025-2026</span>
+                    </div>
+                    <div id="lib-vllm-summary" class="mt-3"><p class="text-sm text-slate-300"><strong class="text-rose-400">实现:</strong> vLLM 的 <code>--enable-dbo</code> 启用 Dual Batch Overlap——将两个 micro-batch 的 all-to-all 通信与 expert 计算重叠。一个 batch 执行通信时，另一个 batch 执行 GEMM。支持 DeepEP 和 HybridEP 后端。</p><a class="ref-link red" href="https://docs.vllm.ai/en/latest/serving/expert_parallel_deployment/" target="_blank"><i class="fas fa-external-link-alt"></i>vLLM Docs</a>
+                    <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('lib-vllm')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-lib-vllm"></i>设计原理</span></div>
+                    <div id="feature-lib-vllm" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-rose-500/20">
+                        <h5 class="text-sm font-medium text-rose-300 mb-3"><i class="fas fa-cogs mr-2"></i>vLLM DBO 详细设计原理</h5>
+                        <div class="space-y-3 text-sm text-slate-400">
+                            <div><strong class="text-slate-300">核心问题：</strong>MoE 推理中，单个 batch 的 all-to-all 通信与 GEMM 无法完全 overlap——因为 GEMM 需要等待所有 token 到达后才能开始。DBO 通过将 batch 切分为两个 micro-batch，实现交错执行。</div>
+                            <div><strong class="text-slate-300">设计原理：</strong>(1) <em>Dual Batch Overlap：</em>将 batch 切分为 micro-batch-0 和 micro-batch-1。执行顺序：dispatch(mb-0) → dispatch(mb-1) || GEMM(mb-0) → combine(mb-0) || GEMM(mb-1) → combine(mb-1)。dispatch(mb-1) 与 GEMM(mb-0) 重叠；combine(mb-0) 与 GEMM(mb-1) 重叠。(2) <em>CUDA Stream 管理：</em>vLLM 使用 3 个 CUDA stream——compute stream（GEMM）、comm stream（all-to-all）、copy stream（H2D/D2D）。三个 stream 并行执行，通过 CUDA event 同步依赖。</div>
+                            <div><strong class="text-slate-300">适用场景：</strong>(1) 大 batch 推理——batch size >= 64 时 DBO 效果最佳；(2) 长序列推理——长序列的 token 多，micro-batch 切分更细，overlap 效果更好；(3) DeepEP/HybridEP 后端——需要非阻塞的 dispatch/combine API。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Techniques Tab ==================== -->
+        <section id="content-techniques" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-cogs text-violet-400"></i> GEMM-EP Fused 核心技术详解</h2>
+
+                <div class="glass-card rounded-lg p-5 border-l-4 border-violet-500 mb-4">
+                    <h3 class="font-semibold text-violet-300 mb-3"><i class="fas fa-clock mr-2"></i>技术 1: Tile-Level Barrier 同步</h3>
+                    <div class="text-sm text-slate-400 space-y-2">
+                        <p><strong class="text-slate-300">核心思想：</strong>将输入 tensor 切分为多个 tile（如 128x128），每个 tile 独立管理通信和计算状态。GPU 使用 warp-level barrier 同步——当一个 tile 的通信完成后，立即触发该 tile 的计算，无需等待其他 tile。</p>
+                        <p><strong class="text-slate-300">代表方案：</strong>MegaScale-MoE、Comet。</p>
+                        <p><strong class="text-slate-300">性能影响：</strong>实现 tile 粒度的流水线，通信延迟隐藏率可达 86.5%（Comet）。</p>
+                        <div class="code-block mt-3">
+<span class="text-slate-500">// Pseudo-code: Tile-level barrier</span>
+<span class="text-blue-400">for</span> (tile_id = 0; tile_id < NUM_TILES; tile_id++) {
+    <span class="text-green-400">// 1. 通信此 tile 的数据</span>
+    nccl_send_recv(tile_buffer[tile_id], ...);
+    <span class="text-green-400">// 2. Warp-level barrier - 等待此 tile 通信完成</span>
+    __syncwarp();
+    <span class="text-green-400">// 3. 立即计算此 tile 的 GEMM</span>
+    gemm_tile(tile_buffer[tile_id], weight[tile_id], ...);
+    <span class="text-green-400">// 4. 通信结果（combine）</span>
+    nccl_send_recv(output_buffer[tile_id], ...);
+}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-layer-group mr-2"></i>技术 2: Staged Execution (send_only)</h3>
+                    <div class="text-sm text-slate-400 space-y-2">
+                        <p><strong class="text-slate-300">核心思想：</strong>将 dispatch 操作拆分为 send 和 receive 两个阶段。send_only=1 时仅发起网络传输（send），GPU 立即执行 GEMM（计算已到达的 local token），然后执行 receive 等待远程 token 到达。</p>
+                        <p><strong class="text-slate-300">代表方案：</strong>NCCL EP、DeepEP、NIXL。</p>
+                        <p><strong class="text-slate-300">流水线：</strong><code>dispatch(send) → GEMM(local) → dispatch(recv) → GEMM(remote) → combine</code></p>
+                        <div class="code-block mt-3">
+<span class="text-slate-500">// Pseudo-code: Staged execution</span>
+<span class="text-green-400">// Phase 1: 发起网络传输（不等待）</span>
+ncclEpDispatch(tokens, handle, send_only=<span class="text-amber-400">1</span>);
+<span class="text-green-400">// Phase 2: GPU 计算 local tokens</span>
+gemm(local_tokens, expert_weights, ...);
+<span class="text-green-400">// Phase 3: 等待远程 token 到达</span>
+ncclEpDispatch(tokens, handle, send_only=<span class="text-amber-400">0</span>);
+<span class="text-green-400">// Phase 4: GPU 计算 remote tokens</span>
+gemm(remote_tokens, expert_weights, ...);
+<span class="text-green-400">// Phase 5: Combine 结果</span>
+ncclEpCombine(output, handle);
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <h3 class="font-semibold text-cyan-300 mb-3"><i class="fas fa-cubes mr-2"></i>技术 3: Hierarchical Aggregation</h3>
+                    <div class="text-sm text-slate-400 space-y-2">
+                        <p><strong class="text-slate-300">核心思想：</strong>在 NVLink 域内先做 local aggregation（多个 GPU 的 token 在域内聚合），减少 inter-node 传输量。例如 8 GPU 节点中，先将 8 个 GPU 的 token 通过 NVLink 聚合到 2 个 GPU 上，再通过 IB 发送到其他节点——IB 传输量减少 4x。</p>
+                        <p><strong class="text-slate-300">代表方案：</strong>Hybrid-EP、NCCL EP HT 模式。</p>
+                        <p><strong class="text-slate-300">性能影响：</strong>inter-node 通信量减少 N/2（N 为 NVLink 域内 GPU 数），但引入 NVLink 聚合开销（~2μs）。</p>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <h3 class="font-semibold text-amber-300 mb-3"><i class="fas fa-warehouse mr-2"></i>技术 4: DSMEM (Distributed Shared Memory)</h3>
+                    <div class="text-sm text-slate-400 space-y-2">
+                        <p><strong class="text-slate-300">核心思想：</strong>利用 H100 的 NVLink DSMEM 特性——一个 GPU 的 shared memory 可以被另一个 GPU 直接访问。GEMM 的 prologue/epilogue 直接通过 DSMEM 从远程 GPU 加载/存储数据，避免 HBM 的中间写入。</p>
+                        <p><strong class="text-slate-300">代表方案：</strong>ClusterFusion（ClusterReduce/ClusterGather）、SonicMoE（Gather-Fused GEMM）。</p>
+                        <p><strong class="text-slate-300">性能影响：</strong>消除 1 次 HBM 写入 + 1 次 HBM 读取，减少 ~30% HBM 流量。但需要 NVLink 连接（仅适用于节点内）。</p>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-lg p-5 border-l-4 border-rose-500 mb-4">
+                    <h3 class="font-semibold text-rose-300 mb-3"><i class="fas fa-microchip mr-2"></i>技术 5: Warp-Specialized Persistent Kernel</h3>
+                    <div class="text-sm text-slate-400 space-y-2">
+                        <p><strong class="text-slate-300">核心思想：</strong>使用 persistent kernel 设计——一个长期运行的 CUDA kernel 占据固定 SM，内部使用 warp specialization：load warp 负责从 shared memory 加载 token，network warp 负责 RDMA 传输，store warp 负责写入结果。三种 warp 在不同 tile 上并行执行。</p>
+                        <p><strong class="text-slate-300">代表方案：</strong>Hybrid-EP、NCCL EP HT 模式、Triton Persistent GEMM。</p>
+                        <p><strong class="text-slate-300">性能影响：</strong>消除 kernel launch overhead（~5μs per launch），实现 load/network/store 三级流水线。SM 利用率提升 2-3x。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Comparison Tab ==================== -->
+        <section id="content-comparison" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-balance-scale text-cyan-400"></i> GEMM-EP Fused 方案技术对比</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm comparison-table">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="text-left py-3 px-4 text-slate-300 font-semibold">方案</th>
+                                <th class="text-center py-3 px-4 text-blue-400 font-semibold">技术分类</th>
+                                <th class="text-center py-3 px-4 text-green-400 font-semibold">Overlap 粒度</th>
+                                <th class="text-center py-3 px-4 text-amber-400 font-semibold">通信隐藏率</th>
+                                <th class="text-center py-3 px-4 text-violet-400 font-semibold">加速比</th>
+                                <th class="text-center py-3 px-4 text-cyan-400 font-semibold">适用平台</th>
+                                <th class="text-center py-3 px-4 text-rose-400 font-semibold">开源</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">MegaScale-MoE</td>
+                                <td class="py-3 px-4 text-center text-blue-400">Overlap</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Tile-level</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">1.88x</td>
+                                <td class="py-3 px-4 text-center text-slate-400">NVIDIA</td>
+                                <td class="py-3 px-4 text-center text-red-400">否</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">NCCL EP (LL)</td>
+                                <td class="py-3 px-4 text-center text-green-400">Fused+Overlap</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Staged</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">~DeepEP</td>
+                                <td class="py-3 px-4 text-center text-slate-400">NVIDIA</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">Comet</td>
+                                <td class="py-3 px-4 text-center text-blue-400">Overlap</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Fine-grained</td>
+                                <td class="py-3 px-4 text-center text-green-400">86.5%</td>
+                                <td class="py-3 px-4 text-center text-green-400">1.96x layer</td>
+                                <td class="py-3 px-4 text-center text-slate-400">NVIDIA</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">Hybrid-EP</td>
+                                <td class="py-3 px-4 text-center text-green-400">Fused+Overlap</td>
+                                <td class="py-3 px-4 text-center text-slate-400">CUDA block</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">514% throughput</td>
+                                <td class="py-3 px-4 text-center text-slate-400">NVIDIA</td>
+                                <td class="py-3 px-4 text-center text-amber-400">部分</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">SonicMoE</td>
+                                <td class="py-3 px-4 text-center text-green-400">Fused</td>
+                                <td class="py-3 px-4 text-center text-slate-400">TMEM buffer</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">+54% TFLOPS</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Blackwell</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">ClusterFusion</td>
+                                <td class="py-3 px-4 text-center text-green-400">Fused</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Cluster-level</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">1.61x</td>
+                                <td class="py-3 px-4 text-center text-slate-400">H100+</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">X-MoE</td>
+                                <td class="py-3 px-4 text-center text-amber-400">算法优化</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">50.7% latency</td>
+                                <td class="py-3 px-4 text-center text-green-400">1.42x</td>
+                                <td class="py-3 px-4 text-center text-slate-400">AMD/NVIDIA</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">DeepGEMM Mega MoE</td>
+                                <td class="py-3 px-4 text-center text-green-400">Fused</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Single kernel</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">1550 TFLOPS</td>
+                                <td class="py-3 px-4 text-center text-slate-400">NVIDIA</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">Lancet</td>
+                                <td class="py-3 px-4 text-center text-blue-400">Overlap</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Whole-graph</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">-</td>
+                                <td class="py-3 px-4 text-center text-slate-400">NVIDIA</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300">Triton Persistent GEMM</td>
+                                <td class="py-3 px-4 text-center text-green-400">Fused</td>
+                                <td class="py-3 px-4 text-center text-slate-400">Persistent</td>
+                                <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                <td class="py-3 px-4 text-center text-green-400">2.62x</td>
+                                <td class="py-3 px-4 text-center text-slate-400">H100+</td>
+                                <td class="py-3 px-4 text-center text-green-400">是</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-pie text-green-400"></i> 技术分类分布</h2>
+                <div class="h-80"><canvas id="pieChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ==================== Trends Tab ==================== -->
+        <section id="content-trends" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-rocket text-pink-400"></i> 趋势展望</h2>
+
+                <div class="space-y-6">
+                    <div class="glass-card rounded-lg p-5 border-l-4 border-green-500">
+                        <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>趋势 1: 从 Overlap 到 Fusion</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">2024 年的主流方案是 Overlap（MegaScale-MoE、Comet、Lancet）——通信和计算在不同 stream 上并行。2025-2026 年转向 Fusion（DeepGEMM Mega MoE、SonicMoE、ClusterFusion）——通信和计算融合为单一 kernel，消除 kernel launch 和中间 buffer。Fusion 方案的性能更好（减少 ~80% kernel launch overhead），但实现复杂度更高（需要硬件特性如 TMEM、DSMEM）。</p>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-5 border-l-4 border-cyan-500">
+                        <h3 class="font-semibold text-cyan-300 mb-3"><i class="fas fa-microchip mr-2"></i>趋势 2: 硬件特性驱动</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">Blackwell 的 TMEM double-buffering、H100 的 DSMEM、NVLink 5.0 的带宽提升正在成为 GEMM-EP fusion 的关键使能技术。SonicMoE 的 gather-fused GEMM 依赖 NVLink 5.0 的带宽；ClusterFusion 的 ClusterReduce 依赖 DSMEM。未来的 fusion 方案将更加依赖特定硬件特性——跨平台兼容性挑战增大。</p>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-5 border-l-4 border-violet-500">
+                        <h3 class="font-semibold text-violet-300 mb-3"><i class="fas fa-code mr-2"></i>趋势 3: NCCL EP 统一生态</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">NCCL EP 正在成为 MoE 通信的统一 API——它融合 DeepEP（LL）和 Hybrid-EP（HT）两种内核，提供统一的 C/Python API。这结束了此前 DeepEP、 NVSHMEM、NCCL all-to-all 三种方案并存的混乱局面。预计 2026 年下半年 NCCL EP 将成为 MoE 训练/推理的标准后端。</p>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-5 border-l-4 border-amber-500">
+                        <h3 class="font-semibold text-amber-300 mb-3"><i class="fas fa-eye mr-2"></i>总体观察</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">GEMM-EP fused 技术正从"通信与计算的粗粒度 overlap"快速演进为"单一 kernel 内的细粒度融合"。三大驱动力：(1) <strong>硬件使能</strong>——Blackwell TMEM、H100 DSMEM、NVLink 5.0 提供了融合的物理基础；(2) <strong>算法创新</strong>——tile-level barrier、warp-specialized persistent kernel、staged execution 提供了融合的软件基础；(3) <strong>生态统一</strong>——NCCL EP 的统一 API 结束了碎片化，降低了采用门槛。预计 2026 年底，GEMM-EP fusion 将成为 MoE 训练/推理的标配技术。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        function showTab(tabName) {
+            const tabs = ['overview', 'papers', 'patents', 'libs', 'techniques', 'comparison', 'trends'];
+            tabs.forEach(t => {
+                document.getElementById('content-' + t).classList.add('hidden');
+                const tab = document.getElementById('tab-' + t);
+                tab.classList.remove('tab-active');
+                tab.classList.add('tab-inactive');
+            });
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            const activeTab = document.getElementById('tab-' + tabName);
+            activeTab.classList.remove('tab-inactive');
+            activeTab.classList.add('tab-active');
+        }
+
+        function toggleDetail(id) {
+            const summary = document.getElementById(id + '-summary');
+            const detail = document.getElementById(id + '-detail');
+            const icon = document.getElementById('icon-' + id);
+            if (detail) {
+                detail.classList.toggle('hidden');
+                icon.classList.toggle('expanded');
+            }
+        }
+
+        function toggleFeatureDetail(id) {
+            const detail = document.getElementById('feature-' + id);
+            const icon = document.getElementById('icon-feature-' + id);
+            if (detail) {
+                detail.classList.toggle('hidden');
+                icon.classList.toggle('expanded');
+            }
+        }
+
+        // Timeline Chart
+        const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+        new Chart(timelineCtx, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'Overlap 方案',
+                        data: [
+                            { x: '2024-03', y: 1, label: 'Lancet' },
+                            { x: '2024-12', y: 2, label: 'MegaScale-MoE' },
+                            { x: '2025-02', y: 3, label: 'Comet' }
+                        ],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        pointRadius: 8
+                    },
+                    {
+                        label: 'Fused 方案',
+                        data: [
+                            { x: '2025-01', y: 1, label: 'ClusterFusion' },
+                            { x: '2025-06', y: 2, label: 'DeepGEMM Mega MoE' },
+                            { x: '2025-09', y: 3, label: 'Hybrid-EP' },
+                            { x: '2026-01', y: 4, label: 'SonicMoE' },
+                            { x: '2026-03', y: 5, label: 'NCCL EP' }
+                        ],
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        pointRadius: 8
+                    },
+                    {
+                        label: '算法优化',
+                        data: [
+                            { x: '2025-04', y: 1, label: 'Occult' },
+                            { x: '2025-08', y: 2, label: 'X-MoE' },
+                            { x: '2026-03', y: 3, label: 'Megatron Core' }
+                        ],
+                        backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                        pointRadius: 8
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8' } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) { return context.raw.label; }
+                        }
+                    }
+                },
+                scales: {
+                    x: { type: 'category', labels: ['2024-03', '2024-06', '2024-09', '2024-12', '2025-02', '2025-04', '2025-06', '2025-08', '2025-09', '2026-01', '2026-03'], ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+                    y: { display: false }
+                }
+            }
+        });
+
+        // Pie Chart
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Overlap (流水线)', 'Fused (单一 kernel)', '算法优化'],
+                datasets: [{
+                    data: [4, 5, 3],
+                    backgroundColor: ['rgba(59, 130, 246, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(245, 158, 11, 0.7)'],
+                    borderColor: ['rgba(59, 130, 246, 1)', 'rgba(16, 185, 129, 1)', 'rgba(245, 158, 11, 1)'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { color: '#94a3b8', padding: 15 } } }
+            }
+        });
+    </script>
+</body>
+</html>

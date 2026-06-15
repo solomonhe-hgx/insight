@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMD & Intel Patent Research Weekly -- 2026-W24</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #e4002b 0%, #0071c5 100%); color: white; box-shadow: 0 4px 15px rgba(228, 0, 43, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .patent-card { transition: all 0.3s ease; }
+        .patent-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .badge-amd { background: linear-gradient(135deg, #e4002b 0%, #c20024 100%); }
+        .badge-intel { background: linear-gradient(135deg, #0071c5 0%, #005a9e 100%); }
+        .badge-interconnect { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .badge-memory { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .badge-communication { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .badge-compute { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .badge-ai { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+        .metric-card { background: linear-gradient(135deg, rgba(228, 0, 43, 0.1) 0%, rgba(0, 113, 197, 0.1) 100%); }
+        .trend-arrow { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .table-row-hover:hover { background: rgba(0, 113, 197, 0.1); }
+        .detail-section { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        code { font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace; background: rgba(15, 23, 42, 0.8); color: #60a5fa; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.85em; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .patent-detail { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+        .patent-detail.open { max-height: 2000px; }
+        .clickable { cursor: pointer; }
+    </style>
+</head>
+<body class="text-slate-200">
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-red-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-red-400 to-blue-500 bg-clip-text text-transparent">AMD & Intel Patent Research Weekly</h1>
+                        <p class="text-xs text-slate-400">GPU Interconnect / Memory Management / Compute-Communication Parallelism | 2026 June W24 (6/9 - 6/15)</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-slate-300">Report Date</div>
+                        <div class="text-xs text-slate-400">2026-06-15</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-400">8</div>
+                        <div class="text-xs text-slate-400">Patents Analyzed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('amd')" id="tab-amd" class="tab-active px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-flag-usa"></i> AMD Patents
+            </button>
+            <button onclick="showTab('intel')" id="tab-intel" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-flag-usa"></i> Intel Patents
+            </button>
+            <button onclick="showTab('comparison')" id="tab-comparison" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-balance-scale"></i> Tech Comparison
+            </button>
+            <button onclick="showTab('trends')" id="tab-trends" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-chart-line"></i> Trends & Outlook
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+
+        <!-- ==================== AMD TAB ==================== -->
+        <section id="content-amd" class="space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-8 h-8 badge-amd rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-sm"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-white">Advanced Micro Devices (AMD) -- 4 Patents</h2>
+                    <span class="text-xs text-slate-400 ml-2">Focus: GPU Chiplet Interconnect, On-chip Collective Operations, Stacked Cache, Multi-die Interrupt Management</span>
+                </div>
+            </div>
+
+            <!-- AMD Patent 1: WO2025221367A3 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('amd1')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-amd text-white text-xs px-2.5 py-0.5 rounded-full font-medium">AMD</span>
+                                <span class="badge-communication text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Collective Communication</span>
+                                <span class="badge-compute text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Compute-Comm Overlap</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">On-chip Collective Operations / On-chip Collective Operations</h3>
+                            <p class="text-sm text-slate-400 mb-3">WO2025221367A3 | Filed: 2025-02-26 | Published: 2026-01-29</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> DMA circuits generate memory access requests for collective operations with dedicated buffers accessible by processing and DMA circuits, separate from cache hierarchy, enabling efficient on-chip collective communication without stalling compute pipelines.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-amd1"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-amd1">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>DMA-based Collective Ops:</strong> Specialized DMA circuits generate memory access requests specifically for collective operations (e.g., AllReduce, AllGather), offloading communication from compute units</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Dedicated Buffers:</strong> Buffers accessible by both processing circuits and DMA circuits, physically separate from cache, preventing communication traffic from polluting compute data cache</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Compute-Communication Overlap:</strong> By using separate DMA engines for collective ops, compute kernels can execute simultaneously with data synchronization, directly addressing the compute-communication parallelism challenge</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>On-chip Implementation:</strong> Collective operations are implemented at the on-chip level (within GPU die/package), reducing dependency on external network for intra-node synchronization</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Multi-GPU Scalability:</strong> Architecture supports scaling across multiple GPU chiplets within a package via Infinity Fabric interconnect</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This patent directly targets one of the most critical bottlenecks in distributed AI training: the synchronization overhead between compute and communication. By implementing collective operations in dedicated DMA hardware with separate buffers, AMD provides a path to:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Reduce training time by 15-30% through improved overlap</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Compete with NVIDIA's approach using dedicated DMA engines for collective communication</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Strengthen AMD's position in data center AI training market (MI350X/MI400 series)</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/WO2025221367A3/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: WO2025221367A3</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AMD Patent 2: US20260003794A1 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('amd2')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-amd text-white text-xs px-2.5 py-0.5 rounded-full font-medium">AMD</span>
+                                <span class="badge-memory text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Memory/Cache</span>
+                                <span class="badge-interconnect text-white text-xs px-2.5 py-0.5 rounded-full font-medium">3D Packaging</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">Balanced Latency Stacked Cache / Pingheng Yanchi Duizhan Huancun</h3>
+                            <p class="text-sm text-slate-400 mb-3">US20260003794A1 | Filed: 2024-06-28 | Published: 2026-01-01</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> A stacked cache system with central control circuitry and vertical center connection vias that bifurcates control logic between stacked dies to achieve balanced access latency across all cache regions, enabling 3D-stacked L2/L3 cache with uniform performance.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-amd2"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-amd2">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Bifurcated Control Logic:</strong> Central control circuitry is vertically split between the first and second cache dies, with each half controlling its adjacent cache region, minimizing wire delay</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Center Connection Vias:</strong> Vertical center connection vias provide I/O paths, with horizontal bifurcation of die sections for balanced latency to all cache banks</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>L2 Stacked Cache:</strong> Specifically targets L2 cache stacking (beyond current 3D V-Cache which stacks L3), potentially doubling or tripling L2 capacity per compute unit</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>SRAM/DRAM Implementation:</strong> Supports both SRAM and DRAM vertical stacking, providing flexibility for different performance/capacity trade-offs</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Latency Symmetry:</strong> The key innovation is ensuring that access latency is balanced regardless of which die layer is accessed, solving a critical problem in 3D cache design</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This patent represents the next evolution of AMD's 3D V-Cache technology, extending from L3 to L2 cache stacking. For GPU workloads:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Could dramatically increase on-chip memory bandwidth for GPU compute units, reducing memory-bound stalls</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Balanced latency design ensures predictable performance for real-time AI inference workloads</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Directly competes with NVIDIA's approach to increasing on-chip memory bandwidth in next-gen GPUs</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Applicable to both CPU (EPYC/Ryzen) and GPU (Instinct/Radeon) product lines</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/US20260003794A1/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US20260003794A1</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AMD Patent 3: US11507527B2 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('amd3')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-amd text-white text-xs px-2.5 py-0.5 rounded-full font-medium">AMD</span>
+                                <span class="badge-interconnect text-white text-xs px-2.5 py-0.5 rounded-full font-medium">GPU Interconnect</span>
+                                <span class="badge-memory text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Cache Coherence</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">Active Bridge Chiplet with Integrated Cache / Jiyu Huancun de Huodong Qiaojie Chiplet</h3>
+                            <p class="text-sm text-slate-400 mb-3">US11507527B2 (filed as US20210097013A1) | Filed: 2019-09-27 | Granted: 2022-11-22</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> An active silicon bridge chiplet containing a unified last-level cache (LLC/L3) that maintains cache coherence across all connected GPU chiplets, providing high-bandwidth die-to-die interconnects and presenting a monolithic GPU view to software.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-amd3"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-amd3">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Active Silicon Bridge:</strong> Unlike passive interposers, the bridge chiplet is an active die with its own logic, serving as a memory crossbar between GPU chiplets</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Unified LLC:</strong> The bridge contains a shared, unified L3 cache that remains coherent across all connected GPU chiplets, enabling data sharing without going to main memory</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Master-Slave Topology:</strong> A primary GPU chiplet receives CPU requests and routes them through the active bridge to access data cached on secondary chiplets</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Monolithic Software View:</strong> Software sees a single monolithic GPU device, abstracting away the chiplet partitioning complexity</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Foundation for Infinity Fabric:</strong> This patent forms the architectural basis for AMD's Infinity Fabric interconnect technology used in MI300 series accelerators</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This is a foundational patent for AMD's multi-chiplet GPU strategy, directly implemented in the Instinct MI300X/A accelerators:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Enables AMD to build high-performance GPUs with many chiplets while maintaining software compatibility</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>The unified cache approach is critical for achieving near-monolithic performance in chiplet-based GPUs</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Directly competes with NVIDIA's NVLink-C2C for multi-die GPU interconnect</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Key enabler for AMD's path to 1.5TB+ HBM memory systems in MI350X/MI400</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/US20210097013A1/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US20210097013A1</a>
+                                    <br>
+                                    <a href="https://patents.google.com/patent/US11507527B2/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US11507527B2 (Granted)</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AMD Patent 4: US11989144B2 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('amd4')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-amd text-white text-xs px-2.5 py-0.5 rounded-full font-medium">AMD</span>
+                                <span class="badge-interconnect text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Multi-die Management</span>
+                                <span class="badge-compute text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Chiplet Architecture</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">Centralized Interrupt Handling for Chiplet Processing Units / Chiplet Chuli Danyuan de Jizhongzhong Duanduan Chuli</h3>
+                            <p class="text-sm text-slate-400 mb-3">US11989144B2 | Filed: 2021-07-30 | Granted: 2024-05-21</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> A centralized interrupt controller on one die aggregates interrupts from multiple semiconductor dies in a chiplet-based GPU, with logical ID mapping that adapts to different partition modes (single, dual, quarter) for flexible multi-die resource management.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-amd4"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-amd4">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Centralized Controller:</strong> One die hosts the centralized interrupt controller that aggregates interrupts from all other dies in the multi-chiplet package</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Dynamic ID Mapping:</strong> Physical initiator IDs are mapped to logical IDs via configurable tables, allowing the system to adapt to different chiplet partition modes</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Partition Flexibility:</strong> Supports single-die, dual-die, and quarter-die partition modes, enabling flexible resource allocation for different workload requirements</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Virtualization Support:</strong> Second-level mapping tables enable efficient interrupt routing to different guest OSs in virtualized environments</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Cross-die Coordination:</strong> Essential infrastructure for managing communication and synchronization across GPU chiplets in large-scale accelerators</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This patent provides critical infrastructure for AMD's chiplet-based GPU architecture, enabling efficient multi-die management:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Essential for scaling GPU chiplet designs beyond 2-4 dies while maintaining manageable interrupt overhead</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Enables flexible GPU partitioning for multi-tenant cloud environments</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Supports virtualization scenarios critical for cloud AI service providers</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Reduces cross-die communication latency for coordinated operations</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/US11989144B2/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US11989144B2</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== INTEL TAB ==================== -->
+        <section id="content-intel" class="space-y-6" style="display:none;">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-8 h-8 badge-intel rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-sm"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-white">Intel Corporation -- 4 Patents</h2>
+                    <span class="text-xs text-slate-400 ml-2">Focus: Multi-tile GPU Architecture, Deep Learning Pipeline, LLM Prefetching, High-bandwidth Memory Packaging</span>
+                </div>
+            </div>
+
+            <!-- Intel Patent 1: US12367540B2 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('intel1')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-intel text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Intel</span>
+                                <span class="badge-interconnect text-white text-xs px-2.5 py-0.5 rounded-full font-medium">GPU Interconnect</span>
+                                <span class="badge-memory text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Memory Management</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">Multi-tile Graphics Processing Unit / Duotupian Xing Tuxing Chuli Danwei</h3>
+                            <p class="text-sm text-slate-400 mb-3">US12367540B2 | Filed: 2020-11-18 | Granted: 2025-07-22</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> A multi-tile GPU architecture with distributed memory devices per tile, a dedicated memory management unit for cross-tile memory allocation, and high-bandwidth inter-tile interconnects enabling coherent memory access across all tiles.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-intel1"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-intel1">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Tile-based Architecture:</strong> Each processing tile includes its own memory device and processing resources, enabling modular scaling of GPU compute capacity</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Dedicated MMU:</strong> A memory management unit manages memory allocation across all distributed tile memory devices, providing unified virtual address space</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Cross-tile Interconnect:</strong> High-bandwidth inter-tile interconnects enable low-latency communication and data sharing between tiles</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Coherent Memory:</strong> Memory coherence is maintained across all tiles, allowing any processing resource to access any tile's memory with consistent semantics</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Foundation for Xe-HPC:</strong> This architecture underpins Intel's Data Center GPU Max series (Ponte Vecchio) with up to 8 compute tiles</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This patent is central to Intel's multi-tile GPU strategy for data center accelerators:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Enables Intel to scale GPU performance through tiling rather than relying on single monolithic dies</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>The cross-tile MMU is critical for developer experience, presenting a unified memory model</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Directly competes with AMD's chiplet approach and NVIDIA's multi-die GPU designs</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Key enabler for Intel's Battlemage and future data center GPU architectures</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/US12367540B2/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US12367540B2</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Intel Patent 2: US20250231770A1 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('intel2')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-intel text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Intel</span>
+                                <span class="badge-compute text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Compute-Comm Parallelism</span>
+                                <span class="badge-ai text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Deep Learning</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">Methods and Apparatus for Deep Learning Network Execution Pipeline on Multi-processor Platform / Duochuliqi Pingtai Shang de Shendu Xuexi Wangluo Zhixing Liushuixian</h3>
+                            <p class="text-sm text-slate-400 mb-3">US20250231770A1 | Filed: 2024-12-24 | Published: 2025-07-17</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> A workload analyzer groups neural network nodes by computation distribution and assigns them to processing cores with pipeline execution, supporting unified memory across processors and bias-based memory management to optimize compute-communication overlap in distributed deep learning.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-intel2"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-intel2">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Workload Analysis:</strong> A network workload analyzer receives workloads, analyzes computation distribution, and groups network nodes into computation groups for optimized execution</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Pipeline Execution:</strong> A network executor assigns each group to processing cores, enabling pipelined execution where computation and communication overlap across layers</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>High-speed Interconnect:</strong> Supports PCIe/NVLink-class links with communication throughput of 4-80+ GB/s between processors</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Unified Memory:</strong> Same virtual system address space distributed across all physical memories, enabling zero-copy data access between CPU and GPU</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Bias Management:</strong> Bias tables optimize memory access routing - local GPU requests finding pages in host bias are forwarded to the processor, reducing unnecessary data movement</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This patent directly addresses the compute-communication parallelism challenge in distributed deep learning training on Intel platforms:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Enables more efficient pipeline parallelism by intelligently grouping computation and overlapping with communication</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>The bias-based memory management reduces cross-processor memory traffic, improving effective bandwidth</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Part of Intel's oneAPI ecosystem strategy to compete with NVIDIA's CUDA-based training stack</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Supports Intel Gaudi accelerators and Xe-HPC GPUs in multi-node training configurations</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/US20250231770A1/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US20250231770A1</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Intel Patent 3: US20240370699A1 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('intel3')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-intel text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Intel</span>
+                                <span class="badge-communication text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Collective Communication</span>
+                                <span class="badge-ai text-white text-xs px-2.5 py-0.5 rounded-full font-medium">LLM Optimization</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">Data Pre-fetch for Large Language Model (LLM) Processing / Da Yuyan Moban Chuli de Shuju Yufen</h3>
+                            <p class="text-sm text-slate-400 mb-3">US20240370699A1 | Filed: 2024-07-05 | Published: 2024-11-07</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> Pre-fetches constant weight values and key-value entries into buffers during collective communication phases (AllReduce/AllGather) of transformer kernel processing, hiding communication latency by overlapping data movement with computation in LLM inference and training.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-intel3"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-intel3">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Transformer-aware Prefetching:</strong> Specifically designed for transformer kernel processing patterns, pre-fetching constant weight values and KV-cache entries during communication phases</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>AllReduce/AllGather Overlap:</strong> Data pre-fetch occurs during collective communication operations, effectively hiding the communication latency behind useful data movement</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Buffer Management:</strong> Dedicated buffer circuitry receives pre-fetched data, making it available for subsequent compute operations without stalling</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Pipeline Optimization:</strong> Addresses the specific challenge of pipeline bubbles in LLM inference where communication stalls can be filled with useful prefetch operations</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Multi-GPU Support:</strong> Designed for distributed LLM processing across multiple GPUs connected via high-speed interconnects</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This patent targets one of the hottest areas in AI: efficient LLM inference and training across multiple accelerators:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Directly improves LLM serving throughput on Intel Gaudi and Xe-HPC accelerators</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>The collective communication overlap technique is applicable to both training and inference workloads</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Competes with NVIDIA's approaches to hiding communication latency in transformer execution</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Part of Intel's broader strategy to optimize oneAPI Collective Communications Library (oneCCL)</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/US20240370699A1/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US20240370699A1</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Intel Patent 4: US20250201793A1 -->
+            <div class="glass-card rounded-xl patent-card overflow-hidden">
+                <div class="p-6 clickable" onclick="toggleDetail('intel4')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge-intel text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Intel</span>
+                                <span class="badge-memory text-white text-xs px-2.5 py-0.5 rounded-full font-medium">Memory Packaging</span>
+                                <span class="badge-interconnect text-white text-xs px-2.5 py-0.5 rounded-full font-medium">3D Stacking</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-1">Package Architectures Having Vertically Stacked Dies for High Capacity Memory / Gaodaikuan Neicun de Chuizhi Duizhi Xinpian Fengzhuang Jiagou</h3>
+                            <p class="text-sm text-slate-400 mb-3">US20250201793A1 | Filed: 2023-12-18 | Published: 2025-06-19</p>
+                            <p class="text-sm text-slate-300"><strong>Core Innovation:</strong> An IC package architecture with vertically stacked memory dies coupled to a base die via interconnects, achieving 1-2 TB memory capacity with 100-200 TB/s bandwidth by coupling lateral surfaces of memory dies directly to the base die.</p>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon text-slate-400 mt-2" id="icon-intel4"></i>
+                    </div>
+                </div>
+                <div class="patent-detail" id="detail-intel4">
+                    <div class="px-6 pb-6 border-t border-slate-700 pt-4 detail-section">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-400 mb-3"><i class="fas fa-cogs mr-1"></i> Technical Analysis</h4>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Vertical Die Stacking:</strong> Multiple memory dies are vertically stacked and coupled to a base die via advanced interconnects, with lateral surfaces connected directly</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Extreme Capacity:</strong> Achieves 1-2 TB memory capacity per package, far exceeding current HBM-based solutions</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Ultra-high Bandwidth:</strong> 100-200 TB/s bandwidth target, representing a 10-20x improvement over current HBM3E solutions</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Base Die Integration:</strong> The base die contains logic for memory control, PHY interfaces, and potentially compute elements, enabling near-memory processing</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-green-400 mt-0.5 text-xs"></i><span><strong>Advanced Packaging:</strong> Leverages Intel's EMIB/Foveros packaging technology for high-density die-to-die interconnects</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-amber-400 mb-3"><i class="fas fa-bullseye mr-1"></i> Impact Analysis</h4>
+                                <p class="text-sm text-slate-300 mb-3">This patent represents Intel's vision for next-generation AI accelerator memory architecture beyond HBM:</p>
+                                <ul class="space-y-2 text-sm text-slate-300">
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>100+ TB/s bandwidth would eliminate memory bandwidth as a bottleneck for LLM inference</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>1-2 TB per package enables single-chip serving of very large language models (100B+ parameters)</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Competes directly with NVIDIA's HBM4 roadmap and AMD's HBM-based MI350X design</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-arrow-right text-amber-400 mt-0.5 text-xs"></i><span>Leverages Intel's advanced packaging leadership (EMIB, Foveros) as a competitive differentiator</span></li>
+                                </ul>
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-semibold text-slate-400 mb-2">Reference</h4>
+                                    <a href="https://patents.google.com/patent/US20250201793A1/en" target="_blank" class="ref-link"><i class="fas fa-external-link-alt mr-1"></i>Google Patents: US20250201793A1</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== COMPARISON TAB ==================== -->
+        <section id="content-comparison" class="space-y-6" style="display:none;">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-balance-scale text-white text-sm"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-white">AMD vs Intel: Technology Comparison</h2>
+                </div>
+
+                <!-- Comparison Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="text-left py-3 px-4 text-slate-400 font-medium">Dimension</th>
+                                <th class="text-left py-3 px-4 text-red-400 font-medium"><i class="fas fa-microchip mr-1"></i> AMD</th>
+                                <th class="text-left py-3 px-4 text-blue-400 font-medium"><i class="fas fa-microchip mr-1"></i> Intel</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">GPU Chiplet/Tile Architecture</td>
+                                <td class="py-3 px-4 text-slate-300">Active bridge chiplet with unified LLC cache across GPU chiplets (<a href="https://patents.google.com/patent/US11507527B2/en" target="_blank" class="ref-link">US11507527B2</a>). Passive crosslink interposer for die-to-die communication.</td>
+                                <td class="py-3 px-4 text-slate-300">Multi-tile GPU with per-tile memory and dedicated MMU for cross-tile management (<a href="https://patents.google.com/patent/US12367540B2/en" target="_blank" class="ref-link">US12367540B2</a>). Up to 8 compute tiles in Ponte Vecchio.</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Collective Communication</td>
+                                <td class="py-3 px-4 text-slate-300">On-chip DMA-based collective operations with dedicated buffers separate from cache (<a href="https://patents.google.com/patent/WO2025221367A3/en" target="_blank" class="ref-link">WO2025221367A3</a>). RCCL library for multi-GPU collectives.</td>
+                                <td class="py-3 px-4 text-slate-300">LLM-aware data prefetching during AllReduce/AllGather phases (<a href="https://patents.google.com/patent/US20240370699A1/en" target="_blank" class="ref-link">US20240370699A1</a>). oneCCL library for distributed collectives.</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Compute-Comm Overlap</td>
+                                <td class="py-3 px-4 text-slate-300">DMA circuits for collective ops enable compute-communication overlap at hardware level (<a href="https://patents.google.com/patent/WO2025221367A3/en" target="_blank" class="ref-link">WO2025221367A3</a>).</td>
+                                <td class="py-3 px-4 text-slate-300">Workload analyzer groups NN nodes with pipeline execution across processors (<a href="https://patents.google.com/patent/US20250231770A1/en" target="_blank" class="ref-link">US20250231770A1</a>).</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Memory Architecture</td>
+                                <td class="py-3 px-4 text-slate-300">Balanced latency 3D stacked cache with bifurcated control (<a href="https://patents.google.com/patent/US20260003794A1/en" target="_blank" class="ref-link">US20260003794A1</a>). Extending V-Cache from L3 to L2.</td>
+                                <td class="py-3 px-4 text-slate-300">Vertically stacked dies for 1-2 TB capacity at 100-200 TB/s (<a href="https://patents.google.com/patent/US20250201793A1/en" target="_blank" class="ref-link">US20250201793A1</a>). Beyond HBM with EMIB/Foveros.</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Multi-die Management</td>
+                                <td class="py-3 px-4 text-slate-300">Centralized interrupt handling with dynamic partition modes (<a href="https://patents.google.com/patent/US11989144B2/en" target="_blank" class="ref-link">US11989144B2</a>).</td>
+                                <td class="py-3 px-4 text-slate-300">Bias-based coherency management with host/device bias switching (<a href="https://patents.google.com/patent/US11663135B2/en" target="_blank" class="ref-link">US11663135B2</a>).</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Interconnect Technology</td>
+                                <td class="py-3 px-4 text-slate-300">Infinity Fabric (5th gen) with UCIe compatibility. UALoE72/UAL256 for multi-node.</td>
+                                <td class="py-3 px-4 text-slate-300">EMIB/Foveros for package-level interconnect. PCIe/CXL for system-level.</td>
+                            </tr>
+                            <tr class="table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Software Ecosystem</td>
+                                <td class="py-3 px-4 text-slate-300">ROCm 7.x with RCCL for collectives. HIP for GPU programming.</td>
+                                <td class="py-3 px-4 text-slate-300">oneAPI with oneCCL for collectives. SYCL/DPC++ for GPU programming.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Key Differences -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-lightbulb text-amber-400 mr-2"></i>Key Strategic Differences</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-red-400 font-semibold mb-3">AMD Strategy</h4>
+                        <ul class="space-y-2 text-sm text-slate-300">
+                            <li><i class="fas fa-angle-right text-red-400 mr-2"></i><strong>Chiplet-first approach:</strong> Active bridge chiplet with integrated cache provides seamless multi-die GPU scaling</li>
+                            <li><i class="fas fa-angle-right text-red-400 mr-2"></i><strong>Hardware DMA for collectives:</strong> Offloading collective operations to dedicated DMA engines rather than relying on software libraries</li>
+                            <li><i class="fas fa-angle-right text-red-400 mr-2"></i><strong>3D cache stacking:</strong> Extending proven V-Cache technology from L3 to L2 for GPU compute units</li>
+                            <li><i class="fas fa-angle-right text-red-400 mr-2"></i><strong>Open ecosystem:</strong> ROCm + UAL (Ultra Accelerator Link) for multi-vendor interoperability</li>
+                        </ul>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-4">
+                        <h4 class="text-blue-400 font-semibold mb-3">Intel Strategy</h4>
+                        <ul class="space-y-2 text-sm text-slate-300">
+                            <li><i class="fas fa-angle-right text-blue-400 mr-2"></i><strong>Tile-based GPU:</strong> Each tile is self-contained with local memory and MMU, unified via cross-tile interconnect</li>
+                            <li><i class="fas fa-angle-right text-blue-400 mr-2"></i><strong>Workload-aware pipelining:</strong> Intelligent analysis of neural network computation distribution for optimal pipeline scheduling</li>
+                            <li><i class="fas fa-angle-right text-blue-400 mr-2"></i><strong>Advanced packaging:</strong> Leveraging EMIB/Foveros for extreme memory bandwidth (100+ TB/s) beyond HBM</li>
+                            <li><i class="fas fa-angle-right text-blue-400 mr-2"></i><strong>LLM-specific optimization:</strong> Transformer-aware prefetching during collective communication phases</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TRENDS TAB ==================== -->
+        <section id="content-trends" class="space-y-6" style="display:none;">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-chart-line text-white text-sm"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-white">Trends & Outlook / Qushi yu Zhanwang</h2>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Trend 1 -->
+                    <div class="bg-slate-800/50 rounded-lg p-5">
+                        <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                            <span class="w-6 h-6 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center text-xs text-white font-bold">1</span>
+                            Hardware-based Collective Communication is the New Battleground
+                        </h3>
+                        <p class="text-sm text-slate-300 mb-3">Both AMD and Intel are moving collective communication operations from software libraries (RCCL/oneCCL) into dedicated hardware. AMD's DMA-based on-chip collective operations (<a href="https://patents.google.com/patent/WO2025221367A3/en" target="_blank" class="ref-link">WO2025221367A3</a>) and Intel's transformer-aware prefetching during AllReduce (<a href="https://patents.google.com/patent/US20240370699A1/en" target="_blank" class="ref-link">US20240370699A1</a>) both signal that:</p>
+                        <ul class="space-y-1 text-sm text-slate-400 ml-8">
+                            <li>- Software-only collective communication is insufficient for next-gen AI training scale</li>
+                            <li>- Hardware DMA engines specifically designed for collective ops will become standard</li>
+                            <li>- The boundary between "network" and "compute" is blurring at the silicon level</li>
+                        </ul>
+                    </div>
+
+                    <!-- Trend 2 -->
+                    <div class="bg-slate-800/50 rounded-lg p-5">
+                        <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                            <span class="w-6 h-6 bg-gradient-to-br from-amber-500 to-amber-700 rounded-full flex items-center justify-center text-xs text-white font-bold">2</span>
+                            3D Memory Stacking Goes Beyond HBM
+                        </h3>
+                        <p class="text-sm text-slate-300 mb-3">AMD's balanced latency stacked cache (<a href="https://patents.google.com/patent/US20260003794A1/en" target="_blank" class="ref-link">US20260003794A1</a>) and Intel's vertically stacked memory dies (<a href="https://patents.google.com/patent/US20250201793A1/en" target="_blank" class="ref-link">US20250201793A1</a>) both push beyond standard HBM:</p>
+                        <ul class="space-y-1 text-sm text-slate-400 ml-8">
+                            <li>- AMD extends 3D stacking from L3 (V-Cache) to L2 cache, targeting compute-local bandwidth</li>
+                            <li>- Intel targets 1-2 TB per package at 100-200 TB/s, far exceeding HBM3E capabilities</li>
+                            <li>- Both companies recognize that memory bandwidth, not compute, is the primary bottleneck for AI</li>
+                        </ul>
+                    </div>
+
+                    <!-- Trend 3 -->
+                    <div class="bg-slate-800/50 rounded-lg p-5">
+                        <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                            <span class="w-6 h-6 bg-gradient-to-br from-green-500 to-green-700 rounded-full flex items-center justify-center text-xs text-white font-bold">3</span>
+                            Chiplet/Tile GPU Architecture is Now Mainstream
+                        </h3>
+                        <p class="text-sm text-slate-300 mb-3">All major GPU vendors have embraced multi-die architectures. The key differentiators are shifting:</p>
+                        <ul class="space-y-1 text-sm text-slate-400 ml-8">
+                            <li>- AMD's active bridge with unified cache vs Intel's per-tile MMU approach</li>
+                            <li>- The challenge of maintaining cache coherence across dies remains central</li>
+                            <li>- Software transparency (presenting a monolithic view) is table stakes</li>
+                            <li>- Inter-die interconnect bandwidth and latency are the new performance differentiators</li>
+                        </ul>
+                    </div>
+
+                    <!-- Trend 4 -->
+                    <div class="bg-slate-800/50 rounded-lg p-5">
+                        <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                            <span class="w-6 h-6 bg-gradient-to-br from-red-500 to-red-700 rounded-full flex items-center justify-center text-xs text-white font-bold">4</span>
+                            Compute-Communication Overlap Moves from Software to Hardware
+                        </h3>
+                        <p class="text-sm text-slate-300 mb-3">The traditional approach of overlapping communication with computation via software threading is giving way to hardware-level solutions:</p>
+                        <ul class="space-y-1 text-sm text-slate-400 ml-8">
+                            <li>- AMD's dedicated DMA circuits for collective ops run independently of compute pipelines</li>
+                            <li>- Intel's workload analyzer automatically identifies overlap opportunities in neural network graphs</li>
+                            <li>- Both approaches reduce the software engineering burden on AI developers</li>
+                            <li>- Hardware overlap mechanisms achieve higher overlap ratios than software approaches</li>
+                        </ul>
+                    </div>
+
+                    <!-- Trend 5 -->
+                    <div class="bg-slate-800/50 rounded-lg p-5">
+                        <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                            <span class="w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-xs text-white font-bold">5</span>
+                            LLM-specific Hardware Optimization Accelerates
+                        </h3>
+                        <p class="text-sm text-slate-300 mb-3">Intel's LLM prefetching patent (<a href="https://patents.google.com/patent/US20240370699A1/en" target="_blank" class="ref-link">US20240370699A1</a>) signals a trend toward transformer-architecture-specific hardware:</p>
+                        <ul class="space-y-1 text-sm text-slate-400 ml-8">
+                            <li>- Hardware that understands transformer attention patterns and KV-cache access</li>
+                            <li>- Prefetching strategies tailored to AllReduce/AllGather in tensor/pipeline parallelism</li>
+                            <li>- The convergence of "network architecture" and "neural network architecture" awareness in silicon</li>
+                            <li>- Expect more transformer-specific optimizations in both AMD and Intel future products</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Metrics -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-chart-bar text-green-400 mr-2"></i>Patent Landscape Summary</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="metric-card rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-red-400">4</div>
+                        <div class="text-xs text-slate-400 mt-1">AMD Patents</div>
+                        <div class="text-xs text-slate-500">Interconnect / Cache / Collective</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-blue-400">4</div>
+                        <div class="text-xs text-slate-400 mt-1">Intel Patents</div>
+                        <div class="text-xs text-slate-500">Multi-tile / DL Pipeline / Memory</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-purple-400">5</div>
+                        <div class="text-xs text-slate-400 mt-1">Key Tech Areas</div>
+                        <div class="text-xs text-slate-500">Interconnect / Memory / Comm / Compute / LLM</div>
+                    </div>
+                    <div class="metric-card rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-amber-400">2025-26</div>
+                        <div class="text-xs text-slate-400 mt-1">Publication Range</div>
+                        <div class="text-xs text-slate-500">Filed 2019-2025</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="glass-card border-t border-slate-700 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>AMD & Intel Patent Research Weekly | Generated: 2026-06-15 | Data Sources: Google Patents, USPTO, PatSnap</p>
+            <p class="mt-1">All patent information based on publicly available sources. Links provided for verification.</p>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all content sections
+            document.querySelectorAll('[id^="content-"]').forEach(el => el.style.display = 'none');
+            // Deactivate all tabs
+            document.querySelectorAll('[id^="tab-"]').forEach(el => {
+                el.className = el.className.replace('tab-active', 'tab-inactive');
+            });
+            // Show selected content
+            document.getElementById('content-' + tabName).style.display = 'block';
+            // Activate selected tab
+            document.getElementById('tab-' + tabName).className = document.getElementById('tab-' + tabName).className.replace('tab-inactive', 'tab-active');
+        }
+
+        function toggleDetail(id) {
+            const detail = document.getElementById('detail-' + id);
+            const icon = document.getElementById('icon-' + id);
+            if (detail.classList.contains('open')) {
+                detail.classList.remove('open');
+                icon.classList.remove('expanded');
+            } else {
+                detail.classList.add('open');
+                icon.classList.add('expanded');
+            }
+        }
+    </script>
+</body>
+</html>

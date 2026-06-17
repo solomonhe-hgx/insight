@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA Open GPU Kernel 周报 (2026-06-10 ~ 2026-06-17)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; color: #e2e8f0; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; border-bottom: 3px solid transparent; }
+        .nav-tab:hover { background: rgba(148, 163, 184, 0.1); }
+        .nav-tab.tab-active { border-bottom-color: #76b900; background: rgba(118, 185, 0, 0.1); }
+        .nav-tab.tab-inactive { border-bottom-color: transparent; }
+        .detail-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); transition: all 0.2s ease; }
+        .detail-card:hover { border-color: rgba(118, 185, 0, 0.4); box-shadow: 0 4px 20px rgba(118, 185, 0, 0.15); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; transition: all 0.2s; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .highlight-box { border-left: 4px solid #76b900; background: rgba(118, 185, 0, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .section-block { display: none; animation: fadeIn 0.5s ease-out; }
+        .section-block.active-section { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .badge-nvidia { background: linear-gradient(135deg, #76b900, #5a8f00); padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #fff; }
+        .badge-bug { background: linear-gradient(135deg, #ef4444, #dc2626); padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #fff; }
+        .badge-pr { background: linear-gradient(135deg, #8b5cf6, #7c3aed); padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #fff; }
+        .badge-release { background: linear-gradient(135deg, #06b6d4, #0891b2); padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #fff; }
+        .badge-feature { background: linear-gradient(135deg, #f59e0b, #d97706); padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #fff; }
+        .metric-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .comparison-table th { background: rgba(118, 185, 0, 0.2); }
+        .comparison-table tr:hover { background: rgba(148, 163, 184, 0.05); }
+        .table-row-hover:hover { background: rgba(118, 185, 0, 0.05); }
+        .trend-card { background: linear-gradient(135deg, rgba(118, 185, 0, 0.1) 0%, rgba(30, 41, 59, 0.5) 100%); border: 1px solid rgba(118, 185, 0, 0.3); }
+        .trend-arrow { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .expand-icon { transition: transform 0.3s ease; display: inline-block; }
+        .expand-icon.rotated { transform: rotate(180deg); }
+        .detail-section { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out; }
+        .detail-section.expanded { max-height: 2000px; }
+        .summary-section { transition: all 0.3s ease; }
+        h3 { font-size: 1.125rem; }
+        h4 { font-size: 1rem; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">NVIDIA Open GPU Kernel 周报</h1>
+                        <p class="text-xs text-slate-400">2026-06-10 ~ 2026-06-17 | NVLink / NVSwitch / NVLink-C2C / MMU</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 flex-wrap">
+                    <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-700/10 border border-green-500/20">
+                        <div class="text-xs text-slate-400">新发布</div>
+                        <div class="text-lg font-bold text-green-400">1</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500/10 to-purple-700/10 border border-purple-500/20">
+                        <div class="text-xs text-slate-400">活跃 PR</div>
+                        <div class="text-lg font-bold text-purple-400">29</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-red-500/10 to-red-700/10 border border-red-500/20">
+                        <div class="text-xs text-slate-400">活跃 Issue</div>
+                        <div class="text-lg font-bold text-red-400">26</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/10 to-cyan-700/10 border border-cyan-500/20">
+                        <div class="text-xs text-slate-400">追踪模块</div>
+                        <div class="text-lg font-bold text-cyan-400">4</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== NAVIGATION ==================== -->
+    <nav class="sticky top-[72px] z-40 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex flex-wrap gap-2">
+                <button onclick="showTab('nvlink')" id="tab-nvlink" class="tab-active px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-green-600/20 to-green-700/10 border border-green-500/30 text-green-300 transition-all"><i class="fas fa-link mr-1"></i> NVLink</button>
+                <button onclick="showTab('nvswitch')" id="tab-nvswitch" class="tab-inactive px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-slate-600/10 to-slate-700/10 border border-slate-500/20 text-slate-400 transition-all"><i class="fas fa-network-wired mr-1"></i> NVSwitch</button>
+                <button onclick="showTab('nvlink-c2c')" id="tab-nvlink-c2c" class="tab-inactive px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-slate-600/10 to-slate-700/10 border border-slate-500/20 text-slate-400 transition-all"><i class="fas fa-microchip mr-1"></i> NVLink C2C</button>
+                <button onclick="showTab('mmu')" id="tab-mmu" class="tab-inactive px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-slate-600/10 to-slate-700/10 border border-slate-500/20 text-slate-400 transition-all"><i class="fas fa-memory mr-1"></i> MMU/UVM</button>
+                <button onclick="showTab('community')" id="tab-community" class="tab-inactive px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-slate-600/10 to-slate-700/10 border border-slate-500/20 text-slate-400 transition-all"><i class="fas fa-comments mr-1"></i> 社区反馈</button>
+                <button onclick="showTab('comparison')" id="tab-comparison" class="tab-inactive px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-slate-600/10 to-slate-700/10 border border-slate-500/20 text-slate-400 transition-all"><i class="fas fa-balance-scale mr-1"></i> 技术对比</button>
+                <button onclick="showTab('trends')" id="tab-trends" class="tab-inactive px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-slate-600/10 to-slate-700/10 border border-slate-500/20 text-slate-400 transition-all"><i class="fas fa-chart-line mr-1"></i> 趋势展望</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <main class="max-w-7xl mx-auto px-4 pb-12 mt-6 space-y-8">
+
+        <!-- ==================== NVLINK SECTION ==================== -->
+        <section id="nvlink" class="section-block active-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-link text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-green-400">NVLink 模块更新</h2>
+            </div>
+
+            <!-- Release 580.167.08 - NVLink Fix -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-release">Release</span>
+                        <h3 class="font-semibold text-green-300">580.167.08: 修复 B200 NVLink 持久中断与系统变慢问题</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键修复:</strong> 修正 B200 平台上 NVLink 持久中断(persistent NVLINK interrupts)的寄存器设置，解决由此引发的系统性能下降(system slowness)问题。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <strong class="text-slate-300">详细技术方案:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>修复 NVLink 中断寄存器配置错误，该错误导致 B200 GPU 上中断无法正确清除，形成持久中断状态</li>
+                                    <li>持久中断会占用 CPU 中断处理资源，导致系统整体性能下降</li>
+                                    <li>此修复确保 NVLink 中断在触发后能被正确响应和清除</li>
+                                    <li>影响范围: 所有搭载 B200 GPU 的 Data Center 系统 (GB200 NVL72 等)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong class="text-slate-300">其他 580.167.08 修复:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>修复 <code>nvidia-imex-ctl</code> JSON 状态关闭顺序和 IMEX 启动失败遗留僵尸进程</li>
+                                    <li>修复心跳逻辑中的竞态条件，防止 double free/堆损坏</li>
+                                    <li>修复 Xid 145、137、94 错误，这些错误影响内核启动性能约 15%</li>
+                                    <li>修复 gRPC 流式服务器拆解时的崩溃问题</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong class="text-slate-300">已知问题:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>与 EUD 版本 580.126.12 及更早版本不兼容，需升级</li>
+                                    <li>Hopper GPU (subrevision = 3) 需要 VBIOS 96.00.68.00.xx 或更高版本</li>
+                                    <li>默认 TCC 模式不支持 L40/L20 等 GPU 的 IOMMU 隔离</li>
+                                    <li>RHEL 10 上 <code>doca-ofed</code> 缺少 <code>ib_umad.ko</code>，导致 Fabric Manager 无法工作</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/580.167.08" target="_blank" class="ref-link">GitHub Release 580.167.08</a> |
+                                <a href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-580-167-08/index.html" target="_blank" class="ref-link">NVIDIA Release Notes</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NVLink Blog: Slurm Block Scheduling -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-nvidia">NVIDIA Blog</span>
+                        <h3 class="font-semibold text-green-300">GB200 NVL72 机架级 NVLink 一致性域优化 — Slurm Block Scheduling</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">核心内容:</strong> NVIDIA 发布技术博客详述如何通过 Slurm Block Scheduling 扩展 NVLink 一致性域至整个机架(72 GPU)，优化 GB200 NVL72 系统的工作负载效率。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <strong class="text-slate-300">技术要点:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>NVLink 一致性域(coherence domain)覆盖整个 NVL72 机架的 72 个 GPU</li>
+                                    <li>Slurm Block Scheduling 确保工作负载在 NVLink 域内局部性最优放置</li>
+                                    <li>减少跨机架通信，充分利用 NVLink 高带宽低延迟特性</li>
+                                    <li>发布时间: 2026 年 5 月 7 日</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://developer.nvidia.com/blog/" target="_blank" class="ref-link">NVIDIA Developer Blog</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NVLink Blog: NVbandwidth Tool -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-nvidia">NVIDIA Blog</span>
+                        <h3 class="font-semibold text-green-300">NVbandwidth: GPU 互连与内存性能基准测试工具</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">核心内容:</strong> NVIDIA 发布 NVbandwidth 工具，帮助开发者精确测量 GPU 互连(NVLink/PCIe)和内存的数据传输性能，为性能调优提供量化依据。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>支持 NVLink 各代带宽测量 (NVLink 3/4/5)</li>
+                                    <li>支持 PCIe Gen4/Gen5 带宽对比测试</li>
+                                    <li>提供 GPU 内存拷贝、Host-to-Device、Device-to-Host 等场景的带宽数据</li>
+                                    <li>发布时间: 2026 年 4 月 14 日</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://developer.nvidia.com/blog/" target="_blank" class="ref-link">NVIDIA Developer Blog</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PR: P2P API cleanup -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-pr">PR</span>
+                        <h3 class="font-semibold text-purple-300">#1172: p2p_api 添加构造清理/展开路径</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键改进:</strong> 为 P2P API 添加构造阶段的清理和展开(unwind)路径，修复 Bug 4016670，提升 GPU 间 P2P 通信的资源管理健壮性。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>P2P (Peer-to-Peer) 是 NVLink 多 GPU 通信的基础 API</li>
+                                    <li>添加构造失败时的资源清理路径，防止内存/句柄泄漏</li>
+                                    <li>修复 Bug 4016670 对应的资源管理缺陷</li>
+                                    <li>提升 NVLink P2P 在多 GPU 系统中的稳定性</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1172" target="_blank" class="ref-link">GitHub PR #1172</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PR: AllowP2PWithoutCoherentMapping -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-pr">PR</span>
+                        <h3 class="font-semibold text-purple-300">#1152: 新增 NVreg_AllowP2PWithoutCoherentMapping 实验性选项</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键特性:</strong> 引入实验性内核模块参数 <code>NVreg_AllowP2PWithoutCoherentMapping</code>，允许在不支持一致性映射的平台上启用 P2P 通信。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>某些平台/芯片组不支持 GPU 间的一致性内存映射(coherent mapping)</li>
+                                    <li>该选项允许用户在这些平台上强制启用 NVLink P2P</li>
+                                    <li>作为实验性功能，需用户手动启用并承担一致性风险</li>
+                                    <li>对无法使用标准 P2P 的硬件环境提供了新的可能性</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1152" target="_blank" class="ref-link">GitHub PR #1152</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PR: Resizable BAR Thunderbolt -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-pr">PR</span>
+                        <h3 class="font-semibold text-purple-300">#1109: Resizable BAR 调整失败改为非致命，Thunderbolt 场景主动跳过</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键改进:</strong> 将 Resizable BAR 调整失败从致命错误改为非致命警告，并在 Thunderbolt 连接场景下主动跳过 BAR 调整，解决 eGPU 场景下的硬锁定问题。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>Thunderbolt 带宽限制下 Resizable BAR 可能失败，此前会导致驱动加载失败</li>
+                                    <li>修改为失败后回退到默认 BAR 大小，保证驱动正常工作</li>
+                                    <li>直接关联 Issue #979 (RTX 5080 via Thunderbolt 5 eGPU 硬锁定)</li>
+                                    <li>关键代码路径: BAR1 空间管理相关逻辑</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1109" target="_blank" class="ref-link">GitHub PR #1109</a> |
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/979" target="_blank" class="ref-link">Related Issue #979</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ==================== NVSWITCH SECTION ==================== -->
+        <section id="nvswitch" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-network-wired text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-blue-400">NVSwitch 模块更新</h2>
+            </div>
+
+            <!-- NVSwitch: Fabric Manager 580.167.08 -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-release">Release</span>
+                        <h3 class="font-semibold text-blue-300">Fabric Manager 580.167.08 同步发布 — IMEX 与 gRPC 修复</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键更新:</strong> Fabric Manager 随驱动 580.167.08 同步发布，修复 IMEX 进程管理和 gRPC 流式服务器稳定性问题，提升 NVSwitch 机架系统的管理面可靠性。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <strong class="text-slate-300">修复详情:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>修复 <code>nvidia-imex-ctl</code> JSON 状态输出的关闭顺序问题</li>
+                                    <li>修复 IMEX daemon 启动失败后遗留僵尸进程(defunct processes)</li>
+                                    <li>修复心跳逻辑竞态条件，防止 double free/堆损坏</li>
+                                    <li>修复 gRPC streaming-server 拆解时的崩溃</li>
+                                    <li>RHEL 10 已知问题: <code>doca-ofed</code> 缺少 <code>ib_umad.ko</code> 模块，影响 Fabric Manager 运行</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong class="text-slate-300">NVSwitch 机架级部署:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>NVIDIA 博客 "Achieving Peak System Efficiency on GB200 NVL72" 详述 Slurm Block Scheduling 优化 NVSwitch 拓扑感知调度</li>
+                                    <li>"Running AI Workloads on Rack-Scale Supercomputers" 讨论 18 系统 NVLink 互连的硬件拓扑</li>
+                                    <li>Fabric Manager 版本需与驱动版本严格匹配 (580.167.08)</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-580-167-08/index.html" target="_blank" class="ref-link">Release Notes 580.167.08</a> |
+                                <a href="https://developer.nvidia.com/blog/" target="_blank" class="ref-link">NVIDIA Developer Blog</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NVSwitch: No direct code changes note -->
+            <div class="detail-card rounded-xl mb-4 p-5">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="badge-feature">说明</span>
+                    <h3 class="font-semibold text-slate-300">本周 NVSwitch 开源代码无直接变更</h3>
+                </div>
+                <div class="text-sm text-slate-400">
+                    <p>NVSwitch 固件和核心逻辑主要闭源，开源驱动中的 NVSwitch 相关代码集中在 Fabric Manager 和用户态管理工具。本周的主要变化来自 Fabric Manager 的 IMEX/gRPC 修复，以及 NVIDIA 官方关于机架级 NVSwitch 部署的博客更新。</p>
+                    <p class="mt-2">NVSwitch 硬件初始化代码路径: <code>src/nvidia/src/gpu/nvswitch/</code> (RM 闭源部分)。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== NVLINK C2C SECTION ==================== -->
+        <section id="nvlink-c2c" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-microchip text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-amber-400">NVLink-C2C 模块更新</h2>
+            </div>
+
+            <!-- CDMM for GB200 -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-feature">New Feature</span>
+                        <h3 class="font-semibold text-amber-300">580.167.08 引入 CDMM — GB200 NVLink-C2C 内存管理新模式</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">核心特性:</strong> Coherent Driver-Based Memory Management (CDMM) — 驱动层一致性内存管理。在 GB200 平台上，由 NVIDIA 驱动而非操作系统来管理 GPU 内存，利用 NVLink-C2C 的一致性域实现 CPU-GPU 统一内存管理。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <strong class="text-slate-300">技术细节:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>CDMM 通过 NVLink-C2C 互连实现 CPU (Grace) 与 GPU (Blackwell) 之间的一致性内存管理</li>
+                                    <li>驱动接管内存管理后，可绕过 OS 页表的部分开销，直接利用 NVLink-C2C 的硬件一致性</li>
+                                    <li>启用方式: 在 <code>/etc/modprobe.d/nvidia-openrm.conf</code> 中添加 <code>options nvidia NVreg_CoherentGPUMemoryMode=driver</code></li>
+                                    <li>注意: CDMM 模式下不支持 GPU Direct Storage</li>
+                                    <li>新增 HAL 支持: <code>GPU_OFFSET_MAX</code> 可见性</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong class="text-slate-300">架构意义:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>GB200 Superchip 通过 NVLink-C2C 将 Grace CPU 和 Blackwell GPU 以 900 GB/s 带宽互连</li>
+                                    <li>CDMM 是 NVLink-C2C 一致性能力的软件层实现，使驱动可直接管理跨 CPU-GPU 的内存页</li>
+                                    <li>对 AI 推理场景(如长上下文 LLM)尤为重要，可减少内存拷贝和页表遍历开销</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-580-167-08/index.html" target="_blank" class="ref-link">Release Notes 580.167.08 - CDMM</a> |
+                                <a href="https://www.nvidia.com/en-us/data-center/nvlink-c2c/" target="_blank" class="ref-link">NVIDIA NVLink-C2C 官方页面</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rubin Platform -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-nvidia">Roadmap</span>
+                        <h3 class="font-semibold text-amber-300">NVIDIA Rubin 平台: NVLink 7 + Vera CPU + NVLink-C2C 演进</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">路线图:</strong> NVIDIA 在 GTC 2026 发布 Rubin 平台，包含六款新芯片。NVLink-C2C 将演进至 Vera CPU + Rubin GPU 的 Superchip 架构，NVLink 升级至第 7 代。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <strong class="text-slate-300">Rubin 平台关键规格:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li><strong>Vera CPU</strong>: NVIDIA 自研 ARM 架构 CPU，替代 Grace</li>
+                                    <li><strong>Rubin GPU</strong>: 下一代 AI GPU，接替 Blackwell</li>
+                                    <li><strong>Rubin Ultra</strong>: 增强版 GPU，面向最高性能需求</li>
+                                    <li><strong>NVLink 7 Switch</strong>: 第 7 代 NVLink 交换芯片</li>
+                                    <li><strong>单 GPU 带宽</strong>: 14.4 Tbit/s (NVLink + NVSwitch 总聚合带宽)</li>
+                                    <li><strong>机架内互连</strong>: 铜缆连接 (cable-less 设计理念延续)</li>
+                                    <li><strong>跨机架互连</strong>: CPO (Co-Packaged Optics) 光互连</li>
+                                    <li><strong>NVLink-C2C</strong>: Vera-Rubin Superchip 中 Vera CPU 与 Rubin GPU 的 C2C 互连将进一步提升带宽</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Kicks-Off-the-Next-Generation-of-AI-With-Rubin--Six-New-Chips-One-Incredible-AI-Supercomputer/default.aspx" target="_blank" class="ref-link">NVIDIA Investor Relations - Rubin 发布</a> |
+                                <a href="https://www.nvidia.com/en-us/data-center/nvlink-c2c/" target="_blank" class="ref-link">NVIDIA NVLink-C2C</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NVLink-C2C no direct code changes -->
+            <div class="detail-card rounded-xl mb-4 p-5">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="badge-feature">说明</span>
+                    <h3 class="font-semibold text-slate-300">本周 NVLink-C2C 开源代码无直接变更</h3>
+                </div>
+                <div class="text-sm text-slate-400">
+                    <p>NVLink-C2C 的硬件协议层和 PHY 实现为闭源固件。开源驱动中的 C2C 相关代码主要体现在内存管理驱动(如 CDMM)和一致性域配置。本周最重要的更新是 580.167.08 引入的 CDMM 功能，这是 NVLink-C2C 一致性能力在软件层的首次落地。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== MMU/UVM SECTION ==================== -->
+        <section id="mmu" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-memory text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-cyan-400">MMU/UVM 模块更新</h2>
+            </div>
+
+            <!-- PR: UVM tracker entries -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-pr">PR</span>
+                        <h3 class="font-semibold text-purple-300">#1139: UVM 避免 tracker entry 过度预留</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键改进:</strong> 优化 UVM (Unified Virtual Memory) 的 tracker entry 分配策略，避免过度预留导致的内存浪费和潜在的性能退化。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <strong class="text-slate-300">技术细节:</strong>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>UVM tracker 用于跟踪 GPU 页表操作和内存迁移的状态</li>
+                                    <li>此前的实现会过度预留 tracker entry，在高并发内存操作场景下造成资源浪费</li>
+                                    <li>优化后的分配策略按需分配，减少不必要的内存占用</li>
+                                    <li>关键代码路径: <code>kernel-open/nvidia-uvm/uvm_tracker.c</code></li>
+                                    <li>对大规模内存操作(如 page migration、prefetch)的性能有正面影响</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1139" target="_blank" class="ref-link">GitHub PR #1139</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PR: mmap_context fix -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-pr">PR</span>
+                        <h3 class="font-semibold text-purple-300">#1096: 修复 mmap_context 在 VMA 访问中的使用前初始化</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键修复:</strong> 修复 nvidia 驱动中 mmap_context 在 VMA (Virtual Memory Area) 访问路径上的使用前初始化(use-before-initialization) 缺陷，可能导致内存访问异常。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>mmap_context 是 GPU 内存映射的核心数据结构</li>
+                                    <li>在特定 VMA 访问路径上，mmap_context 可能在完全初始化前被引用</li>
+                                    <li>该缺陷可能导致 GPU 内存映射失败或数据损坏</li>
+                                    <li>PR 状态: 已关闭 (可能已合入其他分支或以其他方式修复)</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1096" target="_blank" class="ref-link">GitHub PR #1096</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PR: GPFIFO wait bound -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-pr">PR</span>
+                        <h3 class="font-semibold text-purple-300">#1192: 约束 nvWriteGpEntry() 中 GPFIFO-space 等待范围</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">关键改进:</strong> 约束 <code>nvWriteGpEntry()</code> 函数中的 GPFIFO-space 等待边界，防止 GPU 命令队列操作中的潜在死锁或超时。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>GPFIFO 是 GPU 命令队列的核心机制</li>
+                                    <li><code>nvWriteGpEntry()</code> 负责向 GPU 命令队列写入执行条目</li>
+                                    <li>此前在高负载场景下，GPFIFO-space 等待可能超出预期范围</li>
+                                    <li>修复后添加了明确的等待边界，提升 GPU 调度的可预测性</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1192" target="_blank" class="ref-link">GitHub PR #1192</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Issue: BAR1 exhaustion -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-bug">Bug</span>
+                        <h3 class="font-semibold text-red-300">#1187: BAR1 VA 空间耗尽导致系统硬锁定 (Turing, 256 MiB BAR1)</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">严重问题:</strong> 浏览器 WebGL 工作负载即可触发 BAR1 VA 空间耗尽，导致 RC watchdog 报告 "GPU is probably locked"，系统完全硬锁定。影响 Turing 架构 (256 MiB BAR1) 的 595.71.05 驱动。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>BAR1 (Base Address Register 1) 是 CPU 映射 GPU 内存的窗口</li>
+                                    <li>Turing GPU 仅 256 MiB BAR1 空间，VA 空间有限</li>
+                                    <li>浏览器 WebGL 上下文的纹理/缓冲区分配可能耗尽 BAR1 VA 空间</li>
+                                    <li>耗尽后触发 Xid 错误链，最终导致系统硬锁定</li>
+                                    <li>关联 Issue #1134: 类似问题在 RTX 3090 + kernel 7.0.3 上通过 <code>__nv_drm_gem_nvkms_map</code> 触发</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1187" target="_blank" class="ref-link">GitHub Issue #1187</a> |
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1134" target="_blank" class="ref-link">Related Issue #1134</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 580.167.08 Xid fixes -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-release">Release</span>
+                        <h3 class="font-semibold text-cyan-300">580.167.08 修复 Xid 145/137/94 — 内核启动性能提升 15%</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">性能修复:</strong> 修复 Xid 145、137、94 错误，这些错误影响 GPU 内核启动性能约 15%。Xid 错误是 NVIDIA 驱动报告的 GPU 硬件/软件异常。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>Xid 145: 通常与 GPU 页表操作或内存管理相关</li>
+                                    <li>Xid 137: 通常与 GSP (GPU System Processor) 固件交互相关</li>
+                                    <li>Xid 94: 通常与 GPU 内存上下文或地址空间相关</li>
+                                    <li>修复后内核启动性能提升约 15%，表明这些 Xid 的触发导致了重试或降级路径</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-580-167-08/index.html" target="_blank" class="ref-link">Release Notes 580.167.08</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== COMMUNITY SECTION ==================== -->
+        <section id="community" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-comments text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-yellow-400">社区反馈</h2>
+            </div>
+
+            <!-- High-frequency: BAR1 exhaustion -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-bug">高频 Issue</span>
+                        <h3 class="font-semibold text-yellow-300">BAR1 空间耗尽问题集中爆发 — #1187, #1134</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">问题概述:</strong> 多个 Issue 报告了 BAR1 VA 空间耗尽导致的 GPU 锁定问题。从浏览器 WebGL 到 Chromium GPU 工作负载，小 BAR1 的 GPU 在日常使用中即可触发。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li><strong>#1187</strong>: Turing GPU (256 MiB BAR1) + 595.71.05 + 浏览器 WebGL → 系统硬锁定</li>
+                                    <li><strong>#1134</strong>: RTX 3090 + kernel 7.0.3 + 595.71.05 + Chromium → <code>__nv_drm_gem_nvkms_map</code> 超出 PCI BAR1 → Xid 31 → Xid 154</li>
+                                    <li>PR #1109 尝试修复: 将 Resizable BAR 失败改为非致命，Thunderbolt 场景主动跳过</li>
+                                    <li>社区建议: 增大 BAR1 大小或启用 Resizable BAR</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1187" target="_blank" class="ref-link">Issue #1187</a> |
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1134" target="_blank" class="ref-link">Issue #1134</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blackwell mobile suspend issues -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-bug">高频 Issue</span>
+                        <h3 class="font-semibold text-yellow-300">Blackwell 移动端挂起/恢复问题 — #1205, #1136, #1117</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">问题概述:</strong> 多个 Blackwell 移动端 (RTX 50 系列 Laptop) 报告挂起/恢复失败，涉及 CPU soft lockup、黑屏、s2idle 挂起等问题。PR #1199 尝试修复 hibernation resume 路径。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li><strong>#1205</strong>: 595.71.05 + Blackwell mobile (10de:2c59) + kernel 6.17 → S3 resume 时 <code>nvDIFRPrefetchSurfaces</code> CPU soft lockup</li>
+                                    <li><strong>#1136</strong>: nvidia-open 595.71.05 + RTX 4070 Mobile + Wayland/Niri → 挂起/恢复黑屏</li>
+                                    <li><strong>#1117</strong>: RTX 50 系列 Blackwell + Linux 7.0 内核 → s2idle resume 挂起 (6.17 内核正常)</li>
+                                    <li><strong>PR #1199</strong>: 修复 IsHibernate 标志位，避免 GC6/S0ix 挂起恢复走错误的 hibernation 路径</li>
+                                    <li><strong>PR #1181</strong>: 不唤醒 runtime-suspended dGPU 以处理 NVPCF/GPS ACPI 通知</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1205" target="_blank" class="ref-link">Issue #1205</a> |
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1136" target="_blank" class="ref-link">Issue #1136</a> |
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1199" target="_blank" class="ref-link">PR #1199</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RTX 5080 Xid 79 -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-bug">Bug</span>
+                        <h3 class="font-semibold text-yellow-300">#1151: RTX 5080 (GB203) 随机 Xid 79 — 无征兆的 GPU "原子死亡"</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">问题概述:</strong> RTX 5080 在任何负载水平下随机出现 Xid 79 错误，导致 GPU 瞬间"原子死亡"(atomic GPU death)，无前置错误征兆。595.71.05 驱动。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>Xid 79 通常表示 GPU 掉线或无法通信</li>
+                                    <li>该问题的特点是"零 precursor"(无前置错误)，突然出现</li>
+                                    <li>任何负载水平都可能触发，包括空闲和中等负载</li>
+                                    <li>影响 GB203 (RTX 5080) 芯片</li>
+                                    <li>社区关注度高，可能涉及 Blackwell 消费级 GPU 的硬件/固件稳定性</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1151" target="_blank" class="ref-link">GitHub Issue #1151</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GEM allocation failure -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-bug">Bug</span>
+                        <h3 class="font-semibold text-yellow-300">#1191: NVKMS GEM 分配失败导致 Ghostty SIGSEGV</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">问题概述:</strong> nvidia-drm NVKMS GEM 分配失败后，Ghostty 终端在 <code>libnvidia-eglcore.so.610.43.02</code> 中发生 SIGSEGV 崩溃。影响 610.43.02 驱动分支。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>GEM (Graphics Execution Manager) 是 Linux DRM 子系统的内存分配接口</li>
+                                    <li>NVKMS 是 NVIDIA 的 KMS (Kernel Mode Setting) 实现</li>
+                                    <li>GEM 分配失败可能导致依赖 GPU 内存的应用崩溃</li>
+                                    <li>影响新 610.x 驱动分支</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1191" target="_blank" class="ref-link">GitHub Issue #1191</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Linux 7.0 compatibility -->
+            <div class="detail-card rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between p-5 cursor-pointer" onclick="toggleDetail(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="badge-pr">PR</span>
+                        <h3 class="font-semibold text-yellow-300">#1168: 修复 Linux 7.0 内核兼容性</h3>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-400"></i>
+                </div>
+                <div class="px-5 pb-4">
+                    <div class="highlight-box mb-3">
+                        <strong class="text-green-300">兼容性修复:</strong> PR #1168 修复 NVIDIA 开源驱动在 Linux 7.0 内核上的编译和运行问题，确保与最新主线内核的兼容性。
+                    </div>
+                    <div class="detail-section">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                    <li>Linux 7.0 内核引入了 API 变更，影响 NVIDIA 驱动编译</li>
+                                    <li>PR #1183 同时修复构建系统以支持 <code>TARGET_ARCH</code> 交叉编译</li>
+                                    <li>PR #1070 探索 grsecurity 内核兼容性</li>
+                                    <li>PR #1069/#1068 为完整 kbuild 支持做准备</li>
+                                </ul>
+                            </div>
+                            <div class="text-xs text-slate-500">来源:
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1168" target="_blank" class="ref-link">PR #1168</a> |
+                                <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1183" target="_blank" class="ref-link">PR #1183</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== COMPARISON SECTION ==================== -->
+        <section id="comparison" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-balance-scale text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-purple-400">技术对比</h2>
+            </div>
+
+            <!-- Driver version comparison -->
+            <div class="detail-card rounded-xl p-5 mb-6 overflow-x-auto">
+                <h3 class="font-semibold text-violet-300 mb-4"><i class="fas fa-code-branch mr-2"></i>驱动版本对比 (本周活跃)</h3>
+                <table class="comparison-table w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-600">
+                            <th class="text-left p-3 rounded-tl-lg">版本</th>
+                            <th class="text-left p-3">分支</th>
+                            <th class="text-left p-3">发布日期</th>
+                            <th class="text-left p-3">类型</th>
+                            <th class="text-left p-3 rounded-tr-lg">关键变更</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-slate-400">
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-green-300">580.167.08</td>
+                            <td class="p-3">Data Center</td>
+                            <td class="p-3">2026-06-15</td>
+                            <td class="p-3"><span class="badge-release">Production</span></td>
+                            <td class="p-3">CDMM for GB200, NVLink 中断修复, Xid 145/137/94 修复</td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-slate-300">595.80</td>
+                            <td class="p-3">Vulkan Beta</td>
+                            <td class="p-3">2026-05-27</td>
+                            <td class="p-3"><span class="badge-feature">Beta</span></td>
+                            <td class="p-3">Vulkan Developer Beta 驱动</td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-slate-300">610.43.02</td>
+                            <td class="p-3">New Branch</td>
+                            <td class="p-3">2026-05-26</td>
+                            <td class="p-3"><span class="badge-feature">New</span></td>
+                            <td class="p-3">新驱动分支，GEM/NVKMS 变更</td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-slate-300">595.71.05</td>
+                            <td class="p-3">Vulkan Beta</td>
+                            <td class="p-3">2026-05 (前序)</td>
+                            <td class="p-3"><span class="badge-feature">Beta</span></td>
+                            <td class="p-3">本周多个 Issue 报告基于此版本</td>
+                        </tr>
+                        <tr class="table-row-hover">
+                            <td class="p-3 font-medium text-slate-300">595.44.09</td>
+                            <td class="p-3">Vulkan Beta</td>
+                            <td class="p-3">2026-05-22</td>
+                            <td class="p-3"><span class="badge-feature">Beta</span></td>
+                            <td class="p-3">Vulkan Developer Beta 驱动</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bug severity comparison -->
+            <div class="detail-card rounded-xl p-5 mb-6 overflow-x-auto">
+                <h3 class="font-semibold text-violet-300 mb-4"><i class="fas fa-bug mr-2"></i>本周高频 Bug 分类</h3>
+                <table class="comparison-table w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-600">
+                            <th class="text-left p-3 rounded-tl-lg">类别</th>
+                            <th class="text-left p-3">Issue 编号</th>
+                            <th class="text-left p-3">影响架构</th>
+                            <th class="text-left p-3">严重程度</th>
+                            <th class="text-left p-3 rounded-tr-lg">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-slate-400">
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-red-300">BAR1 VA 耗尽</td>
+                            <td class="p-3">#1187, #1134</td>
+                            <td class="p-3">Turing / Ampere</td>
+                            <td class="p-3"><span class="badge-bug">Critical</span></td>
+                            <td class="p-3">Open</td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-red-300">S3/s2idle 恢复失败</td>
+                            <td class="p-3">#1205, #1136, #1117, #1157</td>
+                            <td class="p-3">Blackwell Mobile / Ada</td>
+                            <td class="p-3"><span class="badge-bug">High</span></td>
+                            <td class="p-3">Open (PR #1199)</td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-orange-300">Xid 79 GPU 掉线</td>
+                            <td class="p-3">#1151</td>
+                            <td class="p-3">Blackwell (GB203)</td>
+                            <td class="p-3"><span class="badge-bug">High</span></td>
+                            <td class="p-3">Open</td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-yellow-300">GEM 分配失败</td>
+                            <td class="p-3">#1191</td>
+                            <td class="p-3">通用 (610.x)</td>
+                            <td class="p-3"><span class="badge-feature">Medium</span></td>
+                            <td class="p-3">Open</td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-yellow-300">Thunderbolt eGPU 锁定</td>
+                            <td class="p-3">#979</td>
+                            <td class="p-3">Blackwell (GB203)</td>
+                            <td class="p-3"><span class="badge-bug">High</span></td>
+                            <td class="p-3">Open (PR #1109)</td>
+                        </tr>
+                        <tr class="table-row-hover">
+                            <td class="p-3 font-medium text-slate-300">HDMI FRL 速率错误</td>
+                            <td class="p-3">#1204</td>
+                            <td class="p-3">Ada (RTX 4090)</td>
+                            <td class="p-3"><span class="badge-feature">Medium</span></td>
+                            <td class="p-3">Open (PR #1186)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Module coverage -->
+            <div class="detail-card rounded-xl p-5 overflow-x-auto">
+                <h3 class="font-semibold text-violet-300 mb-4"><i class="fas fa-layer-group mr-2"></i>四大模块本周覆盖度</h3>
+                <table class="comparison-table w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-600">
+                            <th class="text-left p-3 rounded-tl-lg">模块</th>
+                            <th class="text-left p-3">Release</th>
+                            <th class="text-left p-3">PR</th>
+                            <th class="text-left p-3">Issue</th>
+                            <th class="text-left p-3 rounded-tr-lg">活跃度</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-slate-400">
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-green-300"><i class="fas fa-link mr-1"></i> NVLink</td>
+                            <td class="p-3">580.167.08 (NVLink 中断修复)</td>
+                            <td class="p-3">#1172 (P2P), #1152 (P2P), #1109 (BAR)</td>
+                            <td class="p-3">#1187, #979</td>
+                            <td class="p-3"><span class="trend-arrow text-green-400"><i class="fas fa-arrow-up"></i> 高</span></td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-blue-300"><i class="fas fa-network-wired mr-1"></i> NVSwitch</td>
+                            <td class="p-3">Fabric Manager 580.167.08</td>
+                            <td class="p-3">-</td>
+                            <td class="p-3">-</td>
+                            <td class="p-3"><span class="text-yellow-400">中</span></td>
+                        </tr>
+                        <tr class="border-b border-slate-700 table-row-hover">
+                            <td class="p-3 font-medium text-amber-300"><i class="fas fa-microchip mr-1"></i> NVLink-C2C</td>
+                            <td class="p-3">580.167.08 (CDMM)</td>
+                            <td class="p-3">-</td>
+                            <td class="p-3">-</td>
+                            <td class="p-3"><span class="trend-arrow text-green-400"><i class="fas fa-arrow-up"></i> 高 (新功能)</span></td>
+                        </tr>
+                        <tr class="table-row-hover">
+                            <td class="p-3 font-medium text-cyan-300"><i class="fas fa-memory mr-1"></i> MMU/UVM</td>
+                            <td class="p-3">580.167.08 (Xid 修复)</td>
+                            <td class="p-3">#1139 (UVM), #1192 (GPFIFO), #1096 (mmap)</td>
+                            <td class="p-3">#1187, #1191, #1134</td>
+                            <td class="p-3"><span class="trend-arrow text-green-400"><i class="fas fa-arrow-up"></i> 高</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ==================== TRENDS SECTION ==================== -->
+        <section id="trends" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-emerald-400">趋势展望</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-bolt mr-2 trend-arrow"></i>短期趋势 (1-3 个月)</h3>
+                    <ul class="text-sm text-slate-400 space-y-2">
+                        <li><strong class="text-slate-300">CDMM 生态完善:</strong> 580.167.08 首次引入 CDMM，预计后续版本将修复 GPU Direct Storage 兼容性问题并扩展到更多 GB200 配置</li>
+                        <li><strong class="text-slate-300">Blackwell 移动端稳定性:</strong> 多个 suspend/resume Bug 和 PR 表明 NVIDIA 正在积极修复 Blackwell 移动端的电源管理问题</li>
+                        <li><strong class="text-slate-300">Linux 7.0 兼容性:</strong> PR #1168 等修复确保开源驱动与最新主线内核保持兼容</li>
+                        <li><strong class="text-slate-300">BAR1 空间管理:</strong> BAR1 耗尽问题的高频报告可能推动 NVIDIA 优化小 BAR1 GPU 的内存管理策略</li>
+                    </ul>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-rocket mr-2 trend-arrow"></i>中期趋势 (3-12 个月)</h3>
+                    <ul class="text-sm text-slate-400 space-y-2">
+                        <li><strong class="text-slate-300">Rubin 平台驱动支持:</strong> NVIDIA Rubin 平台 (NVLink 7 + Vera CPU) 预计 2026 下半年开始有早期驱动支持</li>
+                        <li><strong class="text-slate-300">NVLink-C2C 带宽提升:</strong> Vera-Rubin Superchip 的 C2C 互连带宽预计将显著超过 Grace-Blackwell 的 900 GB/s</li>
+                        <li><strong class="text-slate-300">开源驱动 upstream 推进:</strong> PR #1069/#1068 的 kbuild 支持和 #1070 的 grsecurity 兼容性表明社区在推动更广泛的上游支持</li>
+                        <li><strong class="text-slate-300">hwmon 基础设施:</strong> PR #1169 添加 hwmon 基础设施，改善开源驱动的硬件监控能力</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Core Insights -->
+            <div class="detail-card rounded-xl p-5 mt-6">
+                <h3 class="font-semibold text-green-300 mb-4"><i class="fas fa-lightbulb mr-2"></i>本周核心洞察</h3>
+                <div class="space-y-4 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">1. CDMM 是 NVLink-C2C 软件生态的关键拼图</strong>
+                        <p class="text-slate-400 mt-1">580.167.08 引入的 CDMM 让驱动直接管理 GPU 内存，绕过 OS 页表开销。这是 NVLink-C2C 硬件一致性能力在软件层的首次落地，对 Grace-Blackwell 及后续 Vera-Rubin 平台的 AI 推理性能至关重要。</p>
+                    </div>
+                    <div class="highlight-box">
+                        <strong class="text-green-300">2. BAR1 空间管理成为开源驱动痛点</strong>
+                        <p class="text-slate-400 mt-1">本周 #1187 和 #1134 两个 Issue 表明，小 BAR1 GPU (256 MiB) 在日常浏览器工作负载下即可触发 VA 空间耗尽。PR #1109 的 Resizable BAR 修复是正确方向，但需要更根本的 VA 空间管理优化。</p>
+                    </div>
+                    <div class="highlight-box">
+                        <strong class="text-green-300">3. Blackwell 移动端电源管理仍需打磨</strong>
+                        <p class="text-slate-400 mt-1">#1205 (CPU soft lockup)、#1136 (黑屏)、#1117 (s2idle 挂起) 三个 Issue 加上 PR #1199 和 #1181 两个修复 PR，说明 Blackwell 移动端的 suspend/resume 路径仍是当前开源驱动的主要不稳定区域。</p>
+                    </div>
+                    <div class="highlight-box">
+                        <strong class="text-green-300">4. Rubin 平台定义下一代互连规格</strong>
+                        <p class="text-slate-400 mt-1">GTC 2026 发布的 Rubin 平台配备 NVLink 7 Switch、14.4 Tbit/s 聚合带宽、CPO 光互连。开源驱动需在未来 6-12 个月内为这些新硬件做好准备。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="detail-card rounded-xl p-5 mt-6">
+                <h3 class="font-semibold text-green-300 mb-4"><i class="fas fa-calendar-alt mr-2"></i>本周关键事件时间线</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-15</span>
+                        <span class="text-slate-400">580.167.08 发布: CDMM for GB200, NVLink 中断修复, Xid 145/137/94 修复</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-16</span>
+                        <span class="text-slate-400">Issue #1205 报告: Blackwell mobile S3 resume CPU soft lockup</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-14</span>
+                        <span class="text-slate-400">Issue #1204 报告: RTX 4090 HDMI 2.1 FRL 速率选择错误</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-13</span>
+                        <span class="text-slate-400">Issue #1202/#1203 报告: 亮度控制 & DDC/CI 问题</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-12</span>
+                        <span class="text-slate-400">PR #1199: 修复 hibernate/suspend 恢复路径 IsHibernate 标志</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-11</span>
+                        <span class="text-slate-400">PR #1192: 约束 GPFIFO-space 等待; PR #1195/#1196: DisplayPort sink caps 修复</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-10</span>
+                        <span class="text-slate-400">PR #1189: 抑制 RM 日志多余换行</span>
+                    </div>
+                    <div class="flex gap-4">
+                        <span class="text-green-400 font-mono whitespace-nowrap">06-09</span>
+                        <span class="text-slate-400">PR #1186: modeset 支持强制 FRL 速率; Issue #1187 报告 BAR1 耗尽</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="glass-card border-t border-slate-700 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>NVIDIA Open GPU Kernel 周报 | 2026-06-10 ~ 2026-06-17 | 数据来源: GitHub (nvidia/open-gpu-kernel-modules), NVIDIA Developer Blog, NVIDIA Data Center Docs, NVIDIA Investor Relations</p>
+            <p class="mt-1">所有信息基于公开可验证来源，每个技术点均附带可点击的 reference 链接</p>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all sections
+            document.querySelectorAll('.section-block').forEach(function(s) {
+                s.classList.remove('active-section');
+            });
+            // Deactivate all tabs
+            document.querySelectorAll('[id^="tab-"]').forEach(function(t) {
+                t.classList.remove('tab-active');
+                t.classList.add('tab-inactive');
+            });
+            // Show target section
+            var target = document.getElementById(tabName);
+            if (target) {
+                target.classList.add('active-section');
+            }
+            // Activate target tab
+            var tab = document.getElementById('tab-' + tabName);
+            if (tab) {
+                tab.classList.remove('tab-inactive');
+                tab.classList.add('tab-active');
+            }
+            // Scroll to top of content
+            window.scrollTo({ top: document.querySelector('nav').offsetTop + document.querySelector('nav').offsetHeight, behavior: 'smooth' });
+        }
+
+        function toggleDetail(header) {
+            var card = header.closest('.detail-card');
+            var detailSection = card.querySelector('.detail-section');
+            var icon = header.querySelector('.expand-icon');
+            if (detailSection) {
+                detailSection.classList.toggle('expanded');
+            }
+            if (icon) {
+                icon.classList.toggle('rotated');
+            }
+        }
+    </script>
+
+</body>
+</html>

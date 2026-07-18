@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Multi-Channel Workload Balance Algorithm</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 960px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.7; }
+  h1 { border-bottom: 3px solid #2563eb; padding-bottom: 8px; }
+  h2 { color: #2563eb; margin-top: 2em; border-left: 4px solid #2563eb; padding-left: 12px; }
+  h3 { color: #374151; }
+  code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
+  pre .kw { color: #7dd3fc; }
+  pre .cm { color: #94a3b8; }
+  pre .num { color: #fbbf24; }
+  pre .str { color: #86efac; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 10px 14px; text-align: center; }
+  th { background: #2563eb; color: white; }
+  tr:nth-child(even) { background: #f9fafb; }
+  .highlight { background: #dbeafe; border-left: 4px solid #2563eb; padding: 16px; border-radius: 4px; margin: 16px 0; }
+  .warn { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px; margin: 16px 0; }
+  .good { background: #d1fae5; border-left: 4px solid #10b981; padding: 16px; border-radius: 4px; margin: 16px 0; }
+  .formula { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 8px; display: inline-block; font-family: "Courier New", monospace; font-size: 1.05em; margin: 8px 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 600; }
+  .tag-best { background: #d1fae5; color: #065f46; }
+  .tag-simple { background: #dbeafe; color: #1e40af; }
+  .tag-bad { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+
+<h1>Multi-Channel Workload Balance Algorithm</h1>
+<p>硬件多channel workload均匀分配算法设计</p>
+
+<h2>1. Problem Statement</h2>
+
+<h3>输入</h3>
+<table>
+  <tr><th>Parameter</th><th>Value</th><th>Description</th></tr>
+  <tr><td>PA width</td><td>40 bit</td><td>Physical Address位宽</td></tr>
+  <tr><td>flow_id width</td><td>12 bit</td><td>每段切分为4K，即一个flow_id</td></tr>
+  <tr><td>N</td><td>9 / 18 / 36 / 72 / 144 / 288 (可配)</td><td>物理channel数量</td></tr>
+  <tr><td>R = 4096 % N</td><td>1(N=9) / 10(N=18) / 28(N=36) / 64(N=72,144,288)</td><td>每block余数</td></tr>
+</table>
+
+<h3>核心矛盾</h3>
+<p>每个4K block有4096个flow_id需要映射到N个channel。简单取模 <code>flow_id % N</code> 时：</p>
+<ul>
+  <li>4096 = 28 &times; 144 + <strong>64</strong>（当N=144）</li>
+  <li>前64个channel（0~63）各得29个flow_id，后80个channel（64~143）各得28个</li>
+  <li>这个偏差在每个4K block中<strong>完全相同</strong>，累积后channel 0比channel 64多144个workload（144 blocks后）</li>
+</ul>
+
+<div class="warn">
+<strong>Naive Modulo的问题：</strong>3.52%的固定不均衡，且永远不会收敛。144个block后，channel 0累计4176次，channel 64只有4032次，差值144。
+</div>
+
+<h2>2. Algorithm Design</h2>
+
+<h3>Approach A: Rotated Modulo <span class="tag tag-simple">最简实现</span></h3>
+
+<p>核心思路：给不同block的flow_id加上不同的偏移量，让"多出来的64个"轮流落在不同channel上。</p>
+
+<div class="formula">
+  channel = (local_id + block_id &times; STRIDE) % N
+</div>
+
+<p>其中：</p>
+<ul>
+  <li><code>local_id = flow_id[11:0]</code>（block内偏移，0~4095，来自flow_id低12位）</li>
+  <li><code>block_id</code>（block编号，驱动rotation），两种取法：
+    <ul>
+      <li>简单：<code>block_id = dst_route_na[27:12]</code>（16 bit，直接截取NA高位）</li>
+      <li>复杂：<code>block_id = hash(dst_route_na[27:12])</code>（16 bit，加hash打散地址相关性）</li>
+    </ul>
+  </li>
+  <li><code>STRIDE</code> 需满足 <strong>R % gcd(STRIDE, N) == 0</strong>。六种N均推荐STRIDE=32（<<5）</li>
+</ul>
+
+<div class="highlight">
+<strong>STRIDE选择条件：R % gcd(STRIDE, N) == 0</strong><br>
+rotation offset 以 <code>gcd(STRIDE, N)</code> 为步长移动一个宽度为R的"extra窗口"。
+只有当R能被步长整除时，窗口才能像砖块一样无缝铺满channel空间。<br><br>
+
+<table style="margin:8px 0">
+  <tr><th>N</th><th>R</th><th>STRIDE</th><th>gcd(STRIDE,N)</th><th>R%gcd</th><th>收敛block数</th><th>结论</th></tr>
+  <tr><td>9</td><td>1</td><td><strong>32</strong></td><td>1</td><td>0</td><td style="color:green"><strong>9</strong></td><td style="color:green">最优</td></tr>
+  <tr><td>18</td><td>10</td><td><strong>32</strong></td><td>2</td><td>0</td><td style="color:green"><strong>9</strong></td><td style="color:green">最优</td></tr>
+  <tr><td>36</td><td>28</td><td><strong>32</strong></td><td>4</td><td>0</td><td style="color:green"><strong>9</strong></td><td style="color:green">最优</td></tr>
+  <tr><td>72</td><td>64</td><td><strong>32</strong></td><td>8</td><td>0</td><td style="color:green"><strong>9</strong></td><td style="color:green">最优</td></tr>
+  <tr><td>144</td><td>64</td><td><strong>32</strong></td><td>16</td><td>0</td><td style="color:green"><strong>9</strong></td><td style="color:green">最优</td></tr>
+  <tr><td>288</td><td>64</td><td><strong>32</strong></td><td>32</td><td>0</td><td style="color:green"><strong>9</strong></td><td style="color:green">最优</td></tr>
+  <tr><td>144</td><td>64</td><td>65</td><td>1</td><td>0</td><td>144</td><td>可行但慢</td></tr>
+  <tr><td>144</td><td>64</td><td>72</td><td>72</td><td>64≠0</td><td style="color:red">永不收敛</td><td style="color:red">不可用</td></tr>
+</table>
+
+<strong>STRIDE=32为什么对所有N都最优？</strong><br>
+以N=144为例：gcd(32, 144) = 16，R=64，64%16=0。9个不同offset {0, 32, 64, 96, 128, 16, 48, 80, 112}，
+每个offset把64宽的extra窗口移动16格，恰好整除窗口宽度，9个block即完美均衡。
+STRIDE=32同时对六种N均满足 R%gcd==0 条件，且实现仅需 <code>block_id &lt;&lt; 5</code>，适合可配设计共用一个常量。
+注意 N/gcd 对六种N都恰好等于9，收敛速度统一。
+</div>
+
+<p><strong>硬件开销：</strong>1个加法器 + 1个取模器（divider）。极其简单。</p>
+
+<h3>Approach B: Bresenham Uniform Distribution <span class="tag tag-best">推荐方案</span></h3>
+
+<p>核心思路分两步：前 (4096−R) 个flow_id用简单取模（完美均衡），剩余R个用Bresenham直线算法均匀散布，再叠加block rotation实现跨block均衡。</p>
+
+<h4>参数定义总表</h4>
+<table>
+  <tr><th>参数</th><th>含义</th><th>公式</th><th>位宽</th><th>N=9</th><th>N=18</th><th>N=36</th><th>N=72</th><th>N=144</th><th>N=288</th></tr>
+  <tr><td><code>N</code></td><td>物理channel数</td><td>配置值</td><td>4~9 bit</td><td>9</td><td>18</td><td>36</td><td>72</td><td>144</td><td>288</td></tr>
+  <tr><td><code>R</code></td><td>每block余数</td><td>4096 % N</td><td>1~7 bit</td><td>1</td><td>10</td><td>28</td><td>64</td><td>64</td><td>64</td></tr>
+  <tr><td><code>Q</code></td><td>每channel基数</td><td>4096 / N</td><td>4~9 bit</td><td>455</td><td>227</td><td>113</td><td>56</td><td>28</td><td>14</td></tr>
+  <tr><td><code>base_limit</code></td><td>base region上界</td><td>4096 − R</td><td>12 bit</td><td>4095</td><td>4086</td><td>4068</td><td>4032</td><td>4032</td><td>4032</td></tr>
+  <tr><td><code>STRIDE</code></td><td>rotation步长</td><td>R%gcd==0</td><td>6 bit</td><td>32</td><td>32</td><td>32</td><td>32</td><td>32</td><td>32</td></tr>
+  <tr style="background:#e8f4f8"><td colspan="10" style="text-align:left;font-weight:600;color:#2563eb">输入信号</td></tr>
+  <tr><td><code>flow_id</code></td><td>12-bit流标识</td><td>{1'b0, 5'b0, hash_12x64(seed)[5:0]}</td><td>12 bit</td><td colspan="6">有效位 [5:0]，0~63</td></tr>
+  <tr><td><code>local_id</code></td><td>block内偏移</td><td>flow_id[11:0]</td><td>12 bit</td><td colspan="6">0 ~ 4095</td></tr>
+  <tr><td><code>block_id</code></td><td>block编号</td><td>dst_route_na[27:12] 或 hash(...)</td><td>16 bit</td><td colspan="6">0 ~ 65535</td></tr>
+  <tr style="background:#e8f4f8"><td colspan="10" style="text-align:left;font-weight:600;color:#2563eb">中间变量</td></tr>
+  <tr><td><code>base_ch</code></td><td>base channel</td><td>local_id % N</td><td>4~9 bit</td><td>0~8</td><td>0~17</td><td>0~35</td><td>0~71</td><td>0~143</td><td>0~287</td></tr>
+  <tr><td><code>extra_idx</code></td><td>extra序号</td><td>local_id − base_limit</td><td>1~7 bit</td><td>0</td><td>0~9</td><td>0~27</td><td>0~63</td><td>0~63</td><td>0~63</td></tr>
+  <tr><td><code>raw_ch</code></td><td>Bresenham channel</td><td>(extra_idx&times;N+N/2)/R</td><td>4~9 bit</td><td>0~8</td><td>0~17</td><td>0~35</td><td>0~71</td><td>0~143</td><td>0~287</td></tr>
+  <tr><td><code>block_rot</code></td><td>rotation偏移</td><td>(block_id&times;STRIDE)%N</td><td>4~9 bit</td><td>0~8</td><td>0~17</td><td>0~35</td><td>0~71</td><td>0~143</td><td>0~287</td></tr>
+  <tr style="background:#e8f4f8"><td colspan="10" style="text-align:left;font-weight:600;color:#2563eb">输出</td></tr>
+  <tr><td><code>channel</code></td><td>物理channel号</td><td>见公式</td><td>4~9 bit</td><td>0~8</td><td>0~17</td><td>0~35</td><td>0~71</td><td>0~143</td><td>0~287</td></tr>
+</table>
+
+<h4>算法公式</h4>
+<div class="formula">
+  <strong>if</strong> local_id &lt; base_limit:<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;channel = local_id % N &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#94a3b8">// base路径：Q个/channel，完美均衡</span><br><br>
+  <strong>else</strong>:<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;extra_idx = local_id − base_limit &nbsp;&nbsp;<span style="color:#94a3b8">// 0 ~ R−1</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;raw_ch = (extra_idx &times; N + N/2) / R &nbsp;&nbsp;<span style="color:#94a3b8">// Bresenham均匀散布</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;block_rot = (block_id &times; STRIDE) % N &nbsp;&nbsp;<span style="color:#94a3b8">// stride rotation</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;channel = (raw_ch + block_rot) % N
+</div>
+
+<h4>关键公式解读</h4>
+<p><strong><code>raw_ch = (extra_idx &times; N + N/2) / R</code></strong> — 这是Bresenham直线算法的变体。
+本质上是在R个点中均匀选取N个位置（R &lt; N时反过来）。
+<code>+ N/2</code> 是四舍五入偏移，让extra不扎堆在channel 0附近。
+以N=144, R=64为例：extra_idx每增1，raw_ch增 ≈144/64=2.25，实际间距在2和3之间交替（48次gap=2，15次gap=3），
+64个extra均匀散布在144个channel上。</p>
+
+<p><strong><code>block_rot = (block_id &times; STRIDE) % N</code></strong> — 每个block把extra的落点整体旋转一个偏移量。
+STRIDE=32时，gcd(32,144)=16，rotation步长16格，9个block覆盖全部144个channel。</p>
+
+<h4>数值走读（N=144, block_id=0）</h4>
+<table>
+  <tr><th>local_id</th><th>路径</th><th>计算过程</th><th>channel</th></tr>
+  <tr><td>0</td><td>base</td><td>0 % 144</td><td>0</td></tr>
+  <tr><td>1</td><td>base</td><td>1 % 144</td><td>1</td></tr>
+  <tr><td>143</td><td>base</td><td>143 % 144</td><td>143</td></tr>
+  <tr><td>144</td><td>base</td><td>144 % 144</td><td>0</td></tr>
+  <tr><td>...</td><td>base</td><td>...</td><td>...</td></tr>
+  <tr><td>4031</td><td>base</td><td>4031 % 144</td><td>143</td></tr>
+  <tr><td>4032</td><td style="color:#2563eb"><strong>extra</strong></td><td>idx=0, (0&times;144+72)/64=1, (1+0)%144</td><td>1</td></tr>
+  <tr><td>4033</td><td style="color:#2563eb"><strong>extra</strong></td><td>idx=1, (1&times;144+72)/64=3, (3+0)%144</td><td>3</td></tr>
+  <tr><td>4034</td><td style="color:#2563eb"><strong>extra</strong></td><td>idx=2, (2&times;144+72)/64=5, (5+0)%144</td><td>5</td></tr>
+  <tr><td>4035</td><td style="color:#2563eb"><strong>extra</strong></td><td>idx=3, (3&times;144+72)/64=7, (7+0)%144</td><td>7</td></tr>
+  <tr><td>4036</td><td style="color:#2563eb"><strong>extra</strong></td><td>idx=4, (4&times;144+72)/64=10, (10+0)%144</td><td>10</td></tr>
+  <tr><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+  <tr><td>4095</td><td style="color:#2563eb"><strong>extra</strong></td><td>idx=63, (63&times;144+72)/64=142, (142+0)%144</td><td>142</td></tr>
+</table>
+<p>block_id=1时：block_rot = (1&times;32)%144 = 32，所有extra的channel整体平移32格。</p>
+
+<h4>Bresenham间距分析（N=144, R=64）</h4>
+<ul>
+  <li>平均间距 = N/R = 144/64 = 2.25</li>
+  <li>实际间距分布：gap=2 出现48次，gap=3 出现15次（48&times;2 + 15&times;3 = 141 ≈ 144）</li>
+  <li>Extra channel序列（block_id=0）：1, 3, 5, 7, 10, 12, 14, 16, 19, ... （每3个extra中2个间距2、1个间距3）</li>
+</ul>
+
+<h4>硬件开销</h4>
+<table>
+  <tr><th>Component</th><th>Size</th><th>Usage</th><th>路径</th></tr>
+  <tr><td>Modulo divider</td><td>12-bit / 8-bit</td><td>local_id % N</td><td>base + extra共用</td></tr>
+  <tr><td>Multiplier</td><td>6-bit &times; 9-bit → 15-bit</td><td>extra_idx &times; N</td><td>仅extra路径</td></tr>
+  <tr><td>Adder</td><td>9-bit</td><td>+ N/2（四舍五入偏移）</td><td>仅extra路径</td></tr>
+  <tr><td>Divider (small)</td><td>15-bit / 7-bit</td><td>/ R</td><td>仅extra路径</td></tr>
+  <tr><td>Multiplier (rot)</td><td>16-bit &times; 7-bit → 23-bit</td><td>block_id &times; STRIDE</td><td>仅extra路径</td></tr>
+  <tr><td>Modulo (rot)</td><td>23-bit / 9-bit</td><td>% N</td><td>仅extra路径</td></tr>
+  <tr><td>Adder (final)</td><td>9-bit</td><td>raw_ch + block_rot</td><td>仅extra路径</td></tr>
+  <tr><td>Modulo (final)</td><td>9-bit / 9-bit</td><td>(raw_ch + block_rot) % N</td><td>仅extra路径</td></tr>
+  <tr><td>Comparator</td><td>12-bit</td><td>local_id &lt; base_limit</td><td>控制MUX选择</td></tr>
+  <tr><td>MUX</td><td>9-bit, 2:1</td><td>选择base_ch或extra_ch</td><td>输出</td></tr>
+</table>
+
+<div class="highlight">
+<strong>优化提示：</strong><br>
+• <code>block_id &times; STRIDE</code>：STRIDE=32 → <code>block_id &lt;&lt; 5</code>，零成本移位<br>
+• <code>extra_idx &times; N</code>：N=288→<code>(i&lt;&lt;8)+(i&lt;&lt;5)</code>；N=144→<code>(i&lt;&lt;7)+(i&lt;&lt;4)</code>；N=72→<code>(i&lt;&lt;6)+(i&lt;&lt;3)</code>；N=36→<code>(i&lt;&lt;5)+(i&lt;&lt;2)</code>；N=18→<code>(i&lt;&lt;4)+i+i</code>；N=9→<code>(i&lt;&lt;3)+i</code><br>
+• <code>/ R</code>：R=64 (N=72/144/288) → <code>&gt;&gt; 6</code>，零成本移位<br>
+• <strong>R非2的幂</strong>：N=36(R=28)、N=18(R=10)、N=9(R=1) 需LUT或小型除法器。但extra_idx位宽很小（1~5 bit），LUT面积可忽略。N=9时R=1，<code>/R</code>退化为除以1（直通）
+</div>
+
+<div class="good">
+<strong>为什么推荐Bresenham方案？</strong><br>
+与Rotated Modulo跨block收敛速度相同（都是9个block），但<strong>单block内的extra分布</strong>更优：
+Rotated Modulo中，64个extra集中在连续的64个channel上（如0-63）；
+Bresenham将64个extra均匀分散到144个channel上（间距2-3），单block内负载更平滑。
+如果系统对瞬时均衡要求不高，Rotated Modulo实现更简单。
+</div>
+
+<h2>3. Hardware Pipeline Architecture (Bresenham)</h2>
+
+<pre>
+                   flow_id[11:0]     dst_route_na[27:12]
+                        │                    │
+                   local_id[11:0]       block_id[15:0]
+                        │              (or hash variant)
+               ┌────────┴────────┐          │
+               │                 │          │
+          % N (divider)    &lt; base_limit?    │
+               │            │       │       │
+            base_ch       YES      NO       │
+               │            │       │       │
+               │            │   extra_idx   │
+               │            │       │       │
+               │            │   *N + N/2    │
+               │            │       │       │
+               │            │     / R       │
+               │            │       │       │
+               │            │    raw_ch     │
+               │            │       │       │
+               │            │       │    *stride %N
+               │            │       │       │
+               │            │       │   block_rot
+               │            │       │       │
+               │            │    raw_ch + block_rot
+               │            │       │
+               │            │     % N
+               │            │       │
+               │            │   extra_ch
+               │            │       │
+               └────MUX─────┘───────┘
+                      │
+                   channel[7:0]
+</pre>
+
+<p><strong>Pipeline stages：</strong></p>
+<ol>
+  <li><strong>Stage 1</strong>：提取local_id(flow_id[11:0]) / block_id(dst_route_na[27:12]) + 取模(local_id % N) + 比较(local_id &lt; base_limit) — 并行</li>
+  <li><strong>Stage 2</strong>：Extra路径的乘加除（仅extra时激活）+ block rotation取模</li>
+  <li><strong>Stage 3</strong>：最终取模 + MUX选择</li>
+</ol>
+
+<h2>4. Configurable Parameters</h2>
+
+<table>
+  <tr><th>Parameter</th><th>N=9</th><th>N=18</th><th>N=36</th><th>N=72</th><th>N=144</th><th>N=288</th><th>Note</th></tr>
+  <tr><td>R = 4096 % N</td><td>1</td><td>10</td><td>28</td><td>64</td><td>64</td><td>64</td><td></td></tr>
+  <tr><td>Q = 4096 / N</td><td>455</td><td>227</td><td>113</td><td>56</td><td>28</td><td>14</td><td>每channel基数</td></tr>
+  <tr><td>base_limit</td><td>4095</td><td>4086</td><td>4068</td><td>4032</td><td>4032</td><td>4032</td><td>4096 - R</td></tr>
+  <tr><td>STRIDE</td><td>32</td><td>32</td><td>32</td><td>32</td><td>32</td><td>32</td><td>统一常量 (&lt;&lt;5)</td></tr>
+  <tr><td>gcd(32, N)</td><td>1</td><td>2</td><td>4</td><td>8</td><td>16</td><td>32</td><td>R%gcd均为0 ✓</td></tr>
+  <tr><td>收敛block数</td><td>9</td><td>9</td><td>9</td><td>9</td><td>9</td><td>9</td><td>N/gcd 均为 9</td></tr>
+  <tr><td>extra_idx位宽</td><td>1 bit</td><td>4 bit</td><td>5 bit</td><td>7 bit</td><td>7 bit</td><td>7 bit</td><td>[0, R−1]</td></tr>
+  <tr><td>channel位宽</td><td>4 bit</td><td>5 bit</td><td>6 bit</td><td>7 bit</td><td>8 bit</td><td>9 bit</td><td>⌈log2(N)⌉</td></tr>
+</table>
+
+<div class="highlight">
+<strong>通用性：</strong>对于任意N值，只需重新计算 R = 4096 % N，并选择满足 <code>R % gcd(STRIDE, N) == 0</code> 的STRIDE。
+最优选择是 gcd(STRIDE, N) 尽量大（收敛越快），但不能超过R。
+例如N=128时R=0（完美整除），算法退化为简单取模。N=100时R=96，STRIDE可取96（gcd=4, 96%4=0）。
+</div>
+
+<h2>5. Key Takeaways</h2>
+
+<div class="good">
+<ol>
+  <li><strong>六种N配置统一STRIDE=32</strong>：N=9/18/36/72/144/288均满足 R%gcd(32,N)==0，9个block完美均衡，实现仅需 <code>block_id &lt;&lt; 5</code></li>
+  <li><strong>单block内不均衡不可避免</strong>（4096不能整除N），最大差值为1，这是数学下界</li>
+  <li><strong>跨block均衡是关键创新</strong>：通过rotation让每个block的"extra"落在不同channel上</li>
+  <li><strong>Rotated Modulo最简实现</strong>：硬件仅需1个加法器+1个取模器，9个block收敛</li>
+  <li><strong>Bresenham单block内更优</strong>：extra均匀分散，瞬时负载更平滑</li>
+  <li><strong>STRIDE条件：R % gcd(STRIDE, N) == 0</strong>，gcd越大收敛越快但不能超过R</li>
+  <li><strong>除法优化</strong>：N=72/144/288的R=64可直接移位(>>6)；N=9/18/36的R非2的幂，用小型LUT实现</li>
+</ol>
+</div>
+
+</body>
+</html>

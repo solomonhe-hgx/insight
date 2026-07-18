@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阶段3 & 阶段4 深度解析：CFT 地址构造与 Fabric 执行</title>
+<style>
+  :root {
+    --nvidia-green: #76b900;
+    --nvidia-dark: #1a1a2e;
+    --nvidia-darker: #0f0f1a;
+    --card-bg: #16213e;
+    --card-border: #1f3460;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0b0;
+    --accent-blue: #4fc3f7;
+    --accent-orange: #ffb74d;
+    --accent-red: #ef5350;
+    --accent-purple: #b39ddb;
+    --accent-cyan: #00e5ff;
+    --code-bg: #0d1117;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--nvidia-darker);
+    color: var(--text-primary);
+    line-height: 1.75;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--nvidia-dark) 0%, #0a2a0a 50%, var(--nvidia-dark) 100%);
+    border-bottom: 3px solid var(--nvidia-green);
+    padding: 50px 40px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 1.9em; color: var(--nvidia-green); margin-bottom: 10px; }
+  .hero .subtitle { font-size: 1.05em; color: var(--text-secondary); max-width: 850px; margin: 0 auto; }
+  .hero .badge {
+    display: inline-block;
+    background: rgba(118,185,0,0.15);
+    border: 1px solid var(--nvidia-green);
+    color: var(--nvidia-green);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.82em;
+    margin-top: 14px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 36px 24px; }
+  
+  h2 {
+    color: var(--nvidia-green);
+    font-size: 1.5em;
+    margin: 36px 0 16px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--card-border);
+  }
+  h3 {
+    color: var(--accent-blue);
+    font-size: 1.15em;
+    margin: 24px 0 10px 0;
+  }
+  h4 {
+    color: var(--accent-cyan);
+    font-size: 1.0em;
+    margin: 16px 0 8px 0;
+  }
+  p { margin-bottom: 12px; }
+  
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 14px 0;
+  }
+  .card.highlight { border-left: 4px solid var(--nvidia-green); }
+  .card.info { border-left: 4px solid var(--accent-blue); background: rgba(79,195,247,0.05); }
+  .card.warning { border-left: 4px solid var(--accent-orange); background: rgba(255,183,77,0.05); }
+  .card.phase3 { border-left: 4px solid var(--accent-cyan); background: rgba(0,229,255,0.04); }
+  .card.phase4 { border-left: 4px solid var(--nvidia-green); background: rgba(118,185,0,0.04); }
+  
+  pre {
+    background: var(--code-bg);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.82em;
+    line-height: 1.55;
+    margin: 10px 0;
+    color: #c9d1d9;
+  }
+  code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.88em;
+    background: rgba(110,118,129,0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #e6edf3;
+  }
+  pre code { background: none; padding: 0; }
+  
+  .insn-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 0;
+    margin: 8px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+  }
+  .insn-addr {
+    background: rgba(118,185,0,0.1);
+    padding: 10px 12px;
+    font-family: monospace;
+    font-size: 0.85em;
+    color: var(--nvidia-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--card-border);
+  }
+  .insn-body {
+    background: var(--card-bg);
+    padding: 12px 16px;
+  }
+  .insn-sass {
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85em;
+    color: var(--accent-blue);
+    margin-bottom: 6px;
+  }
+  .insn-desc {
+    font-size: 0.9em;
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+  .insn-ptx {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    font-style: italic;
+  }
+  
+  .phase-header {
+    background: rgba(118,185,0,0.08);
+    border: 1px solid var(--nvidia-green);
+    border-radius: 8px;
+    padding: 10px 18px;
+    margin: 20px 0 12px 0;
+    font-weight: 700;
+    color: var(--nvidia-green);
+    font-size: 1em;
+  }
+  .phase-header.cyan {
+    background: rgba(0,229,255,0.08);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+  }
+  
+  .formula-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--accent-cyan);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.9em;
+    line-height: 1.8;
+    color: var(--accent-cyan);
+  }
+  .formula-box .label {
+    color: var(--text-secondary);
+    font-size: 0.82em;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .formula-box .result {
+    color: var(--nvidia-green);
+    font-weight: 700;
+  }
+  
+  .mapping-diagram {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    font-family: monospace;
+    font-size: 0.82em;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--text-secondary);
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 0.88em;
+  }
+  th {
+    background: rgba(118,185,0,0.15);
+    color: var(--nvidia-green);
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 2px solid var(--nvidia-green);
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75em;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .tag-addr { background: rgba(79,195,247,0.2); color: var(--accent-blue); }
+  .tag-fabric { background: rgba(118,185,0,0.2); color: var(--nvidia-green); }
+  .tag-retry { background: rgba(239,83,80,0.2); color: var(--accent-red); }
+  .tag-cyan { background: rgba(0,229,255,0.2); color: var(--accent-cyan); }
+  
+  .dataflow {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    margin: 16px 0;
+  }
+  .dataflow-step {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-left: 4px solid var(--accent-cyan);
+    padding: 12px 16px;
+    margin: 4px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.9em;
+  }
+  .dataflow-step.green { border-left-color: var(--nvidia-green); }
+  .dataflow-step .step-label {
+    font-weight: 700;
+    color: var(--accent-cyan);
+    font-size: 0.85em;
+    margin-bottom: 4px;
+  }
+  .dataflow-step.green .step-label { color: var(--nvidia-green); }
+  
+  .arrow-down {
+    text-align: center;
+    color: var(--accent-cyan);
+    font-size: 1.4em;
+    margin: 2px 0;
+    opacity: 0.6;
+  }
+  
+  .footer {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-secondary);
+    font-size: 0.82em;
+    border-top: 1px solid var(--card-border);
+    margin-top: 36px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>阶段3 & 阶段4 深度解析</h1>
+  <p class="subtitle">CFT Handle 地址构造公式推导、寄存器数据流、以及 UBLKCP 如何消费远端 Handle 操作数</p>
+  <span class="badge">fabric_try_get_probe &bull; sm_100a &bull; leId + offset → UBLKCP 操作数</span>
+</div>
+
+<div class="container">
+
+<!-- ==================== 总览 ==================== -->
+<h2>0. 全局视角：从 PTX 到 SASS 的地址构造链路</h2>
+
+<div class="card info">
+<h4>核心问题</h4>
+<p>PTX 的 <code>fabric.try_get.async</code> 接受一个 CFT Handle 操作数 <code>[leId, offset]</code>，其中 <code>leId</code> 是裸的 32-bit 逻辑端点 ID，<code>offset</code> 是裸的 64-bit 资源偏移。但在 SASS 层，<code>UBLKCP</code> 指令不接受裸值 — 它要求操作数编码为硬件特定的 <strong>64-bit Fabric Handle 地址格式</strong>。</p>
+<p>阶段3的任务就是完成这个编码；阶段4的任务是用编码后的地址发起实际的 Fabric 数据传输。</p>
+</div>
+
+<div class="mapping-diagram">
+PTX 视角（逻辑地址）:
+  ┌──────────────────────────────────────────────────────────┐
+  │  fabric.try_get.async [%rd5], [%r1, %rd1], %r2, [%rd3] │
+  │                          ↑ leId  ↑ offset               │
+  │                          (u32)   (u64)                  │
+  └──────────────────────────────────────────────────────────┘
+
+SASS 视角（编码后物理地址）:
+  ┌──────────────────────────────────────────────────────────┐
+  │  UBLKCP.S.G.STRONG.SYS [UR12], [UR6], UR10             │
+  │                            ↑ 64-bit encoded CFT handle  │
+  │                              = encode(leId) ⊕ offset    │
+  └──────────────────────────────────────────────────────────┘
+
+阶段3 负责: leId + offset → UR6/UR7 (64-bit encoded handle)
+阶段4 负责: 用 UR6/UR7 发起 UBLKCP + 重试循环
+</div>
+
+
+<!-- ==================== 阶段3 详细 ==================== -->
+<h2>1. 阶段3：远端 CFT Handle 地址构造</h2>
+
+<div class="phase-header cyan">Phase 3: 0x0140 - 0x0160 | leId 编码 → offset 合并 → 64-bit Handle 就绪</div>
+
+<h3>1.1 输入寄存器状态（阶段3开始时）</h3>
+
+<div class="card">
+<table>
+<tr><th>寄存器</th><th>来源</th><th>内容</th><th>位宽</th></tr>
+<tr><td><code>UR14</code></td><td>0x0030: <code>LDCU UR14, c[0x0][0x380]</code></td><td><code>src_le_id</code>（逻辑端点 ID）</td><td>u32</td></tr>
+<tr><td><code>UR8/UR9</code></td><td>0x0080: <code>LDCU.64 UR8, c[0x0][0x388]</code></td><td><code>src_offset</code>（资源偏移）</td><td>u64</td></tr>
+</table>
+<p style="margin-top:8px;color:var(--text-secondary);font-size:0.88em;">
+这两个值直接来自 PTX kernel 参数 <code>src_le_id</code> 和 <code>src_offset</code>，经过阶段1的参数加载后保存在 Uniform 寄存器中。
+</p>
+</div>
+
+<h3>1.2 指令 0x0140：leId → Fabric 地址空间编码</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0140</div>
+  <div class="insn-body">
+    <div class="insn-sass">ULEA UR7, UR14, 0x200000, 0xa</div>
+    <div class="insn-desc">
+      <span class="tag tag-cyan">LE ID 编码</span>
+      <strong>将裸 leId 编码为 Fabric Handle 地址空间中的路由标识。</strong>
+      <br><br>
+      <code>ULEA</code>（Uniform Load Effective Address）执行线性地址计算。这里使用两操作数+双立即数形式：
+    </div>
+  </div>
+</div>
+
+<div class="formula-box">
+<span class="label">ULEA 编码公式推导：</span>
+<br>
+<strong>ULEA 指令语义：</strong><br>
+UR7 = f(UR14, imm1=0x200000, imm2=0xa)
+<br><br>
+<strong>其中：</strong><br>
+&nbsp;&nbsp;• <strong>UR14</strong> = src_le_id（裸的 32-bit 逻辑端点 ID）<br>
+&nbsp;&nbsp;• <strong>0x200000</strong> = Fabric 地址空间基址常量（bit 21 置位）<br>
+&nbsp;&nbsp;• <strong>0xa = 10</strong> = 位域移位常量
+<br><br>
+<strong>推导：</strong><br>
+&nbsp;&nbsp;UR7 = (0x200000 &lt;&lt; 10) | (src_le_id &lt;&lt; 10)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 0x80000000 | (src_le_id &lt;&lt; 10)
+<br><br>
+<strong>含义：</strong><br>
+&nbsp;&nbsp;• 0x200000 &lt;&lt; 10 = 0x80000000<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 设置 bit 31，标记这是 Fabric 地址（非本地内存）<br>
+&nbsp;&nbsp;• src_le_id &lt;&lt; 10<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 将 leId 放入地址的 [30:10] 位域，用于 NVSwitch 路由<br>
+&nbsp;&nbsp;• 低 10 位 = 0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 留给 offset 合并时使用
+<br><br>
+<span class="result">UR7 = 0x80000000 | (src_le_id &lt;&lt; 10)</span>
+</div>
+
+<div class="card phase3">
+<h4>为什么 leId 需要编码？</h4>
+<p>PTX 的 <code>[%r1, %rd1]</code> 中 <code>%r1</code> 是裸的 leId 值，但 Blackwell 的 Fabric 硬件（TMA/Fabric 命令引擎）期望操作数编码为<strong>统一的地址格式</strong>，其中包含：</p>
+<p>1) <strong>地址类型标记</strong>（bit 31 = 1 表示 Fabric 远端地址，区别于本地/系统内存）</p>
+<p>2) <strong>LE ID 路由字段</strong>（放置在特定位域中，NVSwitch 硬件直接从中提取路由信息）</p>
+<p>3) <strong>Offset 占位区域</strong>（低位保留给 offset 合并）</p>
+<p>这种编码使得 UBLKCP 指令可以用单一 64-bit 操作数同时携带路由目标和资源偏移，无需额外的操作数字段。</p>
+</div>
+
+<h3>1.3 指令 0x0150：清零高 32 位准备</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0150</div>
+  <div class="insn-body">
+    <div class="insn-sass">UMOV UR6, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址构造</span>
+      清零 UR6。UR6 将作为 64-bit CFT Handle 的高 32 位（初始为 0），UR7 作为低 32 位（已编码 leId）。
+      <br><br>
+      此时 64-bit 寄存器对 <code>UR6:UR7</code> 的状态：
+    </div>
+  </div>
+</div>
+
+<div class="formula-box">
+<span class="label">64-bit Handle 中间状态（0x0150 之后）：</span>
+<br><br>
+&nbsp;&nbsp;UR6 (高32位) = 0x00000000<br>
+&nbsp;&nbsp;UR7 (低32位) = 0x80000000 | (src_le_id &lt;&lt; 10)
+<br><br>
+&nbsp;&nbsp;64-bit handle = {UR6, UR7}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 0x00000000_80000000 | (src_le_id &lt;&lt; 10)
+<br><br>
+<span class="result">此时 handle 只包含 leId 路由信息，offset 尚未合并。</span>
+</div>
+
+<h3>1.4 指令 0x0160：offset 合并到 Handle</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0160</div>
+  <div class="insn-body">
+    <div class="insn-sass">UIADD3.64 UR6, UPT, UPT, UR6, UR8, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-cyan">地址合并</span>
+      <strong>64-bit 加法：将 src_offset 合并到已编码 leId 的 Handle 中。</strong>
+      <br><br>
+      <code>UIADD3.64</code> 是 64-bit Uniform 整数加法，操作数：
+      <ul style="margin:6px 0 6px 20px;font-size:0.9em;">
+        <li>目标：<code>UR6</code>（64-bit，覆盖 UR6/UR7）</li>
+        <li>操作数A：<code>UR6</code>（= 0x00000000，高32位）</li>
+        <li>操作数B：<code>UR8</code>（= src_offset，64-bit，占 UR8/UR9）</li>
+      </ul>
+      执行 64-bit 加法后，UR6/UR7 包含完整的 CFT Handle。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>[%r1, %rd1]</code> — leId 和 offset 的 SASS 编码合并</div>
+  </div>
+</div>
+
+<div class="formula-box">
+<span class="label">64-bit Handle 最终状态（0x0160 之后）：</span>
+<br><br>
+&nbsp;&nbsp;<strong>UIADD3.64:</strong><br>
+&nbsp;&nbsp;&nbsp;&nbsp;{UR6, UR7} = {UR6, UR7} + {UR8, UR9}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= (0x00000000_80000000 | (leId &lt;&lt; 10)) + src_offset
+<br><br>
+&nbsp;&nbsp;由于 leId 编码后低 10 位 = 0，且 src_offset 通常 16B 对齐（低 4 位 = 0），<br>
+&nbsp;&nbsp;加法等价于 OR（无进位冲突）：
+<br><br>
+&nbsp;&nbsp;{UR6, UR7} = 0x00000000_80000000 | (leId &lt;&lt; 10) | src_offset
+<br><br>
+&nbsp;&nbsp;<strong>展开为位域：</strong><br>
+&nbsp;&nbsp;┌─────────────────────────────────────────────────────────┐<br>
+&nbsp;&nbsp;│&nbsp;&nbsp;Bit 63-32 (UR6): 0x00000000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;│&nbsp;&nbsp;Bit 31:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Fabric 地址标记)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;│&nbsp;&nbsp;Bit 30-10:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;leId&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(路由字段)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;│&nbsp;&nbsp;Bit 9-0:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;offset[9:0]&nbsp;&nbsp;(页内偏移)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;│&nbsp;&nbsp;Bit 63-32 高位:&nbsp;&nbsp;offset[41:10] (页号)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;└─────────────────────────────────────────────────────────┘
+<br><br>
+<span class="result">最终 64-bit CFT Handle = encode(leId) ⊕ offset</span>
+</div>
+
+<div class="card warning">
+<h4>为什么加法等价于 OR？</h4>
+<p>leId 编码后（<code>leId &lt;&lt; 10</code>），低 10 位全为 0。而 <code>src_offset</code> 是 NVSHMEM heap 上的偏移，根据 CFT 约束必须 16B 对齐（低 4 位 = 0）。由于 <code>leId &lt;&lt; 10</code> 占据 bit [30:10]，而 <code>offset</code> 的低 10 位占据 bit [9:0]，两者位域不重叠，因此加法不产生进位，等价于按位 OR。</p>
+<p>但如果 <code>offset</code> 足够大（>= 1024），其高位会与 leId 字段在 bit 空间上"拼接"，形成完整的 64-bit 地址。这正是 CFT Handle 的设计：leId 决定路由目标，offset 决定目标端内的资源位置。</p>
+</div>
+
+<h3>1.5 阶段3 完整数据流图</h3>
+
+<div class="dataflow">
+  <div class="dataflow-step">
+    <div class="step-label">输入 (来自阶段1参数加载)</div>
+    UR14 = src_le_id (u32) &nbsp;&nbsp;&nbsp; UR8/UR9 = src_offset (u64)
+  </div>
+  <div class="arrow-down">↓</div>
+  <div class="dataflow-step">
+    <div class="step-label">0x0140: ULEA UR7, UR14, 0x200000, 0xa</div>
+    UR7 = (0x200000 &lt;&lt; 10) | (src_le_id &lt;&lt; 10) = 0x80000000 | (leId &lt;&lt; 10)<br>
+    → leId 编码到 Fabric 地址空间的 [30:10] 位域，bit 31 = 1 标记为远端地址
+  </div>
+  <div class="arrow-down">↓</div>
+  <div class="dataflow-step">
+    <div class="step-label">0x0150: UMOV UR6, URZ</div>
+    UR6 = 0x00000000 → 清零高 32 位，准备 64-bit 地址构造
+  </div>
+  <div class="arrow-down">↓</div>
+  <div class="dataflow-step">
+    <div class="step-label">0x0160: UIADD3.64 UR6, UPT, UPT, UR6, UR8, URZ</div>
+    {UR6, UR7} = {0, 0x80000000 | (leId &lt;&lt; 10)} + src_offset<br>
+    <strong style="color:var(--nvidia-green);">= 0x80000000 | (leId &lt;&lt; 10) | offset &nbsp; ← 完整 CFT Handle 就绪</strong>
+  </div>
+  <div class="arrow-down">↓</div>
+  <div class="dataflow-step green">
+    <div class="step-label">输出 (传递给阶段4)</div>
+    <strong style="color:var(--nvidia-green);">UR6/UR7</strong> = 64-bit 编码 CFT Handle → 作为 UBLKCP 的 <code>[UR6]</code> 源操作数
+  </div>
+</div>
+
+
+<!-- ==================== 阶段4 详细 ==================== -->
+<h2>2. 阶段4：Fabric try_get 执行与重试循环</h2>
+
+<div class="phase-header">Phase 4: 0x0170 - 0x01b0 | ELECT → UBLKCP → 状态检查 → 条件重试</div>
+
+<h3>2.1 阶段4 的输入：阶段3 的输出如何被消费</h3>
+
+<div class="card highlight">
+<h4>阶段3 → 阶段4 的寄存器传递</h4>
+<table>
+<tr><th>阶段3 输出</th><th>阶段4 消费位置</th><th>语义</th></tr>
+<tr>
+  <td><code>UR6/UR7</code> = 编码 CFT Handle</td>
+  <td>0x0180: <code>UBLKCP [UR12], <strong>[UR6]</strong>, UR10</code></td>
+  <td>作为 UBLKCP 的<strong>源操作数</strong>（远端 Fabric 地址）</td>
+</tr>
+<tr>
+  <td><code>UR12</code> = smem_data 地址<br>(来自阶段2 的 0x0130)</td>
+  <td>0x0180: <code>UBLKCP <strong>[UR12]</strong>, [UR6], UR10</code></td>
+  <td>作为 UBLKCP 的<strong>目标操作数</strong>（本地 SMEM 地址）</td>
+</tr>
+<tr>
+  <td><code>UR10</code> = 编码 byte_count<br>(来自阶段2 的 0x0110)</td>
+  <td>0x0180: <code>UBLKCP [UR12], [UR6], <strong>UR10</strong></code></td>
+  <td>作为 UBLKCP 的<strong>transaction size</strong> 操作数</td>
+</tr>
+<tr>
+  <td><code>P0</code> = True (retry 使能)<br>(来自阶段1 的 0x0040)</td>
+  <td>0x0170: <code><strong>@P0</strong> ELECT P1, URZ, PT</code></td>
+  <td>控制是否进入重试循环</td>
+</tr>
+</table>
+</div>
+
+<h3>2.2 指令 0x0170：Warp 线程选举</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0170</div>
+  <div class="insn-body">
+    <div class="insn-sass">@P0 ELECT P1, URZ, PT</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">线程选举</span>
+      仅当 P0=True 时执行（首次进入或重试时）。<code>ELECT</code> 从当前 warp 的 32 个 lane 中<strong>选出一个 lane</strong> 来发起 Fabric 事务：
+      <br><br>
+      <strong>选举机制：</strong>
+      <ul style="margin:6px 0 6px 20px;font-size:0.9em;">
+        <li>被选中的 lane：P1 = True（获得发起权限）</li>
+        <li>其他 31 个 lane：P1 = False（等待）</li>
+        <li><code>URZ</code>：目标寄存器未使用（选举结果只写入谓词 P1）</li>
+        <li><code>PT</code>：谓词 true mask，表示所有 lane 都参与选举</li>
+      </ul>
+      <strong>为什么需要选举？</strong> Fabric 操作通过 NVLink/TMA 引擎发送请求，这些引擎每个 warp 只需要一个 lane 代表整个 warp 发起事务。这是 Blackwell SIMT 模型在 Fabric 侧的延伸。
+    </div>
+    <div class="insn-ptx">对应 PTX: 无 — PTX 不暴露硬件级线程选举</div>
+  </div>
+</div>
+
+<h3>2.3 指令 0x0180：UBLKCP — Fabric 读取核心指令</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0180</div>
+  <div class="insn-body">
+    <div class="insn-sass">UBLKCP.S.G.STRONG.SYS [UR12], [UR6], UR10</div>
+    <div class="insn-desc">
+      <span class="tag tag-fabric">Fabric 读取</span>
+      <strong>这是 <code>fabric.try_get.async</code> 的 SASS 核心实现。</strong>
+      <br><br>
+      <code>UBLKCP</code> = Unaligned Block Copy，Blackwell 的硬件块拷贝指令，支持 Fabric 远端访问。
+    </div>
+  </div>
+</div>
+
+<div class="card phase4">
+<h4>UBLKCP 操作数详解 — 阶段3 输出的消费方式</h4>
+
+<table>
+<tr><th>操作数</th><th>值来源</th><th>内容</th><th>UBLKCP 中的角色</th></tr>
+<tr>
+  <td><code>[UR12]</code></td>
+  <td>阶段2 (0x0130)</td>
+  <td>smem_data 的编码 shared memory 地址</td>
+  <td><strong>目标地址 (dst)</strong>：数据写入本地 shared memory 的位置</td>
+</tr>
+<tr>
+  <td><code>[UR6]</code></td>
+  <td><strong>阶段3 (0x0160)</strong></td>
+  <td>64-bit 编码 CFT Handle = 0x80000000 | (leId &lt;&lt; 10) | offset</td>
+  <td><strong>源地址 (src)</strong>：远端 Fabric Handle，TMA 引擎从中提取 leId 用于路由，提取 offset 用于寻址</td>
+</tr>
+<tr>
+  <td><code>UR10</code></td>
+  <td>阶段2 (0x0110)</td>
+  <td>编码后的 byte_count（transaction size 格式）</td>
+  <td><strong>传输大小</strong>：本次 Fabric 读取的字节数</td>
+</tr>
+</table>
+
+<h4 style="margin-top:16px;">UBLKCP 修饰符解析</h4>
+<table>
+<tr><th>修饰符</th><th>含义</th><th>对应 PTX</th></tr>
+<tr><td><code>.S</code></td><td>Source 端通过 <strong>Fabric proxy</strong>（远端读取）</td><td><code>fabric</code> (源操作数)</td></tr>
+<tr><td><code>.G</code></td><td><strong>Generic</strong> 寻址模式（操作数是编码后的通用地址）</td><td>隐式</td></tr>
+<tr><td><code>.STRONG.SYS</code></td><td>系统级<strong>强内存序</strong></td><td><code>.relaxed.sys</code></td></tr>
+</table>
+
+<h4 style="margin-top:16px;">TMA 引擎如何解析 [UR6] 中的 CFT Handle</h4>
+<p>当 UBLKCP 执行时，TMA/Fabric 命令引擎从 <code>[UR6]</code> 的 64-bit 值中提取：</p>
+<div class="formula-box">
+<span class="label">CFT Handle 位域解析（TMA 引擎视角）：</span>
+<br><br>
+&nbsp;&nbsp;64-bit value in UR6 = 0x00000000_8XXXXXXX (示例)
+<br><br>
+&nbsp;&nbsp;<strong>Bit 31 = 1:</strong><br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 地址类型 = FABRIC（非本地/系统内存）<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ TMA 路由到 Fabric 命令管道
+<br><br>
+&nbsp;&nbsp;<strong>Bit 30-10 = leId 字段:</strong><br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 从 Fabric Handle 中提取 Logical Endpoint ID<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ NVSwitch 使用 leId 查找路由表，定位目标 GPU<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 目标 GPU 的 LE 引擎接收请求
+<br><br>
+&nbsp;&nbsp;<strong>Bit 9-0 (+ UR6 高位拼接) = offset 字段:</strong><br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 目标 GPU 内部使用 offset 定位具体资源<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ offset 相对于 LE 绑定的 heap 基址
+<br><br>
+<span class="result">TMA 引擎: UR6 → {fabric_flag=1, leId, offset} → NVLink 路由 → 远端内存读取</span>
+</div>
+</div>
+
+<h3>2.4 指令 0x0190：UBLKCP 状态检查</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0190</div>
+  <div class="insn-body">
+    <div class="insn-sass">@P1 PLOP3.LUT P0, PT, P1, PT, PT, 0x8, 0x80</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">状态检查</span>
+      仅由被 ELECT 选中的 lane (P1=True) 执行。根据 UBLKCP 的返回状态更新 P0（重试控制谓词）：
+      <br><br>
+      <code>PLOP3.LUT</code> 通过查找表实现逻辑运算，操作数 <code>PT, P1, PT, PT</code> 和 LUT 值 <code>0x8</code> 配合操作码 <code>0x80</code> 实现：
+    </div>
+  </div>
+</div>
+
+<div class="formula-box">
+<span class="label">状态检查逻辑：</span>
+<br><br>
+&nbsp;&nbsp;<strong>如果 UBLKCP 成功发出</strong> (P1_status = success):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;P0 = False<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 退出重试循环<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 继续执行 0x01c0 (UTMACMDFLUSH)
+<br><br>
+&nbsp;&nbsp;<strong>如果 UBLKCP 发出失败</strong> (P1_status = busy):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;P0 = True<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 保持重试循环<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 跳回 0x0170 (ELECT)
+<br><br>
+&nbsp;&nbsp;<strong>LUT 真值表</strong> (0x8 = 0b00001000):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;输入组合 → 输出<br>
+&nbsp;&nbsp;&nbsp;&nbsp;仅当特定输入组合为 True 时输出 True<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ 实现 "UBLKCP busy 且当前 lane 是 elected lane" 的条件检测
+</div>
+
+<h3>2.5 指令 0x01a0：谓词 P1 重置</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01a0</div>
+  <div class="insn-body">
+    <div class="insn-sass">PLOP3.LUT P1, PT, PT, PT, PT, 0x8, 0x80</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">谓词重置</span>
+      无条件执行（无谓词前缀）。将 P1 重置为初始状态，为下一次循环迭代中的 <code>ELECT</code> 指令做准备。确保每次循环迭代都从干净的 P1=False 状态开始。
+    </div>
+  </div>
+</div>
+
+<h3>2.6 指令 0x01b0：条件回跳（重试循环闭合）</h3>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01b0</div>
+  <div class="insn-body">
+    <div class="insn-sass">@P0 BRA.U.ANY 0x170</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">条件回跳</span>
+      如果 P0=True（UBLKCP 发出失败），跳转回 0x0170 的 ELECT 指令。<code>BRA.U.ANY</code> 的 <code>ANY</code> 表示只要 warp 中有<strong>任意 lane</strong> 的 P0 为 True 就跳转。
+      <br><br>
+      这闭合了重试循环：
+    </div>
+  </div>
+</div>
+
+<div class="mapping-diagram">
+  重试循环控制流:
+
+  ┌─────────────────────────────────────────────────────────┐
+  │                                                         │
+  │  0x0170: @P0 ELECT P1       ← P0=True 时选一个 lane    │
+  │     │                                                   │
+  │     ↓                                                   │
+  │  0x0180: UBLKCP [UR12], [UR6], UR10                    │
+  │     │       ↑ dst=smem   ↑ src=CFT handle  ↑ size      │
+  │     │       (阶段2)      (阶段3输出!)       (阶段2)     │
+  │     ↓                                                   │
+  │  0x0190: @P1 PLOP3 P0 ← 检查 UBLKCP 状态              │
+  │     │       成功 → P0=False                             │
+  │     │       失败 → P0=True                              │
+  │     ↓                                                   │
+  │  0x01a0: PLOP3 P1 ← 重置 P1                            │
+  │     │                                                   │
+  │     ↓                                                   │
+  │  0x01b0: @P0 BRA 0x0170 ← P0=True 则回跳 ─────────────┘
+  │          P0=False 则继续 → 0x01c0 (UTMACMDFLUSH)
+  └─────────────────────────────────────────────────────────┘
+</div>
+
+
+<!-- ==================== 阶段3→4 数据流总结 ==================== -->
+<h2>3. 阶段3 → 阶段4 数据流总结</h2>
+
+<div class="card highlight">
+<h4>关键数据流：阶段3 的输出如何流入阶段4 的 UBLKCP</h4>
+
+<div class="mapping-diagram">
+阶段2 输出:                        阶段3 输出:
+  UR12 = smem_data addr              UR6/UR7 = CFT Handle
+  UR10 = encoded byte_count          = encode(leId) ⊕ offset
+
+         │                                │
+         │  ┌─────────────────────────────┘
+         │  │
+         ↓  ↓
+  ┌──────────────────────────────────────────────────┐
+  │  0x0180: UBLKCP.S.G.STRONG.SYS [UR12], [UR6], UR10  │
+  │                                                  │
+  │  操作数映射:                                      │
+  │    dst = [UR12] = smem_data (阶段2 的 SMEM 编码)  │
+  │    src = [UR6]  = CFT Handle (阶段3 的 leId+offset)│
+  │    size = UR10  = byte_count (阶段2 的 size 编码)  │
+  └──────────────────────────────────────────────────┘
+         │
+         ↓ 数据流向:
+  ┌──────────────────────────────────────────────────┐
+  │  NVLink Fabric                                   │
+  │                                                  │
+  │  TMA 引擎解析 UR6:                               │
+  │    bit 31 = 1 → 走 Fabric 管道                    │
+  │    bit 30:10 = leId → NVSwitch 路由到目标 GPU     │
+  │    bit 9:0 + 高位 = offset → 目标 GPU 内资源定位  │
+  │                                                  │
+  │  读取的数据通过 NVLink 传输                       │
+  │    → 写入 [UR12] 指向的 shared memory             │
+  └──────────────────────────────────────────────────┘
+</div>
+</div>
+
+<h3>3.1 完整公式汇总</h3>
+
+<div class="formula-box">
+<span class="label">公式 1：leId 编码（0x0140）</span>
+<br><br>
+&nbsp;&nbsp;UR7 = (0x200000 &lt;&lt; 10) | (src_le_id &lt;&lt; 10)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 0x80000000 | (src_le_id &lt;&lt; 10)
+<br><br>
+&nbsp;&nbsp;其中:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0x200000 = Fabric 地址空间基址常量<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0xa = 10 = 位域移位量<br>
+&nbsp;&nbsp;&nbsp;&nbsp;src_le_id = PTX kernel 参数 (u32)
+<br><br>
+<span class="label">公式 2：64-bit Handle 构造（0x0150 + 0x0160）</span>
+<br><br>
+&nbsp;&nbsp;{UR6, UR7} = {0, 0x80000000 | (leId &lt;&lt; 10)} + src_offset<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 0x80000000 | (leId &lt;&lt; 10) | offset
+<br><br>
+&nbsp;&nbsp;其中:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;src_offset = PTX kernel 参数 (u64)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;加法等价于 OR（位域不重叠）
+<br><br>
+<span class="label">公式 3：CFT Handle 位域布局</span>
+<br><br>
+&nbsp;&nbsp;Bit 63:32&nbsp;&nbsp;= offset[41:10]&nbsp;&nbsp;(高位偏移，通常 = 0)<br>
+&nbsp;&nbsp;Bit 31&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Fabric 地址标记)<br>
+&nbsp;&nbsp;Bit 30:10&nbsp;&nbsp;= leId[20:0]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(逻辑端点 ID)<br>
+&nbsp;&nbsp;Bit 9:0&nbsp;&nbsp;&nbsp;&nbsp;= offset[9:0]&nbsp;&nbsp;&nbsp;&nbsp;(页内偏移)
+<br><br>
+<span class="label">公式 4：UBLKCP 语义</span>
+<br><br>
+&nbsp;&nbsp;UBLKCP.S.G.STRONG.SYS [dst_smem], [src_cft_handle], [tx_size]
+<br><br>
+&nbsp;&nbsp;等价于 PTX:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fabric.try_get.async.shared::cta<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mbarrier::complete_tx::bytes.mbarrier::report::fabric<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.relaxed.sys.b128<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[dst_smem], [src_cft_handle], tx_size, [mbarrier]
+<br><br>
+&nbsp;&nbsp;其中:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dst_smem&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= UR12 (阶段2 编码的 SMEM 地址)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;src_cft_handle&nbsp;&nbsp;&nbsp;&nbsp;= UR6 (阶段3 编码的 64-bit CFT Handle)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tx_size&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= UR10 (阶段2 编码的 byte_count)
+<br><br>
+<span class="label">公式 5：重试循环</span>
+<br><br>
+&nbsp;&nbsp;do {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;elected_lane = ELECT(warp)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 0x0170<br>
+&nbsp;&nbsp;&nbsp;&nbsp;status = UBLKCP(dst, src, size)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 0x0180<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if (status == SUCCESS) break&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 0x0190: P0 = False<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if (status == BUSY) continue&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 0x0190: P0 = True → 0x01b0 → 0x0170<br>
+&nbsp;&nbsp;} while (true)
+</div>
+
+<h3>3.2 寄存器生命周期总图</h3>
+
+<table>
+<tr><th>寄存器</th><th>写入位置</th><th>写入内容</th><th>读取位置</th><th>读取用途</th></tr>
+<tr>
+  <td><code>UR14</code></td>
+  <td>0x0030</td><td>src_le_id</td>
+  <td>0x0140</td><td>ULEA 输入 → leId 编码</td>
+</tr>
+<tr>
+  <td><code>UR8/UR9</code></td>
+  <td>0x0080</td><td>src_offset</td>
+  <td>0x0160</td><td>UIADD3.64 输入 → offset 合并</td>
+</tr>
+<tr>
+  <td><code>UR7</code></td>
+  <td>0x0140</td><td>encode(leId)</td>
+  <td>0x0160</td><td>UIADD3.64 低 32 位 → Handle 低位</td>
+</tr>
+<tr>
+  <td><code>UR6</code></td>
+  <td>0x0150 → 0x0160</td><td>0 → offset 高 32 位</td>
+  <td>0x0180</td><td><strong>UBLKCP [UR6] 源操作数</strong></td>
+</tr>
+<tr>
+  <td><code>UR12</code></td>
+  <td>0x0130</td><td>smem_data 地址</td>
+  <td>0x0180</td><td>UBLKCP [UR12] 目标操作数</td>
+</tr>
+<tr>
+  <td><code>UR10</code></td>
+  <td>0x0110</td><td>encoded byte_count</td>
+  <td>0x0180</td><td>UBLKCP UR10 大小操作数</td>
+</tr>
+<tr>
+  <td><code>P0</code></td>
+  <td>0x0040 → 0x0190</td><td>retry 使能 → 状态更新</td>
+  <td>0x0170, 0x01b0</td><td>ELECT 使能 + BRA 条件</td>
+</tr>
+<tr>
+  <td><code>P1</code></td>
+  <td>0x0170 → 0x01a0</td><td>ELECT 结果 → 重置</td>
+  <td>0x0190</td><td>状态检查谓词</td>
+</tr>
+</table>
+
+<div class="card warning">
+<h4>核心洞察</h4>
+<p><strong>阶段3 的本质</strong>是将 PTX 的"逻辑"地址（裸 leId + 裸 offset）转换为 Blackwell TMA/Fabric 引擎能直接消费的"物理"编码地址。这种编码不是任意的 — 它精确对应了 NVSwitch 硬件的路由表查找格式：bit 31 标记地址类型，bit [30:10] 承载 leId 用于路由，低位承载 offset 用于目标端内寻址。</p>
+<p><strong>阶段4 的本质</strong>是将编码后的 CFT Handle 交给 UBLKCP 指令，由 TMA 硬件引擎解析并发起 NVLink 传输。"try" 语义通过 ELECT + 条件分支实现软件重试 — 这揭示了 PTX 的 "try" 前缀不是装饰，而是对应了真实的硬件 busy 可能性。</p>
+</div>
+
+</div>
+
+<div class="footer">
+  <p>基于 cuobjdump SASS 反汇编 + PTX ISA 9.3 文档 + NVSHMEM logical_endpoint_device.cuh &bull; sm_100a (Blackwell)</p>
+  <p>生成时间：2026-07-14</p>
+</div>
+
+</body>
+</html>

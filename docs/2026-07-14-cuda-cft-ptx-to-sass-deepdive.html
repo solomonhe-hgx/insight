@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTX → SASS 逐指令映射：fabric.try_get_probe 深度解析</title>
+<style>
+  :root {
+    --nvidia-green: #76b900;
+    --nvidia-dark: #1a1a2e;
+    --nvidia-darker: #0f0f1a;
+    --card-bg: #16213e;
+    --card-border: #1f3460;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0b0;
+    --accent-blue: #4fc3f7;
+    --accent-orange: #ffb74d;
+    --accent-red: #ef5350;
+    --accent-purple: #b39ddb;
+    --code-bg: #0d1117;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--nvidia-darker);
+    color: var(--text-primary);
+    line-height: 1.75;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--nvidia-dark) 0%, #0a2a0a 50%, var(--nvidia-dark) 100%);
+    border-bottom: 3px solid var(--nvidia-green);
+    padding: 50px 40px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 2em; color: var(--nvidia-green); margin-bottom: 10px; }
+  .hero .subtitle { font-size: 1.05em; color: var(--text-secondary); max-width: 800px; margin: 0 auto; }
+  .hero .badge {
+    display: inline-block;
+    background: rgba(118,185,0,0.15);
+    border: 1px solid var(--nvidia-green);
+    color: var(--nvidia-green);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.82em;
+    margin-top: 14px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 36px 24px; }
+  
+  h2 {
+    color: var(--nvidia-green);
+    font-size: 1.5em;
+    margin: 36px 0 16px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--card-border);
+  }
+  h3 {
+    color: var(--accent-blue);
+    font-size: 1.15em;
+    margin: 24px 0 10px 0;
+  }
+  p { margin-bottom: 12px; }
+  
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 14px 0;
+  }
+  .card.highlight { border-left: 4px solid var(--nvidia-green); }
+  .card.info { border-left: 4px solid var(--accent-blue); background: rgba(79,195,247,0.05); }
+  .card.warning { border-left: 4px solid var(--accent-orange); background: rgba(255,183,77,0.05); }
+  
+  pre {
+    background: var(--code-bg);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.82em;
+    line-height: 1.55;
+    margin: 10px 0;
+    color: #c9d1d9;
+  }
+  code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.88em;
+    background: rgba(110,118,129,0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #e6edf3;
+  }
+  pre code { background: none; padding: 0; }
+  
+  .insn-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 0;
+    margin: 8px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+  }
+  .insn-addr {
+    background: rgba(118,185,0,0.1);
+    padding: 10px 12px;
+    font-family: monospace;
+    font-size: 0.85em;
+    color: var(--nvidia-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--card-border);
+  }
+  .insn-body {
+    background: var(--card-bg);
+    padding: 12px 16px;
+  }
+  .insn-sass {
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85em;
+    color: var(--accent-blue);
+    margin-bottom: 6px;
+  }
+  .insn-desc {
+    font-size: 0.9em;
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+  .insn-ptx {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    font-style: italic;
+  }
+  
+  .phase-header {
+    background: rgba(118,185,0,0.08);
+    border: 1px solid var(--nvidia-green);
+    border-radius: 8px;
+    padding: 10px 18px;
+    margin: 20px 0 12px 0;
+    font-weight: 700;
+    color: var(--nvidia-green);
+    font-size: 1em;
+  }
+  
+  .mapping-diagram {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    font-family: monospace;
+    font-size: 0.82em;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--text-secondary);
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 0.88em;
+  }
+  th {
+    background: rgba(118,185,0,0.15);
+    color: var(--nvidia-green);
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 2px solid var(--nvidia-green);
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75em;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .tag-init { background: rgba(179,157,219,0.2); color: var(--accent-purple); }
+  .tag-addr { background: rgba(79,195,247,0.2); color: var(--accent-blue); }
+  .tag-fabric { background: rgba(118,185,0,0.2); color: var(--nvidia-green); }
+  .tag-submit { background: rgba(255,183,77,0.2); color: var(--accent-orange); }
+  .tag-retry { background: rgba(239,83,80,0.2); color: var(--accent-red); }
+  .tag-misc { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+  
+  .footer {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-secondary);
+    font-size: 0.82em;
+    border-top: 1px solid var(--card-border);
+    margin-top: 36px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>PTX → SASS 逐指令映射解析</h1>
+  <p class="subtitle">fabric_try_get_probe: 从 PTX 虚拟指令到 Blackwell SASS 硬件指令的完整翻译链路</p>
+  <span class="badge">PTX 9.3 → SASS sm_100a &bull; cuobjdump 反汇编分析</span>
+</div>
+
+<div class="container">
+
+<h2>0. PTX 源码回顾</h2>
+
+<pre><code>.version 9.3
+.target sm_100a
+.address_size 64
+
+.visible .entry fabric_try_get_probe(
+    .param .u32 src_le_id,
+    .param .u64 src_offset,
+    .param .u32 byte_count
+) {
+    .reg .b32 %r&lt;8&gt;;
+    .reg .b64 %rd&lt;8&gt;;
+    .shared .align 16 .b8 smem_data[16];
+    .shared .align 8 .b64 smem_bar;
+
+    ld.param.u32 %r1, [src_le_id];       // 读取 src_le_id
+    ld.param.u64 %rd1, [src_offset];     // 读取 src_offset
+    ld.param.u32 %r2, [byte_count];      // 读取 byte_count
+
+    mov.u64 %rd2, smem_bar;
+    cvta.to.shared.u64 %rd3, %rd2;
+    cvt.u32.u64 %r3, %rd3;
+    mbarrier.init.layout::v1.shared::cta.b64 [%r3], 1;   // 初始化 mbarrier
+
+    mov.u64 %rd4, smem_data;
+    cvta.to.shared.u64 %rd5, %rd4;
+    fabric.try_get.async.shared::cta
+        .mbarrier::complete_tx::bytes.mbarrier::report::fabric
+        .relaxed.sys.b128
+        [%rd5], [%r1, %rd1], %r2, [%rd3];  // 发起 fabric get
+
+    fabric.submit;                          // 提交 fabric 操作
+    ret;
+}</code></pre>
+
+<div class="card info">
+<h4>PTX → SASS 翻译的关键差异</h4>
+<p>PTX 是虚拟 ISA，使用符号化的 shared memory 地址和逻辑寄存器。SASS 是 Blackwell 硬件实际执行的指令集，使用<strong>统一寄存器（Uniform Register, UR）</strong>、<strong>shared memory 符号地址编码</strong>、以及<strong>硬件特有的同步原语（SYNCS.EXCH）</strong>。编译器需要完成地址计算、寄存器分配、调度控制字插入等工作。</p>
+</div>
+
+<h2>1. 阶段一：运行时初始化与参数加载</h2>
+
+<div class="phase-header">Phase 1: 常量加载与 CTA 上下文建立 (0x0000 - 0x0040)</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0000</div>
+  <div class="insn-body">
+    <div class="insn-sass">LDC R1, c[0x0][0x37c]</div>
+    <div class="insn-desc">
+      <span class="tag tag-misc">初始化</span>
+      从常量内存 <code>c[0x0][0x37c]</code> 加载运行时状态到通用寄存器 R1。这通常是 kernel 启动参数区的栈指针或 CGA/CTA 上下文指针。LDC = Load Constant，访问只读常量缓存。
+    </div>
+    <div class="insn-ptx">对应 PTX: 隐式 — PTX 不显式加载运行时上下文，由编译器插入</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0010</div>
+  <div class="insn-body">
+    <div class="insn-sass">S2UR UR11, SR_CgaCtaId</div>
+    <div class="insn-desc">
+      <span class="tag tag-init">CTA ID</span>
+      从特殊寄存器 <code>SR_CgaCtaId</code> 读取当前 CTA 的标识符，存入<strong>统一寄存器 UR11</strong>。S2UR = Special to Uniform Register。这个 CTA ID 后续用于计算 shared memory 的物理地址基准 — 每个 CTA 的 shared memory 在不同物理位置，需要通过 CTA ID 计算偏移。
+    </div>
+    <div class="insn-ptx">对应 PTX: 隐式 — PTX 的 <code>.shared</code> 变量地址由硬件自动绑定到当前 CTA，无需显式计算</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0020</div>
+  <div class="insn-body">
+    <div class="insn-sass">UMOV UR10, 0x400</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址计算</span>
+      将立即数 0x400 加载到 UR10。这是 shared memory 符号地址的基准偏移常量。在 Blackwell 的 shared memory 编码方案中，0x400 是 CTA shared memory 区域内的一个基础偏移，用于后续计算 <code>smem_data</code> 和 <code>smem_bar</code> 的实际地址。
+    </div>
+    <div class="insn-ptx">对应 PTX: 隐式 — PTX 中 <code>mov.u64 %rd2, smem_bar</code> 直接取符号地址，SASS 需要手动计算偏移</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0030</div>
+  <div class="insn-body">
+    <div class="insn-sass">LDCU UR14, c[0x0][0x380]</div>
+    <div class="insn-desc">
+      <span class="tag tag-init">参数加载</span>
+      从参数区加载 <code>src_le_id</code>（u32）到统一寄存器 UR14。LDCU = Load Constant to Uniform。注意这里使用了 Uniform 寄存器而非通用寄存器 — Blackwell 的 Fabric 操作数必须在 Uniform 寄存器中。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>ld.param.u32 %r1, [src_le_id]</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0040</div>
+  <div class="insn-body">
+    <div class="insn-sass">PLOP3.LUT P0, PT, PT, PT, PT, 0x80, 0x8</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">Retry 控制</span>
+      通过 LUT（查找表）操作初始化谓词寄存器 P0。LUT 值 0x80 配合操作码 0x8 将 P0 设置为特定初始值（True）。P0 是 fabric.try_get 的<strong>重试循环控制谓词</strong> — 如果 fabric 操作发出失败（busy），需要重新尝试。
+    </div>
+    <div class="insn-ptx">对应 PTX: 无 — PTX 不暴露 retry 语义，这是 SASS 级别的硬件重试逻辑</div>
+  </div>
+</div>
+
+<h2>2. 阶段二：Shared Memory 地址编码</h2>
+
+<div class="phase-header">Phase 2: 计算 smem_bar 和 smem_data 的硬件编码地址 (0x0050 - 0x0130)</div>
+
+<div class="card info">
+<h4>Blackwell Shared Memory 地址编码</h4>
+<p>Blackwell 的 shared memory 指令不使用直接的虚拟地址，而是使用一种<strong>编码后的地址格式</strong>，包含 CTA ID、bank 选择、属性位等字段。编译器需要将 PTX 的符号地址转换为这种编码格式。以下指令序列就是在构建这种编码地址。</p>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0050</div>
+  <div class="insn-body">
+    <div class="insn-sass">UIADD3 UR4, UPT, UPT, UR10, 0x10, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址计算</span>
+      UR4 = UR10 + 0x10 = 0x400 + 0x10 = 0x410。这是 <code>smem_bar</code> 相对于 CTA shared memory 基址的偏移。0x10 = 16 字节偏移，对应 <code>smem_data[16]</code> 之后的 <code>smem_bar</code>（smem_data 占 16 字节）。UIADD3 = Uniform Integer Add 3-operand。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>mov.u64 %rd2, smem_bar</code> 的 SASS 地址计算部分</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0060</div>
+  <div class="insn-body">
+    <div class="insn-sass">UMOV UR6, 0x1</div>
+    <div class="insn-desc">
+      <span class="tag tag-init">mbarrier 初始化</span>
+      将 mbarrier 的 participant count = 1 加载到 UR6。这个 kernel 只有 1 个线程参与 mbarrier（单线程 probe kernel）。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>mbarrier.init.layout::v1.shared::cta.b64 [%r3], 1</code> 中的立即数 1</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0070</div>
+  <div class="insn-body">
+    <div class="insn-sass">LDCU UR12, c[0x0][0x390]</div>
+    <div class="insn-desc">
+      <span class="tag tag-init">参数加载</span>
+      加载 <code>byte_count</code>（u32）到 UR12。后续会被编码为 UBLKCP（Fabric 读取指令）的 transaction size 操作数。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>ld.param.u32 %r2, [byte_count]</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0080</div>
+  <div class="insn-body">
+    <div class="insn-sass">LDCU.64 UR8, c[0x0][0x388]</div>
+    <div class="insn-desc">
+      <span class="tag tag-init">参数加载</span>
+      加载 64-bit <code>src_offset</code> 到 UR8/UR9（64 位占用两个 32-bit uniform 寄存器槽位）。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>ld.param.u64 %rd1, [src_offset]</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0090</div>
+  <div class="insn-body">
+    <div class="insn-sass">UIADD3 UR6, UPT, UPT, -UR6, 0x100000, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址编码</span>
+      UR6 = -1 + 0x100000 = 0x0FFFFF。这是 shared memory 地址编码中的高位字段/掩码中间值。Blackwell 的 shared memory 地址需要将 CTA 内偏移编码为特定位域格式。
+    </div>
+    <div class="insn-ptx">对应 PTX: 无直接对应 — 纯 SASS 级地址编码</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x00a0</div>
+  <div class="insn-body">
+    <div class="insn-sass">USHF.L.U32 UR7, UR6, 0xb, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址编码</span>
+      UR7 = UR6 &lt;&lt; 11 = 0x0FFFFF &lt;&lt; 11。左移 11 位将地址值对齐到 shared memory 编码中的高位字段位置。USHF = Uniform Shift。
+    </div>
+    <div class="insn-ptx">纯 SASS 地址编码</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x00b0</div>
+  <div class="insn-body">
+    <div class="insn-sass">USHF.L.U32 UR6, UR6, 0x1, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址编码</span>
+      UR6 = UR6 &lt;&lt; 1。左移 1 位，为 mbarrier 地址字段做准备 — mbarrier 需要 8 字节对齐，地址最低 3 位为 0，左移 1 位是编码过程的一部分。
+    </div>
+    <div class="insn-ptx">纯 SASS 地址编码</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x00c0</div>
+  <div class="insn-body">
+    <div class="insn-sass">ULO P3.LUT UR6, UR6, 0x1, URZ, 0xfe, !UPT</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址编码</span>
+      通过 LUT 操作设置 shared memory 地址的低位属性位。最终生成的 UR6 包含 <code>smem_bar</code> 的完整编码地址，包括对齐位、属性位等，可以直接传给 SYNCS.EXCH 指令使用。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>cvta.to.shared.u64 %rd3, %rd2</code> + <code>cvt.u32.u64 %r3, %rd3</code> 的 SASS 等价实现</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x00d0</div>
+  <div class="insn-body">
+    <div class="insn-sass">UMOV UR5, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址编码</span>
+      清零 UR5。作为 64 位地址构造的高 32 位（= 0），与低 32 位合并形成完整的 shared memory 地址。
+    </div>
+    <div class="insn-ptx">纯 SASS 辅助操作</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x00e0</div>
+  <div class="insn-body">
+    <div class="insn-sass">ULEA UR4, UR11, UR4, 0x18</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址计算</span>
+      UR4 = UR11 + UR4 + 0x18 的线性组合（LEA = Load Effective Address）。将 CTA ID (UR11) 与 shared 偏移 (UR4=0x410) 合并，生成 <code>smem_bar</code> 的<strong>物理地址</strong>。0x18 是额外的偏移修正。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>mov.u64 %rd2, smem_bar</code> 的最终地址解析</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x00f0</div>
+  <div class="insn-body">
+    <div class="insn-sass">UMOV UR13, UR4</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址保存</span>
+      将 smem_bar 的最终地址保存到 UR13。UR13 将在后续 SYNCS.EXCH（mbarrier 初始化）中作为目标地址使用。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>%r3</code>（mbarrier 地址寄存器的保存）</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0100</div>
+  <div class="insn-body">
+    <div class="insn-sass">ULEA UR4, UR11, UR10, 0x18</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址计算</span>
+      UR4 = UR11 + UR10 + 0x18。这次使用 UR10（= 0x400，即 smem_data 的偏移），生成 <code>smem_data</code> 的物理地址。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>mov.u64 %rd4, smem_data</code> + <code>cvta.to.shared.u64 %rd5, %rd4</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0110</div>
+  <div class="insn-body">
+    <div class="insn-sass">USHF.R.U32.HI UR10, URZ, 0x4, UR12</div>
+    <div class="insn-desc">
+      <span class="tag tag-fabric">size 编码</span>
+      将 <code>byte_count</code> (UR12) 编码为 UBLKCP 指令使用的 transaction size 格式。USHF.R = 右移，HI 表示取高半部分。这是将字节数转换为硬件期望的 block copy size 编码格式。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>%r2</code>（byte_count 直接作为 size 操作数）— PTX 不要求编码，SASS 需要</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0120</div>
+  <div class="insn-body">
+    <div class="insn-sass">SYNCS.EXCH.64 URZ, [UR13], UR6</div>
+    <div class="insn-desc">
+      <span class="tag tag-init">mbarrier 初始化</span>
+      <strong>这是 <code>mbarrier.init.layout::v1</code> 的 SASS 实现。</strong>SYNCS.EXCH = Synchronize Exchange，在 shared memory 地址 [UR13]（即 smem_bar）上执行原子交换初始化操作。UR6 包含初始化值（编码后的 participant count + layout::v1 标志）。这是 Blackwell 特有的 mbarrier 初始化原语 — PTX 的 <code>mbarrier.init</code> 在 SASS 层被翻译为 SYNCS.EXCH 指令。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>mbarrier.init.layout::v1.shared::cta.b64 [%r3], 1</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0130</div>
+  <div class="insn-body">
+    <div class="insn-sass">UMOV UR12, UR4</div>
+    <div class="insn-desc">
+      <span class="tag tag-addr">地址保存</span>
+      将 smem_data 的地址保存到 UR12。UR12 将作为 UBLKCP（fabric try_get）的<strong>本地目标地址</strong>。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>%rd5</code>（fabric.try_get 的 dst 操作数）</div>
+  </div>
+</div>
+
+<h2>3. 阶段三：远端 CFT 地址构造</h2>
+
+<div class="phase-header">Phase 3: 构造 [src_le_id, src_offset] 远端 Handle 地址 (0x0140 - 0x0160)</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0140</div>
+  <div class="insn-body">
+    <div class="insn-sass">ULEA UR7, UR14, 0x200000, 0xa</div>
+    <div class="insn-desc">
+      <span class="tag tag-fabric">LE ID 编码</span>
+      将 <code>src_le_id</code> (UR14) 编码到 CFT 源地址的高位字段中。0x200000 和 0xa 是编码常量 — Blackwell 的 Fabric 指令期望 LE ID 以特定位域格式出现在操作数中，而非裸的 32-bit 值。ULEA 的三操作数模式将 LE ID 与编码常量合并。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>[%r1, %rd1]</code> 中的 <code>%r1</code>（src_le_id）— PTX 直接使用裸值，SASS 需要位域编码</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0150</div>
+  <div class="insn-body">
+    <div class="insn-sass">UMOV UR6, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-fabric">地址构造</span>
+      清零 UR6，准备作为 64-bit 源地址的高 32 位。与 UR7（低 32 位，已编码 LE ID）配合，形成完整的 [leId, offset] 编码地址。
+    </div>
+    <div class="insn-ptx">对应 PTX: 地址组装的中间步骤</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0160</div>
+  <div class="insn-body">
+    <div class="insn-sass">UIADD3.64 UR6, UPT, UPT, UR6, UR8, URZ</div>
+    <div class="insn-desc">
+      <span class="tag tag-fabric">地址合并</span>
+      64-bit 加法：UR6/UR7 = UR6 + UR8。将 <code>src_offset</code> (UR8/UR9) 合并到已编码 LE ID 的地址中，形成最终的完整 CFT 源操作数 <code>[src_le_id, src_offset]</code>。UR6/UR7 现在包含了完整的远端 Handle 编码地址。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>[%r1, %rd1]</code> 的完整 SASS 编码实现</div>
+  </div>
+</div>
+
+<h2>4. 阶段四：Fabric try_get 执行与重试</h2>
+
+<div class="phase-header">Phase 4: Fabric 操作发出、状态检查与重试循环 (0x0170 - 0x01b0)</div>
+
+<div class="card highlight">
+<h4>核心区域：PTX → SASS 的关键翻译</h4>
+<p>PTX 的 <code>fabric.try_get.async</code> 是一条指令，但在 SASS 层被翻译为 <strong>ELECT + UBLKCP + 状态检查 + 条件分支</strong> 的重试序列。这揭示了硬件的一个重要事实：Fabric 操作可能因为资源繁忙而失败，需要软件级重试。</p>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0170</div>
+  <div class="insn-body">
+    <div class="insn-sass">@P0 ELECT P1, URZ, PT</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">线程选举</span>
+      条件执行（仅当 P0=True 时）。ELECT 是 Blackwell 特有的<strong>warp 线程选举</strong>指令 — 从当前 warp 中选出一个 lane 来发起 Fabric 事务。被选中的 lane 将 P1 设为 True，其他 lane 的 P1 为 False。
+      <br><br>
+      <strong>为什么需要选举？</strong>Fabric 操作通过 NVLink 发送请求，每个 warp 只需要一个 lane 发起事务即可（避免多个 lane 同时发送造成冲突）。这与 CUDA 的 SIMT 模型一致 — 单条指令代表整个 warp 执行。
+    </div>
+    <div class="insn-ptx">对应 PTX: 无 — PTX 不暴露硬件级线程选举，这是 SASS 特有的重试机制</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0180</div>
+  <div class="insn-body">
+    <div class="insn-sass">UBLKCP.S.G.STRONG.SYS [UR12], [UR6], UR10</div>
+    <div class="insn-desc">
+      <span class="tag tag-fabric">Fabric 读取核心指令</span>
+      <strong>这是 <code>fabric.try_get.async</code> 的真正 SASS 实现。</strong>
+      <br><br>
+      <table>
+      <tr><th>字段</th><th>含义</th></tr>
+      <tr><td><code>UBLKCP</code></td><td>Unaligned Block Copy — 硬件块拷贝指令，支持 Fabric 远端访问</td></tr>
+      <tr><td><code>.S</code></td><td>Source 端通过 Fabric proxy（远端读取）</td></tr>
+      <tr><td><code>.G</code></td><td>Generic addressing</td></tr>
+      <tr><td><code>.STRONG.SYS</code></td><td>系统级强内存序（对应 PTX 的 <code>.relaxed.sys</code>）</td></tr>
+      <tr><td><code>[UR12]</code></td><td>目标地址 = smem_data 的编码地址</td></tr>
+      <tr><td><code>[UR6]</code></td><td>源地址 = [src_le_id, src_offset] 的编码 Handle</td></tr>
+      <tr><td><code>UR10</code></td><td>transaction size（已编码的 byte_count）</td></tr>
+      </table>
+      <br>
+      UBLKCP 执行从远端 CFT Handle 到本地 SMEM 的数据传输。如果 NVLink 资源可用，操作成功发出；如果资源繁忙，操作返回失败状态，需要重试。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>fabric.try_get.async.shared::cta.mbarrier::complete_tx::bytes.mbarrier::report::fabric.relaxed.sys.b128 [%rd5], [%r1, %rd1], %r2, [%rd3]</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0190</div>
+  <div class="insn-body">
+    <div class="insn-sass">@P1 PLOP3.LUT P0, PT, P1, PT, PT, 0x8, 0x80</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">状态检查</span>
+      仅由被 ELECT 选中的 lane (P1=True) 执行。根据 UBLKCP 返回的状态更新 P0：
+      <br>• 如果 UBLKCP 成功发出 → P0 = False → 退出重试循环
+      <br>• 如果 UBLKCP 失败（busy）→ P0 = True → 继续重试
+      <br><br>
+      LUT 值 0x8 配合操作码 0x80 实现了基于 P1 的条件更新逻辑。
+    </div>
+    <div class="insn-ptx">对应 PTX: 无 — PTX 不暴露重试语义</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01a0</div>
+  <div class="insn-body">
+    <div class="insn-sass">PLOP3.LUT P1, PT, PT, PT, PT, 0x8, 0x80</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">谓词重置</span>
+      重置 P1 为初始状态，为下一次重试循环的 ELECT 指令做准备。确保每次循环迭代都从干净的谓词状态开始。
+    </div>
+    <div class="insn-ptx">纯 SASS 重试控制逻辑</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01b0</div>
+  <div class="insn-body">
+    <div class="insn-sass">@P0 BRA.U.ANY 0x170</div>
+    <div class="insn-desc">
+      <span class="tag tag-retry">条件回跳</span>
+      如果 P0=True（UBLKCP 发出失败），则跳转回 0x0170 的 ELECT 指令，重新执行线程选举和 UBLKCP 发出。这形成了一个<strong>软件重试循环</strong>：
+      <br><br>
+      <code>0x0170: ELECT → 0x0180: UBLKCP → 0x0190: 检查状态 → 0x01b0: 失败则回跳</code>
+      <br><br>
+      <code>BRA.U.ANY</code> 的 <code>ANY</code> 表示只要 warp 中有任意 lane 的 P0 为 True 就跳转。
+    </div>
+    <div class="insn-ptx">对应 PTX: 无 — PTX 的 fabric.try_get 是单次发出，重试是 SASS 级别的实现细节</div>
+  </div>
+</div>
+
+<div class="mapping-diagram">
+  PTX 视角（1 条指令）:
+  ┌─────────────────────────────────────────────────────┐
+  │  fabric.try_get.async ... [%rd5], [%r1,%rd1], %r2   │
+  └─────────────────────────────────────────────────────┘
+
+  SASS 视角（重试循环）:
+  ┌─────────────────────────────────────────────────────┐
+  │  0x0170: ELECT P1          ← 选一个 lane 发起       │
+  │  0x0180: UBLKCP [dst],[src],size  ← 实际发出       │
+  │  0x0190: 检查状态 → P0     ← 成功?                  │
+  │  0x01a0: 重置 P1                                    │
+  │  0x01b0: @P0 BRA 0x0170    ← 失败则重试             │
+  └─────────────────────────────────────────────────────┘
+  
+  关键洞察: PTX 的 "try" 语义在 SASS 层体现为硬件级重试循环
+</div>
+
+<h2>5. 阶段五：fabric.submit 与收尾</h2>
+
+<div class="phase-header">Phase 5: Fabric 操作提交与 kernel 退出 (0x01c0 - 0x01f0)</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01c0</div>
+  <div class="insn-body">
+    <div class="insn-sass">UTMACMDFLUSH</div>
+    <div class="insn-desc">
+      <span class="tag tag-submit">fabric.submit</span>
+      <strong>这是 <code>fabric.submit</code> 的 SASS 实现。</strong>UTMACMDFLUSH = TMA Command Flush — 刷新 TMA/Fabric 命令队列，将所有 pending 的 Fabric 操作提交给硬件。
+      <br><br>
+      命名中的 "TMA" 表明 Fabric submit 和 TMA (Tensor Memory Accelerator) 共享同一套命令刷新机制。在 Blackwell 硬件中，Fabric 操作和 TMA 操作通过同一个命令管道提交。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>fabric.submit</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01d0</div>
+  <div class="insn-body">
+    <div class="insn-sass">DEPBAR.LE SB0, 0x0</div>
+    <div class="insn-desc">
+      <span class="tag tag-submit">依赖屏障</span>
+      DEPBAR = Dependency Barrier。等待 Scoreboard SB0 上的所有操作完成到 LE（Less than or Equal）级别。这确保 fabric.submit 之后的指令不会在 Fabric 操作实际完成之前执行后续依赖操作。
+      <br><br>
+      Scoreboard 是 Blackwell 的指令级依赖追踪机制，DEPBAR 提供了软件可控的同步点。
+    </div>
+    <div class="insn-ptx">对应 PTX: 无直接对应 — 这是 SASS 级的指令排序控制</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01e0</div>
+  <div class="insn-body">
+    <div class="insn-sass">CCTL.IVALL</div>
+    <div class="insn-desc">
+      <span class="tag tag-submit">缓存控制</span>
+      CCTL = Cache Control。IVALL = Invalidate All。执行 Fabric 操作后的缓存失效操作，确保后续读取不会看到陈旧的缓存数据。这是 Fabric 操作完成后的必要副作用 — 远端写入的数据可能需要使本地缓存失效。
+    </div>
+    <div class="insn-ptx">对应 PTX: 隐式 — PTX 的内存序语义在 SASS 层需要显式缓存控制</div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x01f0</div>
+  <div class="insn-body">
+    <div class="insn-sass">EXIT</div>
+    <div class="insn-desc">
+      <span class="tag tag-misc">kernel 退出</span>
+      线程退出。对应 PTX 的 <code>ret</code>。
+    </div>
+    <div class="insn-ptx">对应 PTX: <code>ret</code></div>
+  </div>
+</div>
+
+<div class="insn-row">
+  <div class="insn-addr">0x0200+</div>
+  <div class="insn-body">
+    <div class="insn-sass">BRA 0x200 / NOP × 14</div>
+    <div class="insn-desc">
+      <span class="tag tag-misc">填充</span>
+      自旋分支 + NOP 填充。这些是编译器生成的对齐填充指令，确保后续 kernel 代码的指令对齐。无执行语义。
+    </div>
+    <div class="insn-ptx">无对应</div>
+  </div>
+</div>
+
+<h2>6. 完整映射总结</h2>
+
+<table>
+<tr><th>PTX 指令</th><th>SASS 指令序列</th><th>指令数</th><th>说明</th></tr>
+<tr>
+  <td><code>ld.param.u32 %r1, [src_le_id]</code></td>
+  <td><code>LDCU UR14, c[0x0][0x380]</code></td>
+  <td>1</td>
+  <td>参数加载到 Uniform 寄存器</td>
+</tr>
+<tr>
+  <td><code>ld.param.u64 %rd1, [src_offset]</code></td>
+  <td><code>LDCU.64 UR8, c[0x0][0x388]</code></td>
+  <td>1</td>
+  <td>64-bit 参数加载</td>
+</tr>
+<tr>
+  <td><code>ld.param.u32 %r2, [byte_count]</code></td>
+  <td><code>LDCU UR12, c[0x0][0x390]</code></td>
+  <td>1</td>
+  <td>参数加载 + 后续编码</td>
+</tr>
+<tr>
+  <td><code>mov/cvta/cvt</code> (smem_bar 地址)</td>
+  <td><code>UMOV + UIADD3 + USHF + ULOP3 + ULEA</code> × 多条</td>
+  <td>~8</td>
+  <td>PTX 符号地址 → SASS 编码地址</td>
+</tr>
+<tr>
+  <td><code>mbarrier.init.layout::v1 [%r3], 1</code></td>
+  <td><code>SYNCS.EXCH.64 URZ, [UR13], UR6</code></td>
+  <td>1</td>
+  <td>PTX mbarrier → Blackwell SYNCS 原语</td>
+</tr>
+<tr>
+  <td><code>fabric.try_get.async ...</code></td>
+  <td><code>ELECT + UBLKCP + PLOP3 + BRA</code></td>
+  <td>5</td>
+  <td>1 条 PTX → 带重试的 SASS 序列</td>
+</tr>
+<tr>
+  <td><code>fabric.submit</code></td>
+  <td><code>UTMACMDFLUSH + DEPBAR + CCTL</code></td>
+  <td>3</td>
+  <td>提交 + 排序 + 缓存失效</td>
+</tr>
+</table>
+
+<div class="card highlight">
+<h4>关键架构洞察</h4>
+<ol>
+<li><strong>PTX 1 条 → SASS 多条：</strong>PTX 的 <code>fabric.try_get</code> 在 SASS 层被展开为包含线程选举、实际传输、状态检查、条件重试的完整序列。这揭示了 "try" 语义的硬件实现本质。</li>
+<li><strong>Uniform Register 主导：</strong>Blackwell 的 Fabric 操作大量使用 Uniform Register（UR）而非通用寄存器（R）。UR 的特点是 warp 内所有 lane 共享相同值，适合存储地址、Handle 等共享操作数。</li>
+<li><strong>SYNCS.EXCH = mbarrier.init：</strong>PTX 的高级同步原语在 SASS 层被翻译为 Blackwell 特有的 SYNCS（Synchronize）指令族。</li>
+<li><strong>UTMACMDFLUSH = fabric.submit：</strong>Fabric 提交与 TMA 共享命令管道，统一通过 command flush 机制提交。</li>
+<li><strong>软件重试循环：</strong>Fabric 操作的 "try" 语义意味着硬件可能拒绝请求（busy），SASS 通过 ELECT + 条件分支实现 warp 级重试。</li>
+</ol>
+</div>
+
+<div class="card warning">
+<h4>调度控制字说明</h4>
+<p>每条 SASS 指令后面的 <code>/* 0x... */</code> 注释是<strong>调度控制字</strong>（Scheduler Control Word），描述该指令的 stall cycle、yield 行为、寄存器 reuse 提示等调度信息。这些不是独立的执行指令，而是 cuobjdump 输出的指令编码的一部分。例如 <code>0x000fe20000000000</code> 表示无 stall（完全流水线化），而包含非零 stall 值的控制字表示需要等待特定周期数。</p>
+</div>
+
+</div>
+
+<div class="footer">
+  <p>基于 cuobjdump SASS 反汇编 + PTX ISA 9.3 文档 &bull; sm_100a (Blackwell) 目标架构</p>
+  <p>生成时间：2026-07-14</p>
+</div>
+
+</body>
+</html>

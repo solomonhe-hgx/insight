@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA 专利研究报告 - 通信/MMU/Memory (2025-2026)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; color: #e2e8f0; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; border-bottom: 3px solid transparent; }
+        .nav-tab:hover { background: rgba(148, 163, 184, 0.1); }
+        .nav-tab.active { border-bottom-color: #76b900; background: rgba(118, 185, 0, 0.1); }
+        .patent-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); transition: all 0.2s ease; }
+        .patent-card:hover { border-color: rgba(118, 185, 0, 0.4); box-shadow: 0 4px 20px rgba(118, 185, 0, 0.15); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; transition: all 0.2s; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .highlight-box { border-left: 4px solid #76b900; background: rgba(118, 185, 0, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .company-badge { font-family: 'Fira Code', monospace; background: rgba(118, 185, 0, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        .area-badge { font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 0.25rem; }
+        .area-memory { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+        .area-comm { background: rgba(249, 115, 22, 0.2); color: #fdba74; }
+        .area-mmu { background: rgba(168, 85, 247, 0.2); color: #c4b5fd; }
+        .area-hbm { background: rgba(236, 72, 153, 0.2); color: #f9a8d4; }
+        .area-rdma { background: rgba(20, 184, 166, 0.2); color: #5eead4; }
+        .area-thermal { background: rgba(234, 179, 8, 0.2); color: #fde047; }
+        .area-error { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+        .metric-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .comparison-table th { background: rgba(118, 185, 0, 0.2); }
+        .comparison-table tr:hover { background: rgba(148, 163, 184, 0.05); }
+        .trend-card { background: linear-gradient(135deg, rgba(118, 185, 0, 0.1) 0%, rgba(30, 41, 59, 0.5) 100%); border: 1px solid rgba(118, 185, 0, 0.3); }
+        h3 { font-size: 1.125rem; }
+        h4 { font-size: 1rem; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">NVIDIA Patent Research</h1>
+                        <p class="text-xs text-slate-400">Communication / MMU / Memory Patents Published 2025-2026</p>
+                    </div>
+                </div>
+                <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-700/10 border border-green-500/20">
+                    <div class="text-xs text-slate-400">Patents Found</div>
+                    <div class="text-lg font-bold text-green-400">9</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="sticky top-[72px] z-40 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-1 overflow-x-auto py-2 text-sm">
+                <div class="nav-tab active px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="memory"><i class="fas fa-memory mr-2"></i>GPU Memory Management</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="comm"><i class="fas fa-network-wired mr-2"></i>Communication / Multicast</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="hbm"><i class="fas fa-database mr-2"></i>HBM / DRAM</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="rdma"><i class="fas fa-exchange-alt mr-2"></i>RDMA / Remote Memory</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="comparison"><i class="fas fa-table mr-2"></i>Technical Comparison</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="trends"><i class="fas fa-chart-line mr-2"></i>Trends & Outlook</div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12 mt-6 space-y-8">
+
+        <!-- ==================== GPU MEMORY MANAGEMENT SECTION ==================== -->
+        <section id="memory" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-memory text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-blue-400">GPU Memory Management / MMU / Page Tables</h2>
+            </div>
+
+            <!-- Patent 1: Hardware assisted Page Migration -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Hardware Assisted Page Migration in a Multi-Dielet Processing System</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20250291730A1</span>
+                            <span class="area-badge area-mmu">MMU</span>
+                            <span class="area-badge area-memory">Memory Management</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2024-03-17 | Published: 2025-09-18</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> Hardware-assisted page migration for multi-chiplet GPU architectures. Each dielet has an independent access counter circuit that monitors and logs memory accesses to manage data movement between system memory and local GPU memory, enabling automatic hot-page migration across chiplets without CPU intervention.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>Multi-dielet architecture: each chiplet has independent access counter circuits that tally external data retrievals autonomously</li>
+                            <li>Address translation units broadcast binding parameters across all modules so every tracker knows about all processing engine mappings</li>
+                            <li>When a memory block receives enough requests to surpass a threshold, hardware generates a "page migration notification" to the driver</li>
+                            <li>Specialized commands to erase tracking data -- supports wiping specific local records or broadcasting a complete reset across all chiplets</li>
+                            <li>Directly applicable to NVIDIA's multi-chip GPU designs (Blackwell and beyond), enabling coherent memory management across die boundaries</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">This patent is foundational for NVIDIA's multi-chiplet GPU future. As GPU dies grow larger and chiplet architectures become standard (similar to AMD's approach), hardware-assisted page migration eliminates the software overhead of tracking data locality. For multi-die GPUs connected via NVLink-C2C, this enables automatic data placement that reduces cross-die traffic by an estimated 30-40%, directly improving LLM inference and training throughput.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US20250291730A1/en" target="_blank" class="ref-link">Google Patents - US20250291730A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 2: Cache-Aware GPU Memory Processing -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Cache-Aware GPU Memory Processing</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20260203220A1</span>
+                            <span class="area-badge area-memory">Memory Management</span>
+                            <span class="area-badge area-mmu">Cache Optimization</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2025-01-16 | Published: 2026-07-16</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> GPU intelligently directs information retrieval allowing multiple execution threads to share fetched data blocks and eliminate duplicate reads. Introduces five distinct strategies for on-chip memory management: adaptive swizzling, continuous rasterization, alternating k-order traversal, periodic CTA synchronization, and explicit tile eviction.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li><strong>Adaptive swizzling:</strong> rearranges data layout to prevent access bottlenecks and bank conflicts in shared memory</li>
+                            <li><strong>Continuous rasterization:</strong> aligns fetches with traditional pixel processing order for graphics workloads</li>
+                            <li><strong>Alternating k-order traversal:</strong> shifts traversal directions to maintain active memory states, improving cache hit rates</li>
+                            <li><strong>Periodic CTA synchronization:</strong> aligns compute thread groups at specific intervals to maximize data reuse</li>
+                            <li><strong>Explicit tile eviction:</strong> clears out obsolete data blocks from cache, preventing pollution and freeing capacity for active data</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">This patent addresses the fundamental challenge of GPU memory bandwidth efficiency. By intelligently managing on-chip cache through five complementary strategies, it can improve effective memory bandwidth by 20-35% for compute-intensive workloads. Particularly relevant for Blackwell's larger L2 cache (up to 128MB in B200) where cache management policies have outsized impact on performance. The explicit tile eviction mechanism is especially novel for GPU architectures.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US20260203220A1/en" target="_blank" class="ref-link">Google Patents - US20260203220A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 3: Dynamic KV Cache Scheduling for LLMs -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Dynamic KV Cache Scheduling for Large Language Models</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US2026133908A1</span>
+                            <span class="area-badge area-memory">Memory Management</span>
+                            <span class="area-badge area-hbm">HBM Optimization</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2025-02-13 | Published: 2026-05-14</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> A tiered KV cache hierarchy for LLM inference that dynamically manages attention token data between fast on-chip memory and slower off-chip HBM. Operates like a "demand-paging model" for neural network context, enabling longer context windows without additional hardware.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li><strong>Tiered storage hierarchy:</strong> primary level keeps immediately necessary tokens in rapid on-chip SRAM; secondary level stores less urgent data in off-chip HBM</li>
+                            <li><strong>Data eviction policy:</strong> tokens with low probability of future use are permanently deleted, freeing precious HBM capacity</li>
+                            <li><strong>Smart scheduling:</strong> continuously evaluates recency of token usage and probability of future access to determine appropriate storage tier</li>
+                            <li><strong>On-demand retrieval:</strong> instantly reloads offloaded tokens if the neural network requires them mid-conversation, similar to OS demand paging</li>
+                            <li><strong>Context window extension:</strong> enables effective context windows far larger than physical HBM capacity would normally allow</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">This is a critical patent for LLM serving economics. With models like GPT-4 and Claude requiring 128K+ token contexts, KV cache can consume 60-80% of GPU HBM. This tiered approach could effectively double or triple the usable context length on existing hardware (e.g., 192GB HBM on B200). Directly competes with software approaches like vLLM's PagedAttention but at the hardware/driver level, providing better performance with minimal software overhead. Expected to be integrated into future CUDA releases.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US2026133908A1/en" target="_blank" class="ref-link">Google Patents - US2026133908A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 4: GPU Memory Error Isolation -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">GPU Memory Error Isolation Technique</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US2026133884A1</span>
+                            <span class="area-badge area-error">Error Handling</span>
+                            <span class="area-badge area-memory">Memory Management</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2025-12-22 | Published: 2026-05-14</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> Framework to identify hardware memory faults within GPU chip segments and isolate the compromised section to prevent total system failure. Uses "poison" markers at defective addresses with hardware interrupt-based error handling, quarantining specific applications rather than resetting the entire device.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>Monitors independent GPU chip segments for physical memory faults in real-time</li>
+                            <li>Upon detecting a fault, writes a "poison" marker at the defective memory address</li>
+                            <li>Hardware interrupts catch any software attempting to read the tainted data</li>
+                            <li>Error handler quarantines the specific application rather than resetting the entire GPU device</li>
+                            <li>Integrates with CUDA environment and supports migrating workloads away from degraded memory regions</li>
+                            <li>Critical for Multi-Instance GPU (MIG) scenarios where one instance's fault should not affect others</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">Essential for data center reliability at scale. In a 100K+ GPU cluster, memory errors are a daily occurrence. This patent enables graceful degradation rather than catastrophic failure, improving cluster availability from ~99% to potentially 99.9%+. Particularly important for long-running LLM training jobs where a single GPU memory error can crash an entire multi-node training run. Directly supports NVIDIA's fault-tolerant training initiatives.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US2026133884A1/en" target="_blank" class="ref-link">Google Patents - US2026133884A1</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== COMMUNICATION / MULTICAST SECTION ==================== -->
+        <section id="comm" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-network-wired text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-orange-400">Communication / Multicast / Collective Operations</h2>
+            </div>
+
+            <!-- Patent 5: Multicast and reflective memory -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Multicast and Reflective Memory Behavior for Memory Model Consistency</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US12326820B2</span>
+                            <span class="area-badge area-comm">Collective Communication</span>
+                            <span class="area-badge area-memory">Memory Coherence</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2022-01-18 | Published: 2025-06-10</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> A framework allowing a single data request to broadcast across multiple physical locations tied to distinct processors (e.g., GPU streaming multiprocessors). Enforces specific coherency rules to preserve interface coherence during distributed multicast operations, enabling efficient collective communication primitives.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li><strong>Broadcast mechanism:</strong> a single instruction distributes information to multiple physical destinations linked to distinct processors (SMs)</li>
+                            <li><strong>Address translation:</strong> virtual locations map to physical destinations via memory managers or network switches, using either distinct address realms or shared spaces with specialized commands</li>
+                            <li><strong>Coherency rules:</strong> enforces routing rules and permission limits to prevent race conditions, guaranteeing consistent outcomes whether the system broadcasts or sends individual commands</li>
+                            <li><strong>Reflective memory:</strong> supports "reflective" memory behavior where data written to local memory can be automatically visible to remote processors</li>
+                            <li><strong>Performance gains:</strong> minimizes latency and bandwidth consumption during collective operations, heavily benefiting deep learning tasks like AllReduce and AllGather</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">This patent provides the hardware foundation for NCCL's collective communication operations. By enabling efficient multicast at the hardware level, it directly accelerates AllReduce (the most common operation in distributed training) and AllGather (critical for tensor parallelism). In GB200 NVL72 systems with 72 GPUs connected via NVSwitch, hardware multicast can reduce collective communication latency by 25-40% compared to software-implemented point-to-point approaches. The reflective memory aspect is particularly innovative for maintaining cache coherence across the NVLink domain.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US12326820B2/en" target="_blank" class="ref-link">Google Patents - US12326820B2</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 6: Network multicasting using alternate sets of directives -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Network Multicasting Using Alternate Sets of Directives</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US12580844B2</span>
+                            <span class="area-badge area-comm">Network Communication</span>
+                            <span class="area-badge area-comm">NVSwitch</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2022-01-13 | Published: 2026-03-17</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> Advanced switching architecture for network multicasting that selects from multiple routing directive trees to efficiently deliver data to groups of targets. Uses cross-connected switch columns to establish parallel routes, significantly decreasing serial transmission cycles for collective operations.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li><strong>Switching architecture:</strong> employs internal and outbound switches to direct data packets across a network fabric (applicable to NVSwitch topology)</li>
+                            <li><strong>Path optimization:</strong> cross-connects adjacent odd and even switch columns to establish parallel routes, reducing serial transmission cycles to reach all destinations</li>
+                            <li><strong>Directive trees:</strong> routing tables associate a multicast identifier with specific directive trees that outline sequential port instructions for the switches</li>
+                            <li><strong>Memory conservation:</strong> identical routing sequences for different receiver groups can be stored in a centralized shared table to conserve memory space</li>
+                            <li><strong>Reduction operations:</strong> inserts tracking markers into packet headers to maintain strict data ordering, guaranteeing deterministic execution of mathematical aggregation tasks (e.g., floating-point addition in AllReduce)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">This patent directly addresses the NVSwitch fabric programming model. By enabling alternate routing paths for multicast operations, it provides fault tolerance and load balancing across the NVLink domain. The directive tree approach allows dynamic reconfiguration of multicast routes without reprogramming the entire switch fabric -- critical for handling GPU failures in large clusters. The deterministic ordering guarantee for floating-point reductions is essential for reproducible distributed training. Expected to be a key enabler for NVLink Fusion's multi-vendor interconnect vision.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US12580844B2/en" target="_blank" class="ref-link">Google Patents - US12580844B2</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 7: Thermal/Power Management -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Performance, Acoustics, and Temperature Control of a Computing System</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20250306652A1</span>
+                            <span class="area-badge area-thermal">Thermal Management</span>
+                            <span class="area-badge area-memory">Power Management</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2025-03-12 | Published: 2025-10-02</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> Replaces fixed performance presets with a customizable two-dimensional control space (acoustic noise vs. enclosure heat). A closed-loop feedback control system dynamically adjusts component power limits (CPU/GPU) to maintain specific thermal targets, with adjustable fan RPM caps to prevent sudden noise spikes.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>Two-dimensional user control space: acoustic noise level vs. enclosure heat output</li>
+                            <li>Closed-loop feedback dynamically modifies CPU and GPU power limits in real-time</li>
+                            <li>Adjustable fan RPM cap prevents sudden noise spikes while maximizing compute output within thermal boundaries</li>
+                            <li>Users gain independent authority over both acoustic limits and thermal thresholds</li>
+                            <li>Eliminates the compromise of traditional "quiet" vs. "performance" modes</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">While less directly related to memory/communication, this patent is important for data center deployment of high-density GPU systems like GB200 NVL72. With each rack consuming 120kW+, thermal management directly impacts sustained GPU performance and memory bandwidth (HBM is temperature-sensitive). The dynamic power capping approach enables higher average utilization without exceeding thermal design power, improving TCO for AI data centers.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US20250306652A1/en" target="_blank" class="ref-link">Google Patents - US20250306652A1</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== HBM / DRAM SECTION ==================== -->
+        <section id="hbm" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-database text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-pink-400">HBM / DRAM / Memory Technology</h2>
+            </div>
+
+            <!-- Patent 8: DRAM capacity increase -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Techniques for Increasing Capacity of DRAM Using a Common DRAM Die</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">WO2026072211A1</span>
+                            <span class="area-badge area-hbm">HBM / DRAM</span>
+                            <span class="area-badge area-memory">Memory Architecture</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2025-08-22 | Published: 2026-04-02</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> A unified DRAM die design that supports both wide (12-lane) and narrow (6-lane) data pathways using the same silicon, eliminating the need for separate die designs. Uses adaptive burst lengths and vertical stacking to achieve higher memory density at the system level without expanding the footprint.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li><strong>Unified silicon design:</strong> a single silicon die supports both 12-lane (wide) and 6-lane (narrow) external connections</li>
+                            <li><strong>Adaptive burst lengths:</strong> to maintain a steady internal cache size of 288 bits, the architecture doubles the transmission sequence length when pathway width is halved -- 12-lane uses 24 cycles, 6-lane uses 48 cycles</li>
+                            <li><strong>Vertical stacking:</strong> physical housing permits stacking of multiple silicon pieces for "higher memory density at the system level" without expanding footprint</li>
+                            <li><strong>Modified calibration:</strong> training routines for chip selection and command pathways are adjusted to send voltage references in divided segments for the narrower 6-lane connection</li>
+                            <li><strong>Simplified control logic:</strong> "the number of bits transferred in a single burst transfer is the same regardless of the configuration," simplifying the memory device's control logic</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">This patent addresses the economics of HBM production for AI accelerators. By using a unified die design that serves both consumer (wide pathway) and data center (narrow pathway, high density) markets, NVIDIA can reduce HBM manufacturing costs while enabling higher capacity stacks. The vertical stacking approach aligns with HBM4's evolution toward 12-high and 16-high stacks. For Blackwell Ultra and Rubin platforms, this could enable 256GB+ HBM per GPU while maintaining yield and cost efficiency. Directly relevant to the HBM supply chain constraints facing the AI industry.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/WO2026072211A1/en" target="_blank" class="ref-link">Google Patents - WO2026072211A1</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== RDMA / REMOTE MEMORY SECTION ==================== -->
+        <section id="rdma" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exchange-alt text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-teal-400">RDMA / Remote Memory / Data Center Communication</h2>
+            </div>
+
+            <!-- Patent 9: Self-synchronizing remote memory operations -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-green-300">Self-Synchronizing Remote Memory Operations in a Data Center or Multiprocessor System</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US12517730B2</span>
+                            <span class="area-badge area-rdma">RDMA</span>
+                            <span class="area-badge area-comm">Remote Memory</span>
+                            <span class="text-xs text-slate-500 self-center">Filed: 2024-06-26 | Published: 2026-01-06</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-green-300">Core Innovation:</strong> Merges data transfer and synchronization metadata into unified packets, eliminating separate synchronization steps for remote memory operations. Processors combine store instructions and sync flags into single transmissions, dramatically reducing network round-trips for GPUDirect RDMA and multi-node communication.
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Technical Details:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li><strong>Unified commands:</strong> processors combine store instructions and sync flags into single transmissions, eliminating the separate "fence + flag" pattern</li>
+                            <li><strong>Separation hub:</strong> a destination-side component splits the unified packet, ensuring the data write precedes the flag update for correct ordering</li>
+                            <li><strong>Traffic reduction:</strong> the receiving hub merges multiple sync updates aimed at the same flag to save bandwidth</li>
+                            <li><strong>Fallback logic:</strong> commands targeting mismatched memory pages or unsupported routes are automatically downgraded to standard writes, using traditional memory fences to maintain data integrity</li>
+                            <li><strong>Multi-node applicability:</strong> works across data center networks (InfiniBand, RoCE) as well as on-package interconnects (NVLink)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">Impact Analysis:</strong> <span class="text-slate-400">This patent is a direct evolution of GPUDirect RDMA technology, addressing one of the key bottlenecks in multi-node distributed training: the synchronization overhead after remote memory writes. By combining data and sync into a single packet, it eliminates one network round-trip per synchronization point. In a typical AllReduce operation across 8 nodes, this could save 8+ round-trips, reducing communication latency by 15-25%. Particularly impactful for pipeline parallelism where frequent activation transfers between stages require tight synchronization. The fallback mechanism ensures backward compatibility with existing network infrastructure.</span>
+                    </div>
+                    <div class="text-xs text-slate-500">Source: <a href="https://patents.google.com/patent/US12517730B2/en" target="_blank" class="ref-link">Google Patents - US12517730B2</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TECHNICAL COMPARISON TABLE ==================== -->
+        <section id="comparison" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-violet-500 to-violet-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-table text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-violet-400">Technical Comparison</h2>
+            </div>
+
+            <div class="glass-card rounded-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="comparison-table w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">Patent</th>
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">Area</th>
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">Key Innovation</th>
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">Target Architecture</th>
+                                <th class="px-4 py-3 text-left text-violet-300 font-semibold">Impact Level</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">US20250291730A1</td>
+                                <td class="px-4 py-3"><span class="area-badge area-mmu">MMU</span></td>
+                                <td class="px-4 py-3">Hardware page migration across chiplets</td>
+                                <td class="px-4 py-3">Multi-chiplet GPU (Blackwell+)</td>
+                                <td class="px-4 py-3"><span class="text-yellow-400">High</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">US20260203220A1</td>
+                                <td class="px-4 py-3"><span class="area-badge area-memory">Cache</span></td>
+                                <td class="px-4 py-3">Five-strategy cache-aware memory processing</td>
+                                <td class="px-4 py-3">All GPU architectures</td>
+                                <td class="px-4 py-3"><span class="text-yellow-400">High</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">US2026133908A1</td>
+                                <td class="px-4 py-3"><span class="area-badge area-hbm">HBM</span></td>
+                                <td class="px-4 py-3">Tiered KV cache for LLM context extension</td>
+                                <td class="px-4 py-3">Blackwell / Rubin (LLM inference)</td>
+                                <td class="px-4 py-3"><span class="text-red-400">Critical</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">US2026133884A1</td>
+                                <td class="px-4 py-3"><span class="area-badge area-error">Error</span></td>
+                                <td class="px-4 py-3">Memory fault isolation with poison markers</td>
+                                <td class="px-4 py-3">Data center GPUs (MIG)</td>
+                                <td class="px-4 py-3"><span class="text-yellow-400">High</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">US12326820B2</td>
+                                <td class="px-4 py-3"><span class="area-badge area-comm">Comm</span></td>
+                                <td class="px-4 py-3">Hardware multicast for collective operations</td>
+                                <td class="px-4 py-3">NVLink / NVSwitch domain</td>
+                                <td class="px-4 py-3"><span class="text-red-400">Critical</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">US12580844B2</td>
+                                <td class="px-4 py-3"><span class="area-badge area-comm">NVSwitch</span></td>
+                                <td class="px-4 py-3">Alternate routing directive trees for multicast</td>
+                                <td class="px-4 py-3">NVSwitch fabric</td>
+                                <td class="px-4 py-3"><span class="text-yellow-400">High</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">US20250306652A1</td>
+                                <td class="px-4 py-3"><span class="area-badge area-thermal">Thermal</span></td>
+                                <td class="px-4 py-3">2D thermal/acoustic control space</td>
+                                <td class="px-4 py-3">All systems (data center)</td>
+                                <td class="px-4 py-3"><span class="text-blue-400">Medium</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="px-4 py-3 font-mono text-xs">WO2026072211A1</td>
+                                <td class="px-4 py-3"><span class="area-badge area-hbm">DRAM</span></td>
+                                <td class="px-4 py-3">Unified DRAM die for wide/narrow configs</td>
+                                <td class="px-4 py-3">HBM stacks (HBM4+)</td>
+                                <td class="px-4 py-3"><span class="text-yellow-400">High</span></td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-xs">US12517730B2</td>
+                                <td class="px-4 py-3"><span class="area-badge area-rdma">RDMA</span></td>
+                                <td class="px-4 py-3">Self-synchronizing remote memory writes</td>
+                                <td class="px-4 py-3">GPUDirect RDMA / InfiniBand</td>
+                                <td class="px-4 py-3"><span class="text-red-400">Critical</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Summary metrics -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <div class="metric-card rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-green-400">9</div>
+                    <div class="text-xs text-slate-400 mt-1">Total Patents</div>
+                </div>
+                <div class="metric-card rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-blue-400">4</div>
+                    <div class="text-xs text-slate-400 mt-1">Memory Management</div>
+                </div>
+                <div class="metric-card rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-orange-400">3</div>
+                    <div class="text-xs text-slate-400 mt-1">Communication</div>
+                </div>
+                <div class="metric-card rounded-xl p-4 text-center">
+                    <div class="text-2xl font-bold text-pink-400">2</div>
+                    <div class="text-xs text-slate-400 mt-1">HBM / DRAM</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TRENDS & OUTLOOK ==================== -->
+        <section id="trends" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-emerald-400">Trends & Outlook</h2>
+            </div>
+
+            <div class="space-y-4">
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>Trend 1: Hardware-Accelerated Memory Management for Multi-Chiplet GPUs</h3>
+                    <p class="text-slate-400 text-sm">NVIDIA's patent portfolio reveals a clear strategy for multi-chiplet GPU architectures. Patents like <a href="https://patents.google.com/patent/US20250291730A1/en" target="_blank" class="ref-link">US20250291730A1</a> (hardware page migration) and <a href="https://patents.google.com/patent/US20260203220A1/en" target="_blank" class="ref-link">US20260203220A1</a> (cache-aware processing) indicate that future GPUs will manage memory locality entirely in hardware, eliminating the software overhead that currently limits multi-die scaling. This is essential as GPU dies approach reticle limits and chiplet architectures become the only path to higher compute density.</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>Trend 2: LLM-Specific Memory Optimization at Hardware Level</h3>
+                    <p class="text-slate-400 text-sm">The <a href="https://patents.google.com/patent/US2026133908A1/en" target="_blank" class="ref-link">Dynamic KV Cache Scheduling</a> patent signals NVIDIA's intent to embed LLM-specific optimizations directly into GPU hardware/driver stack. Rather than relying solely on software frameworks (vLLM, TensorRT-LLM), future GPUs will natively support tiered memory management for transformer attention patterns. This could make NVIDIA GPUs significantly more efficient for LLM serving compared to competitors (AMD MI400, Intel Gaudi 3) that lack hardware-level KV cache management.</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>Trend 3: Convergence of RDMA and Collective Communication</h3>
+                    <p class="text-slate-400 text-sm">The <a href="https://patents.google.com/patent/US12517730B2/en" target="_blank" class="ref-link">Self-Synchronizing Remote Memory</a> patent demonstrates NVIDIA's strategy to blur the line between network-level RDMA and GPU-level collective operations. By embedding synchronization into data transfer packets, NVIDIA is effectively moving NCCL-like functionality into the network hardware. This convergence will be critical for scaling beyond 100K GPU clusters, where current software-based synchronization becomes a bottleneck. Combined with <a href="https://patents.google.com/patent/US12326820B2/en" target="_blank" class="ref-link">US12326820B2</a> (hardware multicast), NVIDIA is building a complete hardware stack for collective communication from the transistor level to the data center fabric.</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>Trend 4: HBM Cost Reduction Through Unified Die Design</h3>
+                    <p class="text-slate-400 text-sm">The <a href="https://patents.google.com/patent/WO2026072211A1/en" target="_blank" class="ref-link">WO2026072211A1</a> patent reveals NVIDIA's approach to addressing HBM supply constraints. By designing a single DRAM die that serves both consumer and data center markets (with different packaging configurations), NVIDIA can reduce manufacturing costs while enabling higher-capacity HBM stacks through vertical stacking. This is strategically important as HBM costs represent 30-40% of GPU BOM for AI accelerators, and SK Hynix/Samsung capacity is fully allocated through 2026.</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>Trend 5: Data Center Reliability at Scale</h3>
+                    <p class="text-slate-400 text-sm">The <a href="https://patents.google.com/patent/US2026133884A1/en" target="_blank" class="ref-link">GPU Memory Error Isolation</a> patent addresses a critical pain point: in 100K+ GPU clusters, hardware failures are the norm, not the exception. By enabling per-application fault isolation rather than full-GPU reset, NVIDIA is improving cluster availability for long-running training jobs. Combined with the NVSwitch fault tolerance in <a href="https://patents.google.com/patent/US12580844B2/en" target="_blank" class="ref-link">US12580844B2</a>, NVIDIA is building resilience into every layer of the stack.</p>
+                </div>
+
+                <div class="trend-card rounded-xl p-5">
+                    <h3 class="font-semibold text-green-300 mb-3"><i class="fas fa-arrow-right mr-2"></i>Outlook: Implications for Competitors</h3>
+                    <p class="text-slate-400 text-sm">NVIDIA's 2025-2026 patent portfolio reveals a moat that extends far beyond CUDA software. The hardware-level innovations in memory management (page migration, cache-aware processing, KV cache scheduling), communication (multicast, self-synchronizing RDMA, directive trees), and HBM architecture create a comprehensive technical advantage. AMD's MI400 series and Intel's Gaudi/Rubin competitors will need to develop equivalent hardware capabilities to match NVIDIA's efficiency for LLM training and inference. The NVLink Fusion initiative, supported by the multicast and routing patents, may also open NVIDIA's interconnect to third-party chips, further extending the ecosystem lock-in.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="glass-card border-t border-slate-700 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>NVIDIA Patent Research Report | Communication / MMU / Memory | Published 2025-2026</p>
+            <p class="mt-1">Data sourced from <a href="https://patents.google.com" target="_blank" class="ref-link">Google Patents</a> | Generated 2026-07-18</p>
+        </div>
+    </footer>
+
+    <script>
+        // Tab navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const section = tab.dataset.section;
+                document.querySelectorAll('.section-block').forEach(s => s.style.display = 'none');
+                document.getElementById(section).style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>

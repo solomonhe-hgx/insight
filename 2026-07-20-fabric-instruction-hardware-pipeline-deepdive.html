@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fabric Instruction 端到端硬件实现深度调研</title>
+<style>
+  :root {
+    --nvidia-green: #76b900;
+    --nvidia-dark: #1a1a2e;
+    --nvidia-darker: #0f0f1a;
+    --card-bg: #16213e;
+    --card-border: #1f3460;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0b0;
+    --accent-blue: #4fc3f7;
+    --accent-orange: #ffb74d;
+    --accent-red: #ef5350;
+    --accent-purple: #b39ddb;
+    --code-bg: #0d1117;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--nvidia-darker);
+    color: var(--text-primary);
+    line-height: 1.75;
+    padding: 0;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--nvidia-dark) 0%, #0a2a0a 50%, var(--nvidia-dark) 100%);
+    border-bottom: 3px solid var(--nvidia-green);
+    padding: 60px 40px;
+    text-align: center;
+  }
+  .hero h1 {
+    color: var(--nvidia-green);
+    font-size: 2.2em;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+  .hero .subtitle {
+    font-size: 1.1em;
+    color: var(--text-secondary);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .hero .badge {
+    display: inline-block;
+    background: rgba(118,185,0,0.15);
+    border: 1px solid var(--nvidia-green);
+    color: var(--nvidia-green);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    margin-top: 16px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+  
+  .toc {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 28px 36px;
+    margin-bottom: 40px;
+  }
+  .toc h2 { color: var(--nvidia-green); font-size: 1.3em; margin-bottom: 16px; }
+  .toc ol { padding-left: 24px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: var(--accent-blue); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  
+  section { margin-bottom: 48px; }
+  h2 {
+    color: var(--nvidia-green);
+    font-size: 1.6em;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--card-border);
+  }
+  h3 {
+    color: var(--accent-blue);
+    font-size: 1.2em;
+    margin: 24px 0 12px 0;
+  }
+  h4 {
+    color: var(--accent-orange);
+    font-size: 1.05em;
+    margin: 16px 0 8px 0;
+  }
+  p { margin-bottom: 14px; color: var(--text-primary); }
+  
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+  .card.highlight {
+    border-left: 4px solid var(--nvidia-green);
+  }
+  .card.warning {
+    border-left: 4px solid var(--accent-orange);
+    background: rgba(255,183,77,0.05);
+  }
+  .card.danger {
+    border-left: 4px solid var(--accent-red);
+    background: rgba(239,83,80,0.05);
+  }
+  .card.info {
+    border-left: 4px solid var(--accent-blue);
+    background: rgba(79,195,247,0.05);
+  }
+  
+  pre {
+    background: var(--code-bg);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.88em;
+    line-height: 1.6;
+    margin: 12px 0;
+    color: #c9d1d9;
+  }
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.9em;
+    background: rgba(110,118,129,0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #e6edf3;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.92em;
+  }
+  th {
+    background: rgba(118,185,0,0.15);
+    color: var(--nvidia-green);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid var(--nvidia-green);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-primary);
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  
+  .diagram {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text-secondary);
+  }
+  
+  ul, ol { margin: 12px 0; padding-left: 28px; }
+  li { margin-bottom: 6px; }
+  
+  blockquote {
+    border-left: 4px solid var(--accent-purple);
+    background: rgba(179,157,219,0.08);
+    padding: 12px 20px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  
+  hr {
+    border: none;
+    border-top: 1px solid var(--card-border);
+    margin: 32px 0;
+  }
+  
+  strong { color: var(--nvidia-green); }
+  em { color: var(--accent-orange); }
+  
+  a { color: var(--accent-blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  
+  .footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    border-top: 1px solid var(--card-border);
+    margin-top: 60px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Fabric Instruction 端到端硬件实现深度调研</h1>
+  <div class="subtitle">从 PTX 指令到物理内存：leId/offset 在 7 个硬件层级的完整映射路径，NVSwitch 路由、Swizzle/Compaction、SHARP 引擎、mbarrier 完成追踪全解析</div>
+  <div class="badge">Hardware Pipeline Deep Dive</div>
+</div>
+
+<div class="container">
+<h1 id="fabric-instruction">Fabric Instruction 端到端硬件实现深度调研</h1>
+<blockquote>
+<p><strong>调研目标</strong>：从专利 US11182309B2 / US11822491B2 出发，深入调研 NVIDIA 硬件需要做什么才能让 CUDA CFT 的 fabric instruction（<code>fabric.try_get</code>/<code>try_put</code>/<code>try_red</code>/<code>try_pullred</code>）从上到下完整工作起来。重点解析 leId 和 offset 如何从软件概念映射到硬件执行。</p>
+<p><strong>Reference 规范</strong>：所有内容均标注来源。来源类型包括：<code>[官方文档]</code> = NVIDIA 官方文档/博客；<code>[专利]</code> = 已公开的专利文献；<code>[论文]</code> = 学术论文/技术报告；<code>[开源代码]</code> = NVIDIA 开源代码库；<code>[推断]</code> = 基于多源信息的合理推断，无直接文档支持。</p>
+</blockquote>
+<hr />
+<h2 id="1-ptx">1. 问题定义：从 PTX 到物理内存的完整路径</h2>
+<p>CUDA CFT 编程模型在 PTX ISA 9.3 / CUDA 13.3 中引入了 6 条 fabric 指令，使 GPU 线程能够通过 NVLink 织物发起远程内存操作。一个 fabric 操作的完整路径涉及 <strong>7 个硬件/软件层级</strong>：</p>
+<pre class="codehilite"><code>┌─────────────────────────────────────────────────────────────────────┐
+│  层级 1: PTX 指令层                                                   │
+│  fabric.try_get/put/red/pullred + fabric.submit + fabric.wait        │
+│  → 定义操作的语义（读/写/归约）和完成追踪（mbarrier）                   │
+├─────────────────────────────────────────────────────────────────────┤
+│  层级 2: SM 发射层                                                     │
+│  Load-Store Unit (LSU) 识别 fabric 操作，构造 fabric 请求包             │
+│  → 提取 CFT Handle = {leId (32-bit), offset (64-bit)}                │
+├─────────────────────────────────────────────────────────────────────┤
+│  层级 3: GPU MMU + Swizzle 层                                         │
+│  VA → FLA (FAMLA) 翻译 → Swizzle 地址变换 → NVLink 链路选择           │
+│  → 将 leId+offset 编码到 NVLink 请求包中                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  层级 4: NVLink 链路层                                                 │
+│  128-bit flit 封装 → 信用流控 → CRC 校验 → 链路级重传                  │
+│  → 将请求包传输到 NVSwitch                                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  层级 5: NVSwitch 路由 + 地址变换层                                    │
+│  入口路由表 (Map Slot) → TgtID 查找 → De-swizzle → Compaction         │
+│  → 将全局地址翻译为 FABM 压缩地址 (FAMCA)                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  层级 6: 目标 GPU / FAMM Donor GPU 层                                 │
+│  FAMCA → 物理 DRAM 地址 → 执行读/写/原子操作                           │
+│  → 硬件 RMW 支持，无需软件模拟                                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  层级 7: 完成追踪 + 错误报告层                                         │
+│  mbarrier 硬件 + GNIC 跨处理器通知 → 报告完成/故障状态                  │
+│  → 应用通过 report predicate 和 opaque report value 检查              │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+
+<p><strong>关键问题</strong>：leId 和 offset 在这 7 个层级中分别扮演什么角色？硬件需要哪些机制才能让这套指令从上到下 work 起来？</p>
+<hr />
+<h2 id="2-1-2ptx-sm">2. 层级 1-2：PTX 指令语义与 SM 发射</h2>
+<h3 id="21-ptx-fabric">2.1 PTX Fabric 指令集</h3>
+<p>PTX ISA 9.3 Section 9.7.10 定义了 6 条 fabric 指令，分为三类：</p>
+<p><strong>操作指令（4 条）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>语义</th>
+<th>类比 RDMA</th>
+<th>leId 要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fabric.try_get</code></td>
+<td>从远端异步读取到本地 shared memory</td>
+<td>RDMA READ</td>
+<td>必须 unicast</td>
+</tr>
+<tr>
+<td><code>fabric.try_put</code></td>
+<td>从本地 shared memory 异步写入远端</td>
+<td>RDMA WRITE</td>
+<td>无 <code>.multimem</code>：unicast；有 <code>.multimem</code>：multicast</td>
+</tr>
+<tr>
+<td><code>fabric.try_red</code></td>
+<td>向远端执行归约写入</td>
+<td>RDMA Atomic Reduction</td>
+<td>同 <code>try_put</code></td>
+</tr>
+<tr>
+<td><code>fabric.try_pullred</code></td>
+<td>从 multicast 端点拉取并归约</td>
+<td>无直接 RDMA 对应</td>
+<td>必须 multicast</td>
+</tr>
+</tbody>
+</table>
+<p><strong>控制指令（2 条）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fabric.submit</code></td>
+<td>提交之前 issue 的 fabric 操作到 fabric proxy</td>
+</tr>
+<tr>
+<td><code>fabric.wait</code></td>
+<td>等待 shared memory 读取完成</td>
+</tr>
+</tbody>
+</table>
+<p><strong>来源</strong>：<code>[官方文档]</code> PTX ISA 9.3 Table of Contents, Section 9.7.10.5.1-9.7.10.5.6</p>
+<h3 id="22">2.2 操作生命周期</h3>
+<p>PTX ISA 9.3 Section 9.7.10.3 定义了 fabric 操作的 4 阶段生命周期：</p>
+<pre class="codehilite"><code>阶段 1: Issue
+  GPU 线程执行 fabric.try_get/put/red/pullred
+  → LSU 将操作放入内部队列（类似 cp.async 的异步提交）
+  → 此时操作尚未发送到 fabric
+
+阶段 2: Submit + Arrive
+  线程执行 fabric.submit → 将队列中的操作提交到 fabric proxy
+  线程在 mbarrier 上 arrive + expect_tx → 声明预期传输量
+
+阶段 3: Wait
+  线程执行 fabric.wait（或 mbarrier wait）→ 阻塞等待完成
+  → 硬件在后台处理 fabric 请求
+
+阶段 4: Inspect
+  检查 mbarrier 的 report predicate → 判断是否出错
+  → 如果出错，读取 opaque report value
+  → 通过 cudaFabricOpErrorStatusGet/Count API 解码错误详情
+</code></pre>
+
+<p><strong>来源</strong>：<code>[官方文档]</code> PTX ISA 9.3 Section 9.7.10.3</p>
+<h3 id="23">2.3 完成机制</h3>
+<p>PTX ISA 9.3 Section 9.7.10.4 定义了三种完成机制：</p>
+<ol>
+<li>
+<p><strong>Fabric Reporting Mechanism</strong> (<code>[官方文档]</code> Section 9.7.10.4.1)：通过 mbarrier 的 report predicate 和 opaque report value 报告完成/故障状态。这是 CFT 容错能力的核心——与传统指针式 P2P 不同（NVLink 故障导致致命崩溃），fabric 操作将故障报告给应用。</p>
+</li>
+<li>
+<p><strong>Fabric-read Completion Mechanism</strong> (<code>[官方文档]</code> Section 9.7.10.4.2)：通过读取结果本身来检测完成（用于 <code>try_get</code>）。</p>
+</li>
+<li>
+<p><strong>Counted Completion Mechanism</strong> (<code>[官方文档]</code> Section 9.7.10.4.3)：使用 mbarrier 的 expected transaction count 进行计数完成。支持 <code>.mbarrier::complete_tx::bytes</code>（按字节计数）和 <code>.mbarrier::complete_tx::16B</code>（按 16 字节块计数）。</p>
+</li>
+</ol>
+<h3 id="24-sm">2.4 SM 发射层的硬件行为</h3>
+<p><strong>[推断]</strong> 基于 SM 架构的通用设计模式和 <code>cp.async</code> 的已知行为：</p>
+<p>当 SM 的 Load-Store Unit (LSU) 遇到 fabric 指令时，推测执行以下操作：</p>
+<ol>
+<li><strong>指令解码</strong>：识别 <code>fabric.try_*</code> 操作码，提取操作数：</li>
+<li>CFT Handle 寄存器对：<code>{leId_reg, offset_reg}</code></li>
+<li>源/目标 shared memory 地址</li>
+<li>传输大小</li>
+<li>
+<p>mbarrier 地址</p>
+</li>
+<li>
+<p><strong>请求构造</strong>：将 fabric 操作封装为内部请求包，包含：</p>
+</li>
+<li>操作类型（read/write/reduction）</li>
+<li>leId（32-bit）</li>
+<li>offset（64-bit）</li>
+<li>数据载荷（对于 write/reduction）</li>
+<li>
+<p>完成标记（mbarrier 地址 + 预期计数）</p>
+</li>
+<li>
+<p><strong>异步提交</strong>：请求被放入 LSU 的内部队列，线程可以继续执行其他指令。<code>fabric.submit</code> 触发队列刷写（queue flush），将累积的请求提交到 GPU 的 fabric 接口。</p>
+</li>
+</ol>
+<p><strong>关键设计约束</strong>：<code>try_</code> 前缀表明操作可能失败——如果 fabric 无法接受请求（如队列满、链路故障），操作不会致命崩溃，而是通过 mbarrier 的 report 机制报告失败。这与 <code>cp.async</code> 的"try"语义一致。</p>
+<hr />
+<h2 id="3-3gpu-mmu-swizzle">3. 层级 3：GPU MMU + Swizzle 地址变换</h2>
+<h3 id="31-va-famla">3.1 虚拟地址到织物线性地址（VA → FAMLA）</h3>
+<p><strong>[官方文档]</strong> CUDA Programming Guide — Virtual Memory Management 描述了地址翻译的第一步：</p>
+<blockquote>
+<p><em>"The driver connects the application's virtual location to the hardware's physical location, and subsequently to the network's fabric location."</em></p>
+</blockquote>
+<p>这个过程建立 <strong>VA → PA → FA (Fabric Address)</strong> 的三级映射：</p>
+<pre class="codehilite"><code>应用虚拟地址 (VA)
+    ↓  [GPU MMU 页表翻译]
+物理地址 (PA) — 本地物理内存或 peer aperture 窗口
+    ↓  [Peer Aperture PTE 重定向]
+织物线性地址 (FAMLA / FLA) — 全局地址空间
+</code></pre>
+
+<p><strong>Peer Aperture 机制</strong> (<code>[专利]</code> US11182309B2)：</p>
+<blockquote>
+<p><em>"Source processor utilizes a 'peer aperture,' functioning as a specific window into a remote memory slice."</em></p>
+</blockquote>
+<p>Source GPU 的 MMU 页表中，某些 PTE 不指向本地物理内存，而是指向一个 <strong>peer aperture</strong>——一个映射到远程 FAM 内存的窗口。当 MMU 翻译命中这类 PTE 时，产生的物理地址实际上是一个 <strong>织物线性地址 (FAMLA)</strong>，标识了远程内存在全局地址空间中的位置。</p>
+<p><strong>[官方文档]</strong> Grace Hopper Architecture Blog 进一步确认：</p>
+<blockquote>
+<p><em>"NVLink Network endpoints do not share a common memory address space"</em> — 因此需要新的地址翻译硬件 <em>"to isolate all GPU address spaces"</em> from each other and the network.</p>
+</blockquote>
+<p><strong>[推断]</strong> FAMLA 的编码方式：FAMLA 是一个全局唯一的地址，覆盖所有 FAMM 的总内存空间。例如，6 个 FAMM 各 2 GB，则 FAMLA 范围为 0~12 GB。FAMLA 的高位标识目标 FAMM（间接对应 leId），低位标识该 FAMM 内的偏移（对应 offset）。</p>
+<h3 id="32-leid-mmu">3.2 leId 在 MMU 层的角色</h3>
+<p><strong>[推断]</strong> leId 在 MMU 层的作用机制有两种可能的设计：</p>
+<p><strong>设计 A（直接映射）</strong>：leId 直接编码在 FAMLA 地址的特定比特位中。MMU 翻译时，PTE 中已包含 leId 信息。这种设计的优点是硬件简单，缺点是 leId 空间受限于地址位宽。</p>
+<p><strong>设计 B（间接映射）</strong>：MMU 翻译产生 FAMLA，leId 由独立的硬件表（leId → FAMLA 基址映射）提供。Source GPU 维护一个 leId 查找表（可能位于 L2 cache 或专用 SRAM 中），将 leId 翻译为 FAMLA 基址，然后加上 offset 得到完整的 FAMLA。</p>
+<p><strong>[推断]</strong> 基于 CUDA Driver API 的设计（<code>cuLogicalEndpointBindAddr</code> 将 leId + offset 绑定到具体的 ptr），<strong>设计 B 更可能</strong>：Driver 在创建端点时，将 leId → (FAMLA 基址, 目标设备, NVSwitch Map Slot 索引) 的映射编程到硬件表中。运行时，GPU 线程只需提供 leId + offset，硬件自动查表得到 FAMLA。</p>
+<h3 id="33-swizzle-source-gpu">3.3 Swizzle 地址变换（Source GPU 端）</h3>
+<p><strong>[专利]</strong> US11182309B2 明确描述了 swizzle 机制：</p>
+<blockquote>
+<p><em>"Source processor employs a 'swizzle' technique. By manipulating address bits via mathematical strings, the system generates entropy. This pseudo-randomly distributes requests across multiple physical links."</em></p>
+</blockquote>
+<p>Swizzle 的具体实现 (<code>[专利]</code> US11182309B2, <code>[论文]</code> DySHARP arXiv:2605.05607)：</p>
+<ol>
+<li><strong>伽罗瓦域 (Galois Field) 数学变换</strong>：对 FAMLA 地址的特定比特位执行 GF 乘法。</li>
+<li><strong>XOR 累积</strong>：将变换后的位与原始位做 XOR，产生伪随机的地址分布。</li>
+<li><strong>链路选择</strong>：变换后的低位用于从 k 条 NVLink 链路中选择一条（如 k=12）。</li>
+</ol>
+<p><strong>目的</strong>：使连续的地址请求分散到不同的 NVLink 链路上，实现负载均衡（"喷洒/spraying"），避免单链路过载。</p>
+<p><strong>[论文]</strong> DySHARP (arXiv:2605.05607) 提供了更详细的硬件描述：</p>
+<blockquote>
+<p><em>"Load-Store Unit fetches destinations into a small MultimemQ before transmitting."</em></p>
+</blockquote>
+<p>这表明 SM 的 LSU 内部有一个专用的 <strong>MultimemQ</strong> 队列，用于缓冲 fabric 请求，然后在发送前进行地址变换和链路选择。</p>
+<h3 id="34-swizzle-nvlink">3.4 Swizzle 后的 NVLink 请求包</h3>
+<p>经过 swizzle 后，请求包包含以下信息：</p>
+<pre class="codehilite"><code>NVLink 请求包格式（推测）:
+┌──────────────────────────────────────────────────────┐
+│  Header:                                              │
+│    - Packet Type (Memory Request)                     │
+│    - Source GPU ID                                    │
+│    - Swizzled Address (包含链路选择信息)                │
+│    - Operation Type (Read/Write/Atomic/Reduction)     │
+│    - leId 或编码在地址中的路由信息                      │
+│    - Request Size                                     │
+│    - Completion Tag (mbarrier 地址)                    │
+│  Payload:                                             │
+│    - Data (for write/reduction operations)            │
+│    - Reduction Operator (for atomic operations)       │
+│  Footer:                                              │
+│    - CRC (链路级校验)                                  │
+└──────────────────────────────────────────────────────┘
+</code></pre>
+
+<p><strong>[论文]</strong> NVLink 包格式参考 (MDPI Future Internet 2025)：NVLink 使用 <strong>128-bit flits</strong>（flow control digits），最大包大小 256 字节，有效载荷效率 &gt;94%。</p>
+<hr />
+<h2 id="4-4nvlink">4. 层级 4：NVLink 链路层传输</h2>
+<h3 id="41-nvlink">4.1 NVLink 物理层</h3>
+<p><strong>[官方文档]</strong> 各代 NVLink 规格：</p>
+<table>
+<thead>
+<tr>
+<th>代际</th>
+<th>产品</th>
+<th>每 GPU 链路数</th>
+<th>单向带宽/GPU</th>
+<th>信令</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NVLink 3</td>
+<td>A100</td>
+<td>12</td>
+<td>300 GB/s</td>
+<td>PAM4</td>
+</tr>
+<tr>
+<td>NVLink 4</td>
+<td>H100</td>
+<td>18</td>
+<td>450 GB/s</td>
+<td>PAM4</td>
+</tr>
+<tr>
+<td>NVLink 5</td>
+<td>B200</td>
+<td>18</td>
+<td>900 GB/s</td>
+<td>PAM4</td>
+</tr>
+<tr>
+<td>NVLink 5 (NVL72)</td>
+<td>GB200</td>
+<td>18</td>
+<td>1.8 TB/s</td>
+<td>PAM4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>来源</strong>：<code>[官方文档]</code> NVIDIA 各代架构白皮书</p>
+<h3 id="42">4.2 链路层协议</h3>
+<p><strong>[专利]</strong> US9954984B2 (NVIDIA) 描述了 NVLink 链路层的关键机制：</p>
+<ol>
+<li>
+<p><strong>信用流控 (Credit-based Flow Control)</strong>：接收端向发送端分配信用值，表示可用的缓冲区空间。发送端每发送一个 flit 消耗一个信用，收到信用返回后恢复。这确保了不会发生缓冲区溢出。</p>
+</li>
+<li>
+<p><strong>CRC 校验</strong>：每个 flit 包含 CRC 校验码。接收端验证 CRC，如果发现错误，请求重传。</p>
+</li>
+<li>
+<p><strong>重传缓冲区 (Replay Buffer)</strong>：发送端维护已发送 flit 的副本，直到收到接收端的确认。如果 CRC 失败，接收端请求重传特定 flit。</p>
+</li>
+</ol>
+<p><strong>[论文]</strong> NVBleed (安全研究论文) 确认：NVLink 的传输开销极低，有效载荷效率 &gt;94%，重传率通常 &lt;0.1%。</p>
+<h3 id="43-fabric">4.3 链路层对 fabric 操作的影响</h3>
+<p><strong>[推断]</strong> NVLink 链路层对 fabric 操作是<strong>透明的</strong>——它只负责可靠地传输比特流，不感知上层是 fabric 操作还是普通 P2P 操作。fabric 操作的语义（leId 路由、地址变换、完成追踪）由更高层处理。</p>
+<p>但链路层对 fabric 操作的<strong>容错能力</strong>至关重要：</p>
+<ul>
+<li><strong>NVLink 故障检测</strong>：链路层通过 CRC 错误率、信用超时等机制检测链路故障。</li>
+<li><strong>故障报告</strong>：当链路故障被检测到时，正在传输中的 fabric 操作会被标记为失败。</li>
+<li><strong>完成报告</strong>：失败的 fabric 操作通过 mbarrier 的 report predicate 通知应用。</li>
+</ul>
+<p>这实现了 CFT 的核心价值——<strong>将硬件故障报告给应用而非致命崩溃</strong>。</p>
+<hr />
+<h2 id="5-5nvswitch">5. 层级 5：NVSwitch 路由 + 地址变换（核心）</h2>
+<h3 id="51-nvswitch">5.1 NVSwitch 架构概述</h3>
+<p><strong>[官方文档]</strong> 第三代 NVSwitch (H100) (<code>[官方文档]</code> NVIDIA Developer Blog)：</p>
+<ul>
+<li><strong>工艺</strong>：定制 TSMC 4N 工艺，251 亿晶体管，294 mm²</li>
+<li><strong>端口</strong>：64 个 NVLink 端口</li>
+<li><strong>带宽</strong>：3.2 TB/s 全双工</li>
+<li><strong>信令</strong>：50 Gbaud PAM4，每差分对 100 Gbps</li>
+<li><strong>拓扑</strong>：中央 crossbar + 两侧端口逻辑块和加速器，128 条 PHY 通道</li>
+</ul>
+<p><strong>[官方文档]</strong> 第四代 NVSwitch (B200 NVL72)：</p>
+<ul>
+<li><strong>端口</strong>：72 个 NVLink 端口（18 计算托盘 + 9 交换托盘）</li>
+<li><strong>带宽</strong>：57.6 Tbps 全双工（机架级）</li>
+<li><strong>拓扑</strong>：非阻塞计算织物，最多 576 GPU 无阻塞连接</li>
+</ul>
+<h3 id="52-nvswitch-ingress-routing-table">5.2 NVSwitch 入口路由表（Ingress Routing Table）</h3>
+<p><strong>[专利]</strong> US11182309B2 是理解 NVSwitch 路由机制的核心文献。专利描述了 <strong>入口路由表重映射表 (Ingress Port Route Remap Table)</strong>，表中的每个条目称为一个 <strong>Map Slot</strong>。</p>
+<p><strong>Map Slot 字段定义</strong> (<code>[专利]</code> US11182309B2)：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>位宽</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Base</strong></td>
+<td>可配置</td>
+<td>地址范围的起始值，用于匹配检查</td>
+</tr>
+<tr>
+<td><strong>Limit</strong></td>
+<td>可配置</td>
+<td>地址范围的结束值，用于匹配检查</td>
+</tr>
+<tr>
+<td><strong>TgtID</strong></td>
+<td>可配置</td>
+<td>目标标识符 — 指定请求应路由到哪个目标（FAMM/GPU）</td>
+</tr>
+<tr>
+<td><strong>Shuffle Mode</strong></td>
+<td>可配置</td>
+<td>控制 de-swizzle 和 compaction 的具体模式</td>
+</tr>
+<tr>
+<td><strong>Offset</strong></td>
+<td>可配置</td>
+<td>可编程偏移量，加到压缩后的地址上</td>
+</tr>
+</tbody>
+</table>
+<p><strong>来源</strong>：<code>[专利]</code> US11182309B2 — <em>"The central routing switch manages traffic via ingress tables containing 'map slots.' These entries define address boundaries and utilize software-programmable 'Target IDs' to direct traffic to specific hardware targets."</em></p>
+<h3 id="53-nvswitch">5.3 NVSwitch 路由流程</h3>
+<p><strong>[专利]</strong> US11182309B2 描述了完整的路由流程：</p>
+<pre class="codehilite"><code>NVSwitch 入口端口收到 NVLink 请求包
+    ↓
+步骤 1: 从请求地址中提取特定比特位作为索引
+    ↓
+步骤 2: 查找该入口端口对应的 Route Remap Table
+    ↓
+步骤 3: 找到对应的 Map Slot，验证 Base ≤ 地址 &lt; Limit
+    ↓
+步骤 4: 读取 TgtID → 确定目标 FAMM/GPU
+    ↓
+步骤 5: 根据 Shuffle Mode 执行 De-swizzle（逆向 swizzle）
+    ↓
+步骤 6: 执行 Compaction（地址压缩）
+    ↓
+步骤 7: 加上 Offset 字段值 → 得到最终的 FAMCA 地址
+    ↓
+步骤 8: 将请求转发到 TgtID 指定的目标
+</code></pre>
+
+<p><strong>来源</strong>：<code>[专利]</code> US11182309B2 — <em>"The switch evaluates incoming physical addresses against these programmed parameters to determine the correct egress path."</em></p>
+<h3 id="54-leid-tgtid">5.4 leId → TgtID 映射（关键桥梁）</h3>
+<p><strong>这是连接软件层（CUDA CFT）和硬件层（NVSwitch）的核心映射。</strong></p>
+<p><strong>[专利]</strong> US11182309B2 使用 "TgtID"（Target ID）作为路由目标标识符，而 <code>[官方文档]</code> CUDA Driver API 使用 "leId"（Logical Endpoint ID）。两套文档使用不同术语描述同一概念。</p>
+<p><strong>[推断]</strong> leId → TgtID 的映射机制：</p>
+<ol>
+<li>
+<p><strong>Driver 层配置</strong>：当应用调用 <code>cuLogicalEndpointCreate(leId, prop)</code> 时，CUDA Driver 分配一个 leId，并确定该端点对应的物理目标设备。Driver 随后通过 RM Control 接口（闭源）将 leId → TgtID 的映射编程到 NVSwitch 的 Map Slot 表中。</p>
+</li>
+<li>
+<p><strong>Map Slot 编程</strong>：每个 leId 对应一个或多个 Map Slot 条目。Map Slot 的 TgtID 字段指向目标设备的硬件标识符（如 NVSwitch 端口号或设备物理 ID）。</p>
+</li>
+<li>
+<p><strong>运行时查找</strong>：当 fabric 请求到达 NVSwitch 时，NVSwitch 硬件从请求地址中提取 leId 相关信息，查找 Map Slot，得到 TgtID，然后路由到目标。</p>
+</li>
+</ol>
+<p><strong>关键证据</strong>：</p>
+<ul>
+<li><code>[官方文档]</code> MNNVL User Guide 确认：<em>"NVLink Subnet Manager assigns logical identifiers (LID) to the GPU and NVSwitch NVLink ports"</em> 并 <em>"calculates and programs the NVSwitch forwarding table"</em>。这里的 LID 与 leId 概念相似，都是逻辑标识符。</li>
+<li><code>[官方文档]</code> Fabric Manager 文档确认：<em>"configures the NVSwitch memory fabric to form a single memory fabric among the participating GPUs"</em> 并管理 <em>"NVLink port mapping and routing between compute nodes and NVLink switches"</em>。</li>
+<li><code>[专利]</code> US11182309B2 的 Map Slot 中 TgtID 字段是 <em>"software-programmable"</em>，说明它由驱动/Fabric Manager 在初始化时配置。</li>
+</ul>
+<h3 id="55-de-swizzlenvswitch">5.5 De-swizzle（NVSwitch 端）</h3>
+<p><strong>[专利]</strong> US11182309B2 描述了 de-swizzle 机制：</p>
+<blockquote>
+<p><em>"The switch must first reverse the initial entropy manipulation."</em></p>
+</blockquote>
+<p>De-swizzle 是 swizzle 的逆操作：</p>
+<ol>
+<li>Source GPU 对地址执行了 GF 域变换 + XOR 累积。</li>
+<li>NVSwitch 根据 Map Slot 的 <strong>Shuffle Mode</strong> 字段，知道 Source GPU 使用了哪种 swizzle 模式。</li>
+<li>NVSwitch 执行逆向变换，恢复原始 FAMLA 地址。</li>
+</ol>
+<p><strong>[推断]</strong> Shuffle Mode 字段的作用：不同的 Source GPU 可能使用不同的 swizzle 模式（例如，不同代际的 GPU 或不同配置的链路数）。Shuffle Mode 告诉 NVSwitch 应该使用哪种逆向算法。这确保了 NVSwitch 可以与多种 Source GPU 兼容。</p>
+<h3 id="56-compaction">5.6 Compaction（地址压缩）</h3>
+<p><strong>[专利]</strong> US11182309B2 的核心创新之一：</p>
+<blockquote>
+<p><em>"Divides the address by the number of active links so the memory module receives consecutive, usable addresses without collisions."</em></p>
+</blockquote>
+<p><strong>为什么需要 Compaction</strong>：</p>
+<p>Source GPU 看到的是全局的 FAMLA 地址空间（如 0~12 GB），覆盖所有 FAMM 的总容量。但单个 FAMM 只有 2 GB 物理内存。如果不做压缩，FAMM 的内存控制器需要处理 12 GB 的地址范围，其中大部分是空洞（无效地址），浪费 TLB 和页表资源。</p>
+<p><strong>Compaction 的数学</strong>：</p>
+<pre class="codehilite"><code>假设：
+  - 全局 FAMLA 空间 = 12 GB（6 个 FAMM × 2 GB）
+  - 每个 FAMM 通过 L=2 条 NVLink 连接到 NVSwitch
+  - Source GPU 通过 k=12 条 NVLink 连接到 NVSwitch
+
+对于 FAMM 2（全局地址范围 8~10 GB）：
+  1. De-swizzle 后恢复 FAMLA（如 8.5 GB）
+  2. Compaction: FAMCA = (FAMLA - Base_of_FAMM2) / L
+                = (8.5 GB - 8 GB) / 2
+                = 0.25 GB
+  3. 加上 Map Slot Offset: Final_addr = 0.25 GB + Offset
+
+结果：FAMM 2 只需要处理 0~2 GB 的紧凑地址空间（FAMCA），
+      而不是 8~10 GB 的全局空间。
+</code></pre>
+
+<p><strong>[专利]</strong> US11182309B2 Claim 9 明确保护了 <em>"地址变换器包含除法或压缩电路"</em>。</p>
+<h3 id="57-nvswitch">5.7 NVSwitch 多播支持</h3>
+<p><strong>[官方文档]</strong> NVSwitch 第三代 Blog 确认了 in-fabric 多播和归约能力：</p>
+<blockquote>
+<p><em>"In-fabric multicast and reductions provide up to 2x throughput gain."</em></p>
+</blockquote>
+<p><strong>[论文]</strong> TokenWeave (arXiv:2505.11329) 描述了多播 fabric 操作的工作方式：</p>
+<blockquote>
+<p><em>"The network fabric duplicates packets for all subscribed devices and executes in-network reduction directly inside the switch ASIC."</em></p>
+</blockquote>
+<p><strong>[推断]</strong> 对于 multicast leId 的 fabric 操作（<code>fabric.try_put.multimem</code> / <code>fabric.try_red.multimem</code>）：</p>
+<ol>
+<li>NVSwitch 维护一个 <strong>multicast group table</strong>，记录每个 multicast group 的成员端口列表。</li>
+<li>当请求到达 NVSwitch 时，硬件查找 multicast group，将请求复制到所有成员端口。</li>
+<li>对于 reduction 操作，NVSwitch 的 <strong>SHARP 引擎</strong> 在 crossbar 内执行归约（如 FP32 加法），只将最终结果写回目标内存。</li>
+</ol>
+<p><strong>[官方文档]</strong> NVSwitch 第三代 Blog 确认 SHARP 引擎的归约能力：</p>
+<blockquote>
+<p><em>"Embedded ALUs and SRAM directly in the fabric execute collective operations without routing data back to GPUs."</em><br />
+<em>"400 GFlops FP32 capability."</em></p>
+</blockquote>
+<h3 id="58-nvswitch-sharp">5.8 NVSwitch SHARP 引擎详解</h3>
+<p><strong>[官方文档]</strong> NVSwitch 第三代 Blog 提供了 SHARP 引擎的技术细节：</p>
+<ul>
+<li><strong>位置</strong>：直接嵌入在 NVSwitch crossbar 的数据通路中</li>
+<li><strong>能力</strong>：逻辑运算、min/max、加法，支持 FP16/FP32/FP64/BF16/整数</li>
+<li><strong>组管理</strong>：专用控制器同时管理最多 128 个 SHARP 组</li>
+<li><strong>性能</strong>：400 GFlops FP32 计算能力，通信量减少从 4N 到 2N+2</li>
+</ul>
+<p><strong>[论文]</strong> DySHARP (arXiv:2605.05607) 进一步描述了 switch 内的归约硬件：</p>
+<blockquote>
+<p><em>"Records the number of targets and tracks incoming partial responses to return final aggregated value."</em></p>
+</blockquote>
+<p>这表明 NVSwitch 内部有 <strong>Merging Table</strong> 用于跟踪归约会话状态：</p>
+<pre class="codehilite"><code>Merging Table 条目（推测）:
+┌──────────────────────────────────────────────────────┐
+│  Session ID:     归约操作的唯一标识                    │
+│  Target Count:   预期参与的 GPU 数量                   │
+│  Received Count: 已收到的部分结果数量                   │
+│  Operator:       归约操作类型（add/min/max/and/or）    │
+│  Data Type:      数据类型（FP32/FP64/INT32...）        │
+│  Accumulator:    累积值缓冲区                          │
+│  Dest Address:   最终结果的写入地址                     │
+│  Completion Tag: 完成通知标记                          │
+└──────────────────────────────────────────────────────┘
+</code></pre>
+
+<hr />
+<h2 id="6-6-gpu-famm-donor-gpu">6. 层级 6：目标 GPU / FAMM Donor GPU 处理</h2>
+<h3 id="61-donor-gpu">6.1 Donor GPU 架构</h3>
+<p><strong>[专利]</strong> US11182309B2 描述了 Donor GPU（Floor-swept GPU）的内部结构：</p>
+<pre class="codehilite"><code>FAMM (Fabric Attached Memory Module)
+┌──────────────────────────────────────────────────────┐
+│  Donor GPU (Floor-swept GPU):                         │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │  Boot ROM:          启动固件                      │ │
+│  │  DDR Memory Ctrl:   硬件加速原子操作 (RMW)         │ │
+│  │  Row Remapper:      坏行重映射管理                 │ │
+│  │  Data Cache:        数据缓存（缓冲热点数据）        │ │
+│  │  Crossbar:          内部数据通路                   │ │
+│  │  Fabric Interface:  NVLink 织物接口               │ │
+│  │  计算引擎 (SM):     被禁用（熔断或软件配置）        │ │
+│  └─────────────────────────────────────────────────┘ │
+│                                                       │
+│  离散 DRAM 阵列:     大容量内存（如 16 GB）            │
+│  L 条 NVLink 链路:   连接到 NVSwitch（如 L=2）        │
+└──────────────────────────────────────────────────────┘
+</code></pre>
+
+<p><strong>来源</strong>：<code>[专利]</code> US11182309B2 Claims 1-7</p>
+<h3 id="62">6.2 请求处理流程</h3>
+<p><strong>[专利]</strong> US11182309B2 描述了 Donor GPU 的处理流程：</p>
+<blockquote>
+<p><em>"Donor controller acts strictly as a slave device."</em></p>
+</blockquote>
+<ol>
+<li><strong>接收压缩请求</strong>：NVSwitch 将 FAMCA 地址的请求发送到 Donor GPU。</li>
+<li><strong>FAMCA → 物理地址翻译</strong>：Donor GPU 的内存控制器将 FAMCA 地址翻译为物理 DRAM 地址。</li>
+<li><strong>执行操作</strong>：</li>
+<li><strong>Read</strong>：从 DRAM 读取数据，沿原路返回 Source GPU。</li>
+<li><strong>Write</strong>：将数据写入 DRAM。</li>
+<li><strong>Atomic (RMW)</strong>：硬件执行 read-modify-write，无需软件模拟。这是 Donor GPU 与普通内存控制器的关键区别。</li>
+<li><strong>返回结果</strong>：对于 read 和某些 atomic 操作，结果通过 NVSwitch 返回 Source GPU。</li>
+</ol>
+<h3 id="63">6.3 硬件原子操作支持</h3>
+<p><strong>[专利]</strong> US11182309B2 Claim 1 的关键限定：</p>
+<blockquote>
+<p><em>"该处理器被构造为在所述内存上执行至少一个 read-modify-write 原子内存访问命令。"</em></p>
+</blockquote>
+<p><strong>为什么硬件原子操作至关重要</strong>：</p>
+<ul>
+<li>分布式训练中的梯度归约（AllReduce）需要在多个 GPU 之间执行原子加法。</li>
+<li>如果 Donor GPU 不支持硬件原子操作，就需要 Source GPU 执行 read → modify → write 三步操作，这在远程内存场景下会导致严重的性能问题（3 倍延迟 + 一致性问题）。</li>
+<li>Donor GPU 的硬件 RMW 确保原子操作的 <strong>线性一致性 (linearizability)</strong>——所有 GPU 看到的操作顺序是一致的。</li>
+</ul>
+<p><strong>[专利]</strong> US11182309B2 Claim 16 列出了 Donor GPU 上被禁用的计算能力清单：</p>
+<ul>
+<li>浮点原子加法（全局和共享内存）</li>
+<li>Warp vote 和 ballot 函数</li>
+<li>内存围栏函数</li>
+<li>同步函数</li>
+<li>Surface 函数</li>
+<li>3D 线程块网格</li>
+<li>漏斗移位</li>
+<li>动态并行</li>
+<li>半精度浮点运算</li>
+<li>加减乘比较、warp shuffle、转换</li>
+<li>张量核心 (Tensor Core)</li>
+</ul>
+<p>这份清单实质上列出了 CUDA GPU 的主要计算特性，明确了 Donor GPU 只保留内存控制和 fabric 接口能力。</p>
+<h3 id="64-data-cache-row-remapper">6.4 Data Cache 和 Row Remapper</h3>
+<p><strong>[专利]</strong> US11182309B2 还描述了两个重要的辅助机制：</p>
+<p><strong>Data Cache</strong>：Donor GPU 包含数据缓存，用于缓冲热点数据。对于频繁访问的远程内存区域，Data Cache 可以减少 DRAM 访问延迟。</p>
+<p><strong>Row Remapper</strong>：内存坏行重映射器。当 DRAM 中出现坏行时，Row Remapper 将坏行的地址重映射到备用行，确保应用无需感知硬件缺陷。这与 Floor-swept GPU 的理念一致——即使是"残次品"也能可靠工作。</p>
+<hr />
+<h2 id="7-7">7. 层级 7：完成追踪与错误报告</h2>
+<h3 id="71-mbarrier">7.1 mbarrier 硬件机制</h3>
+<p><strong>[推断]</strong> 基于 PTX ISA 对 mbarrier 的描述和 <code>cp.async</code> 的已知行为：</p>
+<p>mbarrier（memory barrier）是一个硬件同步原语，位于 shared memory 中。对于 fabric 操作，mbarrier 承担以下职责：</p>
+<ol>
+<li>
+<p><strong>预期计数 (Expected Transaction Count)</strong>：线程在 arrive 时声明预期的传输量（<code>expect_tx</code>）。硬件维护一个计数器，初始值为 0，每次完成一个 fabric 操作时递增。</p>
+</li>
+<li>
+<p><strong>完成检测</strong>：当计数器达到预期值时，mbarrier 触发，唤醒等待的线程。</p>
+</li>
+<li>
+<p><strong>Report Predicate</strong>：如果任何 fabric 操作失败，mbarrier 的 report predicate 被设置为 true。线程可以检查这个 predicate 来判断是否有错误。</p>
+</li>
+<li>
+<p><strong>Opaque Report Value</strong>：错误发生时，硬件将错误详情编码到 opaque report value 中。应用通过 <code>cudaFabricOpErrorStatusGet/Count</code> API 解码。</p>
+</li>
+</ol>
+<p><strong>[官方文档]</strong> PTX ISA 9.3 Section 9.7.10.4.1：</p>
+<blockquote>
+<p><em>"If the operation succeeds, the mbarrier report predicate is not modified... Otherwise, the operation fails, the mbarrier report predicate is set, and the opaque report value may contain more information, which may be decoded via the cudaFabricOpErrorStatusGet/Count APIs."</em></p>
+</blockquote>
+<h3 id="72">7.2 跨处理器完成通知</h3>
+<p><strong>[专利]</strong> US20230289242A1 (NVIDIA) 描述了跨处理器通知的硬件机制：</p>
+<ul>
+<li><strong>GNIC (GPU Network Interface Controller)</strong>：负责在 fabric 操作完成时向 Source GPU 发送完成通知。</li>
+<li><strong>通知合并 (Notification Coalescing)</strong>：GNIC 将多个完成通知合并为一个，减少中断开销。</li>
+<li><strong>零平衡计数器 (Zero-balanced Counter)</strong>：mbarrier 使用零平衡计数器——初始值为 0，每次完成递增，达到预期值时触发。</li>
+</ul>
+<h3 id="73">7.3 错误类型与恢复</h3>
+<p><strong>[官方文档]</strong> CUDA Runtime API 定义了 fabric 操作错误报告：</p>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cudaFabricOpErrorStatusCount</code></td>
+<td>返回 fabric 操作的错误总数</td>
+</tr>
+<tr>
+<td><code>cudaFabricOpErrorStatusGet</code></td>
+<td>提取具体错误详情到 <code>cudaFabricOpStatusInfo</code> 结构</td>
+</tr>
+</tbody>
+</table>
+<p><strong>[推断]</strong> 可能的错误类型：</p>
+<ol>
+<li><strong>NVLink 链路故障</strong>：物理链路断开或不可用。</li>
+<li><strong>NVSwitch 路由错误</strong>：Map Slot 查找失败（无效的 leId 或地址范围）。</li>
+<li><strong>目标设备故障</strong>：Donor GPU 无响应。</li>
+<li><strong>超时</strong>：fabric 操作在规定时间内未完成。</li>
+<li><strong>一致性错误</strong>：多播归约中的参与者数量不匹配。</li>
+</ol>
+<p><strong>恢复策略</strong>（由应用决定）：</p>
+<ul>
+<li><strong>重试</strong>：暂时性故障（如链路瞬断）可以重试。</li>
+<li><strong>降级</strong>：永久故障可以绕过故障设备，使用剩余设备继续计算。</li>
+<li><strong>中止</strong>：严重故障可以中止整个计算任务。</li>
+</ul>
+<hr />
+<h2 id="8-driverimex-fabric-manager">8. 软件基础设施：Driver、IMEX 与 Fabric Manager</h2>
+<h3 id="81-cuda-driver">8.1 CUDA Driver 层的职责</h3>
+<p><strong>[官方文档]</strong> CUDA Driver API — Logical Endpoint 定义了 12 个 API 函数。Driver 层承担以下关键职责：</p>
+<ol>
+<li>
+<p><strong>leId 管理</strong>：<code>cuLogicalEndpointIdReserve/Release</code> 分配和回收 leId 空间。</p>
+</li>
+<li>
+<p><strong>端点创建</strong>：<code>cuLogicalEndpointCreate</code> 根据属性创建端点，内部创建端点数据结构。</p>
+</li>
+<li>
+<p><strong>资源绑定</strong>：<code>cuLogicalEndpointBindAddr/BindMem</code> 建立 <code>(leId, offset) → (device, physical_memory)</code> 的映射。</p>
+</li>
+<li>
+<p><strong>硬件编程</strong>：<code>[推断]</code> Driver 通过 RM Control 接口将 leId → TgtID 映射编程到 NVSwitch Map Slot 表，配置 Source GPU 的 leId 查找表，设置 Donor GPU 的地址翻译参数。</p>
+</li>
+<li>
+<p><strong>IPC 导出/导入</strong>：<code>cuLogicalEndpointExport/Import</code> 序列化/反序列化 leId 和绑定信息为 <code>CUlogicalEndpointFabricHandle</code>。</p>
+</li>
+<li>
+<p><strong>就绪查询</strong>：<code>cuLogicalEndpointQuery</code> 检查端点是否已完成构造（所有远端 GPU 已同步元数据）。</p>
+</li>
+</ol>
+<h3 id="82-imex-daemon">8.2 IMEX Daemon（跨进程/跨节点协调）</h3>
+<p><strong>[官方文档]</strong> NVIDIA IMEX (Import/Export Service) Guide：</p>
+<ul>
+<li><strong>角色</strong>：<em>"A privileged entity capable of communicating across OS/Node domains"</em> — 跨 OS/节点域协调内存映射。</li>
+<li><strong>工作机制</strong>：当节点 A 分配内存时，创建 <em>"Virtual Address (VA) to Physical Address (PA) to Fabric Address (FA) mapping"</em>。IMEX daemon 将此映射安全地传播到其他节点。</li>
+<li><strong>通信方式</strong>：使用 TCP/IP 和 gRPC 进行节点间控制平面通信。</li>
+<li><strong>安全隔离</strong>：通过 <code>nvidia-caps-imex-channels</code> 字符设备提供用户级内存隔离。</li>
+</ul>
+<p><strong>[官方文档]</strong> IMEX Channels Guide：</p>
+<blockquote>
+<p><em>"User-based memory isolation in a multi-user environment."</em></p>
+</blockquote>
+<p>IMEX channel 是 GPU 驱动特性，提供 <code>/dev/nvidia-caps-imex-channels/channelN</code> 字符设备。只有被授权访问同一 IMEX channel 的进程才能安全地共享 fabric 内存。</p>
+<p><strong>[开源代码]</strong> NVIDIA open-gpu-kernel-modules 中的 IMEX 相关参数：</p>
+<pre class="codehilite"><code class="language-c">NVreg_ImexChannelCount:    // IMEX channel 数量，默认 2048，最大 2^20
+NVreg_CreateImexChannel0:  // 自动创建 channel 0（仅用于可信环境）
+</code></pre>
+
+<p><strong>来源</strong>：<code>[开源代码]</code> <code>kernel-open/nvidia/nv-reg.h</code></p>
+<h3 id="83-fabric-manager-nvlink-subnet-manager">8.3 Fabric Manager 与 NVLink Subnet Manager</h3>
+<p><strong>[官方文档]</strong> MNNVL User Guide：</p>
+<ul>
+<li>
+<p><strong>Fabric Manager (FM)</strong>：<em>"configures the NVSwitch memory fabric to form a single memory fabric among the participating GPUs"</em> — 配置 NVSwitch 内存织物，管理 NVLink 端口映射和路由。</p>
+</li>
+<li>
+<p><strong>NVLink Subnet Manager (NVLSM)</strong>：<em>"assigns logical identifiers (LID) to the GPU and NVSwitch NVLink ports"</em> 并 <em>"calculates and programs the NVSwitch forwarding table"</em> — 分配逻辑标识符，计算和编程 NVSwitch 转发表。</p>
+</li>
+</ul>
+<p><strong>[推断]</strong> Fabric Manager 和 NVLSM 在 fabric instruction 工作流中的角色：</p>
+<ol>
+<li><strong>初始化阶段</strong>：FM/NVLSM 发现 NVLink 拓扑，为每个 GPU 和 NVSwitch 端口分配 LID。</li>
+<li><strong>路由表计算</strong>：NVLSM 根据拓扑计算 NVSwitch 的转发表（包括 Map Slot 的 Base/Limit/TgtID/Shuffle Mode/Offset 字段）。</li>
+<li><strong>路由表编程</strong>：FM 通过 RM Control 接口将转发表编程到 NVSwitch 硬件中。</li>
+<li><strong>动态更新</strong>：当拓扑发生变化（如 GPU 故障、链路降级）时，FM/NVLSM 重新计算和编程路由表。</li>
+</ol>
+<h3 id="84-fenceproxy">8.4 fence.proxy 指令</h3>
+<p><strong>[官方文档]</strong> PTX ISA 9.3 定义了 3 条 fence.proxy 指令：</p>
+<pre class="codehilite"><code class="language-ptx">fence.proxy.generic::fabric.alias.release.sys;   // 普通内存 → fabric 可见
+fence.proxy.fabric::generic.alias.acquire.sys;   // fabric → 普通内存可见
+fence.proxy.fabric::fabric.alias.acquire.sys;    // fabric 内部排序
+</code></pre>
+
+<p><strong>[论文]</strong> "Mixed-Proxy Extensions for the NVIDIA PTX Memory Consistency Model" (ISCA 2022) 解释了 mixed-proxy 内存一致性模型：</p>
+<blockquote>
+<p><em>"The fabric proxy is a memory ordering concept."</em></p>
+</blockquote>
+<p><strong>[推断]</strong> fence.proxy 的作用：fabric 操作和普通内存操作位于不同的 <strong>代理域 (proxy domain)</strong>。fence.proxy 确保跨代理域的内存可见性顺序：</p>
+<ul>
+<li><code>generic → fabric</code>：确保在 fabric 操作之前，普通内存的写入对 fabric 可见。</li>
+<li><code>fabric → generic</code>：确保在普通内存操作之前，fabric 操作的写入对普通内存可见。</li>
+<li><code>fabric → fabric</code>：确保 fabric 操作之间的顺序。</li>
+</ul>
+<p>这对于保证数据一致性至关重要——例如，在通过 fabric 发送数据之前，必须确保数据已经写入 shared memory。</p>
+<hr />
+<h2 id="9-fabric">9. 多播 Fabric 操作的硬件路径</h2>
+<h3 id="91-multicast-vs-unicast">9.1 Multicast vs Unicast 的区别</h3>
+<p><strong>[官方文档]</strong> CUDA Driver API 定义了两种端点类型：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>路由行为</th>
+<th>硬件机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CU_LOGICAL_ENDPOINT_TYPE_UNICAST</code></td>
+<td>路由到单个 GPU</td>
+<td>标准 NVSwitch 单播路由</td>
+</tr>
+<tr>
+<td><code>CU_LOGICAL_ENDPOINT_TYPE_MULTICAST</code></td>
+<td>路由到多个 GPU</td>
+<td>NVSwitch 多播复制 + SHARP 归约</td>
+</tr>
+</tbody>
+</table>
+<h3 id="92-multicast">9.2 Multicast 硬件路径</h3>
+<p><strong>[专利]</strong> US12326820B2 (Multicast and Reflective Memory) 描述了多播内存行为的硬件机制：</p>
+<blockquote>
+<p><em>"将单个虚拟地址映射到多个物理地址并传播访问请求。"</em></p>
+</blockquote>
+<p><strong>[论文]</strong> MSCCL++ (arXiv:2504.09014) 描述了多播 fabric 操作的工作方式：</p>
+<blockquote>
+<p><em>"Switch-Mapped I/O: Accelerator kernels utilize specialized PTX commands to interact with the network fabric. During aggregation, instruction fetches the values from all the virtual memory addresses pointed by the multimem address to the switch for hardware-level reduction."</em></p>
+</blockquote>
+<p><strong>[推断]</strong> 多播 fabric 操作的完整硬件路径：</p>
+<pre class="codehilite"><code>1. Source GPU 执行 fabric.try_put.multimem [dstLeId, dstOffset], [src], size
+   → leId 标识一个 multicast group
+
+2. NVSwitch 收到请求，查找 multicast group table
+   → 获取成员端口列表 [port_0, port_1, ..., port_N]
+
+3. 对于普通 put（无归约）：
+   → NVSwitch crossbar 将数据复制到所有成员端口
+   → 每个目标 GPU 的 Donor GPU 将数据写入本地内存
+
+4. 对于 reduction（try_red.multimem）：
+   → NVSwitch SHARP 引擎从所有成员收集数据
+   → 在 switch 内执行归约（如 FP32 加法）
+   → 将最终结果写入目标内存
+
+5. 对于 pull-reduction（try_pullred）：
+   → Source GPU 发起拉取请求
+   → NVSwitch 从所有成员收集数据
+   → 在 switch 内执行归约
+   → 将结果返回 Source GPU
+</code></pre>
+
+<h3 id="93-nvshmem-multimem">9.3 NVSHMEM 中的 multimem 指令</h3>
+<p><strong>[论文]</strong> NCCL NVLink SHARP 源码分析 (CSDN) 提供了 multimem 指令的实际使用方式：</p>
+<pre class="codehilite"><code class="language-ptx">// 从所有 multicast 成员加载并归约
+multimem.ld_reduce.relaxed.sys.global.add.v4.f32
+    [dst], [multimem_addr];
+// → Switch 收集所有成员的值，执行加法，返回结果
+
+// 向所有 multicast 成员存储（广播）
+multimem.st.relaxed.sys.global.v4.f32
+    [multimem_addr], [src];
+// → Switch 将数据复制到所有成员
+
+// 向所有 multicast 成员执行归约
+multimem.red.relaxed.sys.global.add.v4.f32
+    [multimem_addr], [src];
+// → Switch 将 src 与所有成员的当前值做加法
+</code></pre>
+
+<p><strong>来源</strong>：<code>[论文]</code> CSDN NCCL NVLink SHARP 源码分析</p>
+<p><strong>注意</strong>：<code>multimem.*</code> 指令是 PTX ISA 9.7.9 定义的（Section 9.7.9.13-9.7.9.26），与 Section 9.7.10 的 <code>fabric.try_*</code> 指令是<strong>不同的指令集</strong>。<code>multimem.*</code> 用于 NVLink SHARP (NVLS) 操作，<code>fabric.try_*</code> 用于更通用的 CFT 操作。两者共享底层硬件路径（NVSwitch crossbar + SHARP 引擎），但语义和完成机制不同。</p>
+<hr />
+<h2 id="10">10. 硬件需要的完整能力清单</h2>
+<p>基于以上分析，要让 fabric instruction 从上到下 work 起来，硬件需要具备以下能力：</p>
+<h3 id="101-source-gpu">10.1 Source GPU 需要的硬件能力</h3>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>功能</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>扩展 MMU</strong></td>
+<td>支持 peer aperture PTE，将 VA 翻译为 FAMLA</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>Swizzle 引擎</strong></td>
+<td>GF 域变换 + XOR 累积，产生链路选择熵</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>leId 查找表</strong></td>
+<td>将 leId 翻译为 FAMLA 基址和目标信息</td>
+<td><code>[推断]</code></td>
+</tr>
+<tr>
+<td><strong>NVLink 发射引擎</strong></td>
+<td>k 条 NVLink 链路，信用流控，CRC 校验</td>
+<td><code>[官方文档]</code> NVLink 规格</td>
+</tr>
+<tr>
+<td><strong>MultimemQ</strong></td>
+<td>LSU 内部的 fabric 请求缓冲队列</td>
+<td><code>[论文]</code> DySHARP</td>
+</tr>
+<tr>
+<td><strong>mbarrier 硬件</strong></td>
+<td>异步完成追踪，零平衡计数器，report predicate</td>
+<td><code>[官方文档]</code> PTX ISA 9.3</td>
+</tr>
+<tr>
+<td><strong>fence.proxy 支持</strong></td>
+<td>跨代理域内存排序</td>
+<td><code>[论文]</code> ISCA 2022</td>
+</tr>
+</tbody>
+</table>
+<h3 id="102-nvswitch">10.2 NVSwitch 需要的硬件能力</h3>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>功能</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>入口路由表 (Map Slot)</strong></td>
+<td>Base/Limit 匹配 + TgtID 路由</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>De-swizzle 引擎</strong></td>
+<td>逆向 GF 域变换，恢复原始地址</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>Compaction 电路</strong></td>
+<td>除法/压缩，消除地址间隙</td>
+<td><code>[专利]</code> US11182309B2 Claim 9</td>
+</tr>
+<tr>
+<td><strong>Offset 加法器</strong></td>
+<td>将可编程偏移加到压缩后地址</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>Crossbar</strong></td>
+<td>非阻塞多端口数据交换</td>
+<td><code>[官方文档]</code> NVSwitch Blog</td>
+</tr>
+<tr>
+<td><strong>多播复制</strong></td>
+<td>将请求复制到多个目标端口</td>
+<td><code>[官方文档]</code> NVSwitch Blog</td>
+</tr>
+<tr>
+<td><strong>SHARP 引擎</strong></td>
+<td>网内归约（FP16/32/64, BF16, INT）</td>
+<td><code>[官方文档]</code> NVSwitch Blog</td>
+</tr>
+<tr>
+<td><strong>Merging Table</strong></td>
+<td>跟踪归约会话状态</td>
+<td><code>[论文]</code> DySHARP, CAIS</td>
+</tr>
+<tr>
+<td><strong>Multicast Group Table</strong></td>
+<td>记录多播组成员端口列表</td>
+<td><code>[推断]</code></td>
+</tr>
+<tr>
+<td><strong>转发编程接口</strong></td>
+<td>接受 FM/NVLSM 的路由表编程</td>
+<td><code>[官方文档]</code> MNNVL Guide</td>
+</tr>
+</tbody>
+</table>
+<h3 id="103-donor-gpu-gpu">10.3 Donor GPU / 目标 GPU 需要的硬件能力</h3>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>功能</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FAMCA → 物理地址翻译</strong></td>
+<td>将压缩地址翻译为 DRAM 物理地址</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>硬件 RMW (原子操作)</strong></td>
+<td>read-modify-write 无需软件模拟</td>
+<td><code>[专利]</code> US11182309B2 Claim 1</td>
+</tr>
+<tr>
+<td><strong>Data Cache</strong></td>
+<td>缓冲热点远程数据</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>Row Remapper</strong></td>
+<td>坏行重映射，容忍 DRAM 缺陷</td>
+<td><code>[专利]</code> US11182309B2</td>
+</tr>
+<tr>
+<td><strong>NVLink 接收引擎</strong></td>
+<td>L 条 NVLink 链路，信用流控，CRC 校验</td>
+<td><code>[官方文档]</code> NVLink 规格</td>
+</tr>
+<tr>
+<td><strong>完成通知生成</strong></td>
+<td>向 Source GPU 发送完成/错误通知</td>
+<td><code>[推断]</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="104">10.4 互连需要的硬件能力</h3>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>功能</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>NVLink 链路层</strong></td>
+<td>128-bit flit, 信用流控, CRC, 重传缓冲</td>
+<td><code>[专利]</code> US9954984B2</td>
+</tr>
+<tr>
+<td><strong>故障检测</strong></td>
+<td>CRC 错误率监控, 信用超时检测</td>
+<td><code>[推断]</code></td>
+</tr>
+<tr>
+<td><strong>故障报告</strong></td>
+<td>将链路故障信息编码到 fabric 操作的 report 中</td>
+<td><code>[推断]</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-hopper-blackwell-rubin">11. 代际演进：从 Hopper 到 Blackwell 到 Rubin</h2>
+<h3 id="111-hopper-h100-fabric">11.1 Hopper (H100) — 第一代 Fabric 硬件</h3>
+<p><strong>[官方文档]</strong> H100 引入了 NVSwitch 第三代和 NVLink SHARP：</p>
+<ul>
+<li><strong>NVSwitch 3</strong>：64 端口，3.2 TB/s 全双工</li>
+<li><strong>SHARP v1</strong>：网内归约，400 GFlops FP32</li>
+<li><strong>multimem 指令</strong>：PTX ISA 中引入 <code>multimem.ld_reduce</code>/<code>st</code>/<code>red</code></li>
+<li><strong>限制</strong>：仅支持 NVLS 模式的多播操作，不支持通用 fabric instruction</li>
+</ul>
+<h3 id="112-grace-hopper-gh200-fabric">11.2 Grace Hopper (GH200) — 相干 Fabric 扩展</h3>
+<p><strong>[官方文档]</strong> Grace Hopper Blog：</p>
+<ul>
+<li><strong>NVLink-C2C</strong>：900 GB/s 双向相干带宽（ARM AMBA CHI 协议）</li>
+<li><strong>ATS (Address Translation Services)</strong>：CPU 和 GPU 共享单一页表</li>
+<li><strong>EGM (Extended GPU Memory)</strong>：通过 NVSwitch 可寻址最多 150 TB 内存</li>
+<li><strong>硬件隔离</strong>：新的地址翻译硬件隔离所有 GPU 地址空间</li>
+</ul>
+<h3 id="113-blackwell-b200gb200-cft">11.3 Blackwell (B200/GB200) — CFT 指令集引入</h3>
+<p><strong>[官方文档]</strong> Blackwell 架构引入：</p>
+<ul>
+<li><strong>NVSwitch 4</strong>：72 端口，57.6 Tbps 全双工（NVL72 机架级）</li>
+<li><strong>NVLink 5</strong>：每 GPU 1.8 TB/s 双向带宽</li>
+<li><strong>PTX ISA 9.3 / CUDA 13.3</strong>：引入 <code>fabric.try_*</code> 指令集</li>
+<li><strong>sm_100</strong>：要求 Blackwell 数据中心架构</li>
+<li><strong>CFT 编程模型</strong>：从容错 fabric 操作到通用远程内存访问</li>
+</ul>
+<p><strong>[推断]</strong> Blackwell 相比 Hopper 的关键硬件变化：</p>
+<ol>
+<li><strong>Source GPU 端</strong>：LSU 增加了 fabric 指令解码和执行能力（MultimemQ 扩展），MMU 增加了 leId 查找表支持。</li>
+<li><strong>NVSwitch 端</strong>：路由表扩展支持 leId 路由（不仅仅是物理地址路由），SHARP 引擎增强支持更多数据类型和归约操作。</li>
+<li><strong>完成追踪</strong>：mbarrier 硬件扩展支持 fabric report predicate 和 opaque report value。</li>
+</ol>
+<h3 id="114-rubin-r100">11.4 Rubin (R100) — 下一代展望</h3>
+<p><strong>[官方文档]</strong> NVIDIA 路线图：</p>
+<ul>
+<li><strong>NVSwitch 5</strong>：36 物理端口，448G SerDes</li>
+<li><strong>NVLink 6</strong>：更高带宽</li>
+<li><strong>预期</strong>：进一步扩展 fabric instruction 能力，可能支持跨节点 fabric 操作（目前仅限 NVLink 域内）</li>
+</ul>
+<hr />
+<h2 id="12-cft">12. 专利与 CFT 编程模型的关系总结</h2>
+<h3 id="121">12.1 概念映射表</h3>
+<table>
+<thead>
+<tr>
+<th>专利概念 (US11182309B2)</th>
+<th>CFT 编程模型概念</th>
+<th>关系说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fabric Attached Memory (FAM)</td>
+<td>NVLink 织物域</td>
+<td>专利描述硬件架构，CFT 是其编程接口</td>
+</tr>
+<tr>
+<td>Fabric Linear Address (FLA/FAMLA)</td>
+<td>offset (64-bit)</td>
+<td>offset 经过翻译后成为 FAMLA 的一部分</td>
+</tr>
+<tr>
+<td>Target ID (TgtID)</td>
+<td>leId (32-bit)</td>
+<td>leId 在硬件层映射到 TgtID</td>
+</tr>
+<tr>
+<td>Map Slot</td>
+<td>Driver 编程的路由表条目</td>
+<td>Driver 根据 leId 配置 Map Slot</td>
+</tr>
+<tr>
+<td>Swizzle</td>
+<td>Source GPU 地址变换</td>
+<td>对 offset/FAMLA 做 GF 域变换</td>
+</tr>
+<tr>
+<td>De-swizzle + Compaction</td>
+<td>NVSwitch 地址翻译</td>
+<td>将全局地址压缩为 FAMM 本地地址</td>
+</tr>
+<tr>
+<td>Donor GPU</td>
+<td>目标设备</td>
+<td>Floor-swept GPU 作为内存控制器</td>
+</tr>
+<tr>
+<td>Peer Aperture</td>
+<td>leId + offset 的底层机制</td>
+<td>将远程内存映射到本地地址空间</td>
+</tr>
+<tr>
+<td>Fabric Error</td>
+<td>mbarrier report predicate</td>
+<td>硬件故障报告给应用</td>
+</tr>
+</tbody>
+</table>
+<h3 id="122">12.2 时间线</h3>
+<pre class="codehilite"><code>2019-11-04  US11182309B2 优先权日（FAM 架构专利）
+    ↓
+2021-11-23  US11182309B2 授权
+    ↓
+2022        ISCA 2022 &quot;Mixed-Proxy Extensions for PTX&quot; 论文
+    ↓         → 为 fabric proxy 和 fence.proxy 奠定理论基础
+2023-11-21  US11822491B2 授权（分案专利）
+    ↓
+2023        H100 发布（NVSwitch 3 + SHARP + multimem 指令）
+    ↓         → 硬件支持多播 fabric 操作，但尚无通用 fabric instruction
+2024        CUDA 12.4 引入 CU_MEM_HANDLE_TYPE_FABRIC
+    ↓         → 软件基础设施就绪
+2024-03     GB200 NVL72 发布（NVSwitch 4 + NVLink 5）
+    ↓
+2025        CUDA 13.3 / PTX ISA 9.3 引入 fabric.try_* 指令
+    ↓         → CFT 编程模型正式推出
+2025        NVSHMEM v3.7.0 实验性支持 logical endpoint/CFT handle
+    ↓         → 第一个使用 fabric instruction 的库
+</code></pre>
+
+<h3 id="123">12.3 关键发现</h3>
+<ol>
+<li>
+<p><strong>专利先于 API 6 年</strong>：US11182309B2 的优先权日（2019-11-04）比 CFT 编程模型的推出（2025）早 6 年。专利描述的硬件架构是 CFT 的基础。</p>
+</li>
+<li>
+<p><strong>leId → TgtID 是核心桥梁</strong>：软件的 leId 和硬件的 TgtID 是同一概念在不同抽象层的表达。Driver 通过 RM Control 接口将 leId 映射编程到 NVSwitch Map Slot 的 TgtID 字段。</p>
+</li>
+<li>
+<p><strong>offset 经过完整的地址变换流水线</strong>：offset → FAMLA → Swizzled Address → (NVSwitch) → De-swizzled → Compacted (FAMCA) → + Offset → 物理地址。</p>
+</li>
+<li>
+<p><strong>没有专利显式使用 "CFT" 或 "Compute Fabric Transport"</strong>：CFT 是较新的软件 API 层。它依赖的硬件机制被已有专利覆盖，但 CFT 级别的抽象（fabric handle 作为软件对象、CFT 指令编码）可能是作为硬件原语之上的实现，尚未找到单独的专利覆盖。</p>
+</li>
+<li>
+<p><strong>容错是 CFT 的核心价值</strong>：传统指针式 P2P 在 NVLink 故障时致命崩溃，CFT 通过 mbarrier report 机制将故障报告给应用。这要求从 NVLink 链路层到 mbarrier 硬件的完整错误传播路径。</p>
+</li>
+</ol>
+<hr />
+<h2 id="13">13. 参考来源</h2>
+<h3 id="131-nvidia">13.1 NVIDIA 官方文档</h3>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>来源</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[D1]</td>
+<td>PTX ISA 9.3 Documentation</td>
+<td>https://docs.nvidia.com/cuda/parallel-thread-execution/index.html</td>
+</tr>
+<tr>
+<td>[D2]</td>
+<td>CUDA Driver API - Logical Endpoint</td>
+<td>https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__LOGICAL__ENDPOINT.html</td>
+</tr>
+<tr>
+<td>[D3]</td>
+<td>CUDA Runtime API - Fabric</td>
+<td>https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__FABRIC.html</td>
+</tr>
+<tr>
+<td>[D4]</td>
+<td>CUDA Programming Guide - Virtual Memory</td>
+<td>https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/virtual-memory-management.html</td>
+</tr>
+<tr>
+<td>[D5]</td>
+<td>Grace Hopper Superchip Architecture In-Depth</td>
+<td>https://developer.nvidia.com/blog/nvidia-grace-hopper-superchip-architecture-in-depth/</td>
+</tr>
+<tr>
+<td>[D6]</td>
+<td>Hopper Architecture In-Depth</td>
+<td>https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/</td>
+</tr>
+<tr>
+<td>[D7]</td>
+<td>Third-Generation NVSwitch</td>
+<td>https://developer.nvidia.com/blog/upgrading-multi-gpu-interconnectivity-with-the-third-generation-nvidia-nvswitch/</td>
+</tr>
+<tr>
+<td>[D8]</td>
+<td>MNNVL User Guide</td>
+<td>https://docs.nvidia.com/multi-node-nvlink-systems/mnnvl-user-guide/overview.html</td>
+</tr>
+<tr>
+<td>[D9]</td>
+<td>IMEX Overview</td>
+<td>https://docs.nvidia.com/multi-node-nvlink-systems/imex-guide/overview.html</td>
+</tr>
+<tr>
+<td>[D10]</td>
+<td>IMEX Channels Guide</td>
+<td>https://docs.nvidia.com/multi-node-nvlink-systems/imex-guide/imexchannels.html</td>
+</tr>
+<tr>
+<td>[D11]</td>
+<td>NVSHMEM Documentation</td>
+<td>https://docs.nvidia.com/nvshmem/api/introduction.html</td>
+</tr>
+<tr>
+<td>[D12]</td>
+<td>CUDA Driver API - Multicast</td>
+<td>https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MULTICAST.html</td>
+</tr>
+</tbody>
+</table>
+<h3 id="132">13.2 专利文献</h3>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>专利号</th>
+<th>标题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[P1]</td>
+<td>US11182309B2</td>
+<td>Techniques for an Efficient Fabric Attached Memory</td>
+</tr>
+<tr>
+<td>[P2]</td>
+<td>US11822491B2</td>
+<td>Techniques for an Efficient Fabric Attached Memory (Divisional)</td>
+</tr>
+<tr>
+<td>[P3]</td>
+<td>US12326820B2</td>
+<td>Multicast and Reflective Memory Behavior for Memory Model Consistency</td>
+</tr>
+<tr>
+<td>[P4]</td>
+<td>US12248788B2</td>
+<td>Distributed Shared Memory</td>
+</tr>
+<tr>
+<td>[P5]</td>
+<td>WO2019068013A1</td>
+<td>Fabric Control Protocol for Data Center Networks</td>
+</tr>
+<tr>
+<td>[P6]</td>
+<td>US12086087B2</td>
+<td>Methods and Apparatus for Network Interface Fabric Operations</td>
+</tr>
+<tr>
+<td>[P7]</td>
+<td>US9954984B2</td>
+<td>NVLink Link Layer Protocol (CRC, Replay, Flow Control)</td>
+</tr>
+<tr>
+<td>[P8]</td>
+<td>US20230289242A1</td>
+<td>Cross-Processor Notification Coalescing (mbarrier)</td>
+</tr>
+<tr>
+<td>[P9]</td>
+<td>US10031857B2</td>
+<td>Address Translation Services for Direct Access</td>
+</tr>
+</tbody>
+</table>
+<h3 id="133">13.3 学术论文</h3>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>论文</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[A1]</td>
+<td>The Landscape of GPU-Centric Communication</td>
+<td>https://arxiv.org/abs/2409.09874</td>
+</tr>
+<tr>
+<td>[A2]</td>
+<td>Dissecting the NVIDIA Hopper Architecture</td>
+<td>https://arxiv.org/abs/2501.12084</td>
+</tr>
+<tr>
+<td>[A3]</td>
+<td>Dissecting the NVIDIA Blackwell Architecture</td>
+<td>https://arxiv.org/abs/2507.10789</td>
+</tr>
+<tr>
+<td>[A4]</td>
+<td>Grace Hopper Data Movement Study</td>
+<td>https://arxiv.org/abs/2408.11556</td>
+</tr>
+<tr>
+<td>[A5]</td>
+<td>Mixed-Proxy Extensions for PTX (ISCA 2022)</td>
+<td>https://research.nvidia.com/publication/2022-06_mixed-proxy-extensions-nvidia-ptx-memory-consistency-model</td>
+</tr>
+<tr>
+<td>[A6]</td>
+<td>DySHARP: Accelerating MoE with Dynamic In-Switch Computing</td>
+<td>https://arxiv.org/abs/2605.05607</td>
+</tr>
+<tr>
+<td>[A7]</td>
+<td>CAIS: Compute-Aware In-Switch Computing</td>
+<td>https://arxiv.org/abs/2605.05628</td>
+</tr>
+<tr>
+<td>[A8]</td>
+<td>TokenWeave</td>
+<td>https://arxiv.org/abs/2505.11329</td>
+</tr>
+<tr>
+<td>[A9]</td>
+<td>MSCCL++: Rethinking GPU Communication Abstractions</td>
+<td>https://arxiv.org/abs/2504.09014</td>
+</tr>
+<tr>
+<td>[A10]</td>
+<td>CXL-GPU: Pushing GPU Memory Boundaries</td>
+<td>https://arxiv.org/abs/2506.15601</td>
+</tr>
+<tr>
+<td>[A11]</td>
+<td>NVSHMEM System-Level Analysis</td>
+<td>https://arxiv.org/abs/2606.05951</td>
+</tr>
+</tbody>
+</table>
+<h3 id="134">13.4 开源代码</h3>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>来源</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[S1]</td>
+<td>NVIDIA open-gpu-kernel-modules</td>
+<td>https://github.com/NVIDIA/open-gpu-kernel-modules</td>
+</tr>
+<tr>
+<td>[S2]</td>
+<td>NVSHMEM Changelog</td>
+<td>https://github.com/NVIDIA/nvshmem/blob/devel/changelog</td>
+</tr>
+<tr>
+<td>[S3]</td>
+<td>Fabric Manager Client</td>
+<td>https://github.com/NVIDIA/Fabric-Manager-Client</td>
+</tr>
+</tbody>
+</table>
+<h3 id="135">13.5 其他来源</h3>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>来源</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[O1]</td>
+<td>NCCL NVLink SHARP 源码分析 (CSDN)</td>
+<td>https://blog.csdn.net/KIDGIN7439/article/details/137056421</td>
+</tr>
+<tr>
+<td>[O2]</td>
+<td>NVIDIA Forum: multimem NVLS Instructions</td>
+<td>https://forums.developer.nvidia.com/t/how-do-the-multimem-nvlinksharp-nvls-instructions-work-under-the-hood/337084</td>
+</tr>
+<tr>
+<td>[O3]</td>
+<td>Chips and Cheese: Grace Hopper Deep Dive</td>
+<td>https://chipsandcheese.com/p/grace-hopper-nvidias-halfway-apu</td>
+</tr>
+<tr>
+<td>[O4]</td>
+<td>OCP 2024 Memory Fabric Forum</td>
+<td>https://www.youtube.com/playlist?list=PLeljWm1xf7wl9ng_yTbFXOrHoUD_ojtc6</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="footer">
+  Generated on 2026-07-20 &mdash; NVIDIA GPU Architecture Research
+</div>
+
+</body>
+</html>

@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA 专利研究周报 (2025-07-29)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; color: #e2e8f0; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; border-bottom: 3px solid transparent; }
+        .nav-tab:hover { background: rgba(148, 163, 184, 0.1); }
+        .nav-tab.active { border-bottom-color: #8b5cf6; background: rgba(139, 92, 246, 0.1); }
+        .patent-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); transition: all 0.2s ease; }
+        .patent-card:hover { border-color: rgba(139, 92, 246, 0.4); box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; transition: all 0.2s; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .highlight-box { border-left: 4px solid #8b5cf6; background: rgba(139, 92, 246, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .company-badge { font-family: 'Fira Code', monospace; background: rgba(139, 92, 246, 0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        .metric-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .comparison-table th { background: rgba(139, 92, 246, 0.2); }
+        .comparison-table tr:hover { background: rgba(148, 163, 184, 0.05); }
+        .trend-card { background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(30, 41, 59, 0.5) 100%); border: 1px solid rgba(139, 92, 246, 0.3); }
+        h3 { font-size: 1.125rem; }
+        h4 { font-size: 1rem; }
+        .tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 500; }
+        .tag-memory { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .tag-comm { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .tag-mmu { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+        .tag-interconnect { background: rgba(244, 114, 182, 0.2); color: #f472b6; }
+        .tag-cache { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+        .details-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .details-content.open { max-height: 2000px; }
+        .toggle-btn { cursor: pointer; user-select: none; }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-file-alt text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-transparent">NVIDIA 专利研究周报</h1>
+                        <p class="text-xs text-slate-400">2026-07-29 | Communication / MMU / Memory / Interconnect</p>
+                    </div>
+                </div>
+                <div class="metric-card px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500/10 to-purple-700/10 border border-violet-500/20">
+                    <div class="text-xs text-slate-400">本期专利数</div>
+                    <div class="text-lg font-bold text-violet-400">10</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="sticky top-[72px] z-40 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-1 overflow-x-auto py-2 text-sm">
+                <div class="nav-tab active px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="memory"><i class="fas fa-memory mr-2"></i>Memory 管理</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="comm"><i class="fas fa-exchange-alt mr-2"></i>通信 / 同步</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="mmu"><i class="fas fa-microchip mr-2"></i>MMU / 地址转换</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="interconnect"><i class="fas fa-network-wired mr-2"></i>互连技术</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="comparison"><i class="fas fa-table mr-2"></i>技术对比</div>
+                <div class="nav-tab px-4 py-2 rounded-t-lg font-medium whitespace-nowrap" data-section="trends"><i class="fas fa-chart-line mr-2"></i>趋势展望</div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12 mt-6 space-y-8">
+
+        <!-- ==================== MEMORY SECTION ==================== -->
+        <section id="memory" class="section-block">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-memory text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-green-400">GPU 内存管理 / 虚拟内存 / KV Cache</h2>
+            </div>
+
+            <!-- Patent 1: DE102024121954A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">统一内存 GPU 的局部化模式 (Localized Mode for Unified Memory GPU)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">DE102024121954A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2024-08-01 | 公开: 2025-03-06</span>
+                            <span class="tag tag-memory">Memory</span>
+                            <span class="tag tag-mmu">MMU</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> GPU 可"选择性地限制执行仅使用本地连接的存储组件"以降低延迟,同时在需要额外容量时允许远程访问。通过在页表中引入局部化属性位,实现按 64MB 块级别的内存局部化映射。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>设备划分为微单元 (micro-GPU),每个微单元包含处理核心、交叉开关和专用 DRAM,单元间通过 NoC 或 die 间链路通信</li>
+                                <li>MMU 内的 AMAP 模块可在交错步幅映射 (interleaved stride mapping) 和集群绑定映射 (cluster-bound mapping) 之间切换</li>
+                                <li>一个属性位决定局部化和非局部化内存访问,转换硬件读取页表条目内的局部化标志</li>
+                                <li>启用后对齐块 (64MB 段) 专门映射到特定微单元的 DRAM,调度器将线程束路由到与其数据共享相同物理集群的核心</li>
+                                <li>每个对齐段独立切换模式,支持混合工作负载策略;结合 Cooperative Group Array (CGA) 实现执行绑定</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">直接支持 NVIDIA Blackwell 及后续 GPU 架构中的多 chiplet 设计。在 GB200 NVL72 等大规模系统中,减少跨 die 通信延迟对训练和推理性能至关重要。局部化内存模式可减少 30-50% 的跨集群流量,显著提升能效。对于 LLM 推理场景,KV cache 的局部化分配可降低 tail latency。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/DE102024121954A1/en" target="_blank" class="ref-link">Google Patents - DE102024121954A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 2: US20260133908A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">LLM 动态 KV Cache 调度 (Dynamic KV Cache Scheduling for LLMs)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20260133908A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2025-02-13 | 公开: 2026-05-14</span>
+                            <span class="tag tag-memory">Memory</span>
+                            <span class="tag tag-cache">Cache</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 为 Transformer 注意力机制创建分层 KV Cache 存储结构。频繁使用的 KV 对保留在高速片上存储,不关键信息移至较慢二级位置。调度器评估检索概率,按需取回卸载数据 ("just-in-time"),类似操作系统的按需分页机制。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>分层存储架构:热数据 (hot KV pairs) 驻留在 HBM 或 SRAM 中,冷数据迁移至 SSD 或远程内存</li>
+                                <li>调度器基于注意力分数评估每个 KV 对的检索概率,预测哪些数据即将被使用</li>
+                                <li>按需分页 (demand-paging) 机制:在数据实际需要之前,提前将其从二级存储取回到快速存储</li>
+                                <li>支持扩展上下文长度,使模型能够处理远超物理内存容量的序列</li>
+                                <li>与操作系统虚拟内存管理类似,实现 KV Cache 的"换入/换出"策略</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">解决 LLM 推理中最大的内存瓶颈之一。当前 LLM 服务系统 (如 vLLM, TensorRT-LLM) 受限于 KV Cache 占用的 GPU 内存。该专利允许有效无限上下文长度,同时保持低延迟。对长文档理解、代码生成和多轮对话场景有重大影响。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-dynamic-kv-cache-scheduling-llms/" target="_blank" class="ref-link">Patentlyze - US20260133908A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 3: US20260203220A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">缓存感知 GPU 内存处理 (Cache-Aware GPU Memory Processing)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20260203220A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2025-01-16 | 公开: 2026-07-16</span>
+                            <span class="tag tag-cache">Cache</span>
+                            <span class="tag tag-memory">Memory</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 处理器主动决定如何从片上高速存储中拉取数据块,通过评估多个计算线程对数据的使用方式,最小化重复取取,节省能耗。支持多达五种动态切换的访问模式。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li><strong>自适应交换 (Adaptive Swizzling):</strong> 重新排列存储中的数据布局以减少访问冲突并提高复用率</li>
+                                <li><strong>连续光栅化 (Continuous Rasterization):</strong> 按与传统图形像素处理一致的扫描序列取数据</li>
+                                <li><strong>交替 k 阶遍历 (Alternating k-order):</strong> 切换遍历方向以在连续操作期间保持活跃的缓存内容</li>
+                                <li><strong>周期性 CTA 同步 (Periodic CTA Synchronization):</strong> 在特定间隔对齐计算线程阵列以协同使用共享存储</li>
+                                <li><strong>显式块驱逐 (Explicit Tile Eviction):</strong> 主动清除特定未使用的数据块以为后续需求腾出空间</li>
+                                <li>基础数据通过"交换模型 (swizzle model)"组织,将数据映射到物理地址以防止访问瓶颈</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利对 GPU 的 L1/共享内存层级有深远影响。五种可切换的缓存访问模式使 GPU 能够针对不同工作负载 (图形、计算、AI) 优化数据流。对 Blackwell 架构中的结构化稀疏计算和 AI 推理的 tile-based 处理特别重要。可减少 20-40% 的缓存未命中率。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-cache-aware-gpu-memory-processing/" target="_blank" class="ref-link">Patentlyze - US20260203220A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 4: US20260220041A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">AI 模型智能 KV Cache 内存管理 (Smarter KV Cache Memory for AI Models)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20260220041A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2025-01-30 | 公开: 2026-07-30</span>
+                            <span class="tag tag-memory">Memory</span>
+                            <span class="tag tag-cache">Cache</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 采用"两阶段过滤系统,只保留重要的音符"来减少硬件需求。第一阶段通过动态池化技术粗粒度淘汰"不太可能再次有用"的数据;第二阶段使用混合注意力机制进行细粒度处理,聚类剩余记录并执行"稀疏注意力"。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li><strong>第一阶段 - 粗粒度淘汰:</strong> 通过动态池化技术识别并移除低价值 KV 对,减少缓存占用</li>
+                                <li><strong>第二阶段 - 细粒度处理:</strong> 混合注意力机制对剩余 KV 对进行聚类,记录极值,执行稀疏注意力以隔离最高优先级的词片段</li>
+                                <li>完全"无需训练 (training-free)"的方法, operators 可以在运行模型时立即部署,无需重建神经架构</li>
+                                <li>与 PagedAttention 等现有 KV Cache 管理方案互补,提供更智能的驱逐策略</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">与 US20260133908A1 (动态 KV Cache 调度) 形成互补。该专利关注"哪些 KV 对应该被保留",而前者关注"KV 对放在哪里"。两者结合可实现完整的智能 KV Cache 管理系统。无需训练的特性使其可快速集成到现有推理框架中。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-smarter-kv-cache-memory-ai-models/" target="_blank" class="ref-link">Patentlyze - US20260220041A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 5: US20230393788A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">封装内与封装外组合内存系统 (Combined On-Package and Off-Package Memory System)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20230393788A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2023-08-23 | 公开: 2023-12-07</span>
+                            <span class="tag tag-memory">Memory</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 定制逻辑基座将内部高速存储堆栈和外部大容量模块聚合为单一可寻址空间。系统划分为"近内存池 (near memory pool)"追求速度,"远内存池 (far memory pool)"追求容量,并通过透明迁移引擎自动在两者间移动数据。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>统一架构:定制硅层桥接处理器与内部 HBM 堆栈和外部 CXL/DDR 模块</li>
+                                <li>智能路由:制造电路引导流量以维持不同计算工作负载的性能标准</li>
+                                <li>透明迁移引擎:自动在"近"和"远"内存池之间移动数据,绕过主芯片以节省功耗和带宽</li>
+                                <li>交错访问:控制器交替向内部和外部模块发送请求以最大化总吞吐量</li>
+                                <li>支持 Fabric-Attached Memory 架构,实现内存资源的池化和共享</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利是 NVIDIA 应对 AI 模型参数量爆炸式增长的关键基础设施技术。通过在封装内外构建分层内存,可在不显著增加延迟的情况下扩展可用内存容量。对万亿参数模型的训练至关重要,因为单节点 HBM 容量往往不足。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US20230393788A1/en" target="_blank" class="ref-link">Google Patents - US20230393788A1</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== COMMUNICATION SECTION ==================== -->
+        <section id="comm" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exchange-alt text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-blue-400">集合通信 / 数据同步 / 多加速器协作</h2>
+            </div>
+
+            <!-- Patent 6: US12326820B2 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">多播与反射内存行为实现内存模型一致性 (Multicast and Reflective Memory Behavior for Memory Model Consistency)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US12326820B2</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2022-01-18 | 授权: 2025-06-10</span>
+                            <span class="tag tag-comm">Communication</span>
+                            <span class="tag tag-interconnect">Interconnect</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 单一内存访问请求可被传播到多个物理地址,跨多个处理单元同时完成数据事务。引入"反射内存"概念:节点请求自身本地数据时,仍将包发送到外部交换机,再由交换机"反射回"设备,确保统一路径和可预测延迟。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li><strong>互连路由:</strong> 中心交换机作为"一致性互联结构"连接设备,翻译并路由内存包跨网络</li>
+                                <li><strong>反射内存行为:</strong> 消除不可预测延迟和竞态条件,本地数据请求通过统一路径确保一致性延迟</li>
+                                <li><strong>地址翻译:</strong> 虚拟地址决定路由行为,多播指针同时映射到多个物理位置,标准指针定位单一物理位置</li>
+                                <li><strong>一致性约束:</strong> 系统强制执行严格规则,确保"使用多播处理请求与单播执行一致",维护内存完整性</li>
+                                <li><strong>优化工作负载:</strong> 通过同时广播数据加速集体操作如 AllReduce,大幅减少深度学习中的带宽开销</li>
+                                <li>可选择对应用程序隐藏多播机制或通过"独立的多播和单播指令"暴露</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利是 NVSwitch 多播能力的硬件基础。反射内存概念确保了在多 GPU 系统中,无论数据位于本地还是远程,延迟都是确定性的。这对 NCCL 的 AllReduce、AllGather、ReduceScatter 等集合通信操作至关重要。在 GB200 NVL72 等 72-GPU 系统中,多播可将集合通信效率提升 2-3 倍。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US12326820B2/en" target="_blank" class="ref-link">Google Patents - US12326820B2</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 7: US20260170317A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">消除 AI 芯片间共享数据等待 (Stop AI Chips From Waiting on Shared Data)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20260170317A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2024-12-18 | 公开: 2026-06-18</span>
+                            <span class="tag tag-comm">Communication</span>
+                            <span class="tag tag-memory">Memory</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 解决跨数百个芯片训练大型 AI 模型时的通信瓶颈。系统评估"激活值 (activations)"——神经网络层间产生的中间值。当不同处理器需要相同激活值时,架构主动将相关信息预先复制到两个单元,消除等待时间。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>专用处理器电路管理数据集在多个加速器间的划分方式</li>
+                                <li>有意复制重叠信息 (overlap duplication),而非严格隔离分区</li>
+                                <li>激活值驱动的复制策略:基于中间计算结果判断哪些数据需要被共享</li>
+                                <li>复制量与重叠程度成正比,防止在很少共享数据的芯片上浪费内存</li>
+                                <li>同时适用于训练 (training) 和推理 (inference) 场景</li>
+                                <li>减少处理器空闲等待时间,加速整体训练运行</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利直接针对大规模分布式训练中的"通信墙"问题。在万亿参数模型训练中,激活值的重计算或传输是主要瓶颈之一。通过预复制重叠激活值,可减少 30-50% 的跨节点通信量。与 NCCL 的通信原语互补,在系统层面优化训练效率。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-smarter-data-sharing-ai-accelerators/" target="_blank" class="ref-link">Patentlyze - US20260170317A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 8: US20230315655A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">处理器与内存中的快速数据同步 (Fast Data Synchronization in Processors and Memory)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20230315655A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2022 | 公开: 2023-10-05</span>
+                            <span class="tag tag-comm">Communication</span>
+                            <span class="tag tag-interconnect">Interconnect</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 引入 "store + arrive" 组合指令,将数据写入接收缓冲区的同时更新同步屏障,实现"光速"延迟 (约 0.5 往返时间) 的 GPU 间数据同步。双屏障架构消除远程轮询开销。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>单一的 store-and-arrive 指令同时完成数据写入和同步信号更新,消除传统方案中独立的 flag 更新步骤</li>
+                                <li>双屏障架构:同步功能分布在两个屏障上——一个位于消费者侧,一个位于生产者侧,消除远程轮询开销</li>
+                                <li>协作组阵列 (CGA) 模型:确保并发线程执行的一致性语义,内存围栏"在所有互连路径上复制"</li>
+                                <li>Multi-Instance GPU (MIG) 支持:允许多个 GPU 实例独立执行同步操作</li>
+                                <li>内存围栏在所有路径 (包括 NVLink, PCIe) 上复制,减少额外带宽消耗</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利是 NCCL 底层同步原语的硬件级优化,对 AllReduce、AllGather 等集合通信操作有直接影响。在 H100/B200 GPU 集群中,可降低集体通信的 tail latency 约 20-30%。发明人团队包括 NVIDIA GPU 架构核心人物 Olivier Giroux 和 Jack Choquette。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank" class="ref-link">Google Patents - US20230315655A1</a> | <a href="https://patentlyze.com/patent/nvidia-smarter-data-sharing-ai-accelerators/" target="_blank" class="ref-link">Patentlyze 分析</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== MMU SECTION ==================== -->
+        <section id="mmu" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-microchip text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-yellow-400">MMU / 地址转换 / 虚拟化</h2>
+            </div>
+
+            <!-- Patent 9: US20200356492A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">虚拟化环境中的内存访问安全 (Securing Memory Accesses in a Virtualized Environment)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20200356492A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2020-07-23 | 公开: 2020-11-12</span>
+                            <span class="tag tag-mmu">MMU</span>
+                            <span class="tag tag-memory">Memory</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 建立全局寻址方案,目标节点"将本地虚拟地址范围导出到 FLA 空间"。多阶段翻译管线:请求处理器将本地虚拟地址转换为全局 Fabric 地址,到达后接收节点将其翻译为"客户物理地址 (GPA)",再次本地翻译解析为实际"系统物理地址 (SPA)"。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li><strong>统一寻址框架:</strong> 全局寻址方案中不同处理器共享公共寻址视图,尽管拥有独立物理硬件</li>
+                                <li><strong>多阶段翻译管线:</strong> VA -> FLA (Fabric Logical Address) -> GPA (Guest Physical Address) -> SPA (System Physical Address)</li>
+                                <li><strong>凭证验证:</strong> 内存请求携带"关联标识符 (affiliation identifier)",表示安全上下文或权限层级,目标节点在响应前评估</li>
+                                <li><strong>TLB 优化:</strong> 请求节点可使用超大 TLB 页面,允许映射巨大的连续全局地址块,与目标硬件管理的碎片化物理内存分配完全解耦</li>
+                                <li><strong>隔离保障:</strong> "不同应用程序可以相互隔离",同时仍利用共享集群资源</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利是 NVIDIA MIG (Multi-Instance GPU) 和 GPU 虚拟化的安全基础。多阶段地址翻译机制支撑了 NVIDIA GPU 在云环境中的安全共享。超大 TLB 页面设计对减少地址翻译开销至关重要,特别是在大规模 AI 训练集群中。该架构也是 NVIDIA Fabric Manager 和 Magnum IO 的底层技术基础。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US20200356492A1/en" target="_blank" class="ref-link">Google Patents - US20200356492A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 10: US12499065 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">通过 API 实现地址大小转换 (Address Size Conversion via API)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US12499065B2</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2024-01-25 | 授权: 2025</span>
+                            <span class="tag tag-mmu">MMU</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 电路通过 API 执行将初始存储地址大小转换为辅助地址大小的操作,使用物理位置标识符进行映射。为 5G-NR 计算环境中的异构内存系统提供统一的地址转换接口。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>API 驱动的地址转换:软件通过标准 API 调用触发硬件级地址大小转换</li>
+                                <li>支持不同内存域之间的地址映射,包括从逻辑地址到物理位置的转换</li>
+                                <li>设计用于 5G-NR 计算环境中跨不同传输协议的异构系统</li>
+                                <li>与 US12507160 (存储选择 API) 和 US12474981 (存储识别 API) 形成完整的内存管理 API 套件</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利为 NVIDIA 在边缘计算和 5G 基础设施中的内存管理提供标准化接口。随着 NVIDIA 扩展至电信领域 (如 DOCA SDK),统一的地址转换 API 对跨平台兼容性至关重要。简化了开发者在异构内存架构上的编程模型。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.storagenewsletter.com/2026/01/21/nvidia-assigned-eight-patents/" target="_blank" class="ref-link">StorageNewsletter - NVIDIA Patents (US12499065)</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== INTERCONNECT SECTION ==================== -->
+        <section id="interconnect" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-network-wired text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-pink-400">互连技术 / NVLink / 数据中心拓扑</h2>
+            </div>
+
+            <!-- Patent 11: US20260194956A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">AI 选择芯片互连速度以降低功耗 (AI Selects Chip Interconnect Speed to Reduce Power Consumption)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20260194956A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2025-01-06 | 公开: 2026-07-09</span>
+                            <span class="tag tag-interconnect">Interconnect</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> AI 模型实时监控处理器间通信的性能指标 (温度、流量等),通过神经网络评估确定物理连接最高效的数据传输速率。防止接口在空闲期间以最大容量浪费能源,动态调整降低大型服务器场的整体功耗。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>AI 模型实时监控 GPU-CPU 互连的性能指标,包括温度、流量、利用率</li>
+                                <li>神经网络预测最优链路速度,替代传统的基于规则的频率调节</li>
+                                <li>动态调整:在低负载时降低链路速度,在突发工作负载时快速提升</li>
+                                <li>识别传统规则可能忽略的复杂使用模式</li>
+                                <li>适用于数据中心级功耗优化和笔记本电池续航提升</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利将 AI 驱动的功耗管理引入物理层互连。在 GB200 NVL72 等系统中,互连功耗占总功耗的 20-30%。通过 AI 预测性调节链路速度,可在不影响性能的情况下降低 15-25% 的互连功耗。这对 NVIDIA 的可持续发展目标和数据中心 TCO 有重要意义。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-ml-driven-power-saving-gpu-cpu-links/" target="_blank" class="ref-link">Patentlyze - US20260194956A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 12: US20260195187A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">基于硬件路径速度的虚拟机放置 (VM Placement Based on Hardware Path Speed)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20260195187A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2026-03-03 | 公开: 2026-07-09</span>
+                            <span class="tag tag-interconnect">Interconnect</span>
+                            <span class="tag tag-comm">Communication</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 评估物理组件间的通信速度,然后"选择具有最优互连速度的一组芯片"来执行特定计算任务。执行"拓扑感知映射 (topology-aware mapping)",确保数字蓝图反映物理布局。不同于传统调度器将所有设备视为相同,该方法将设备间链路作为首要指标。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li>硬件路径速度评估:测量物理组件间的实际通信带宽和延迟</li>
+                                <li>拓扑感知 VM 放置:根据物理互连拓扑选择最优芯片组</li>
+                                <li>将工作负载映射到具有最快内部通信路径的设备组</li>
+                                <li>不同于传统调度器,将互连质量作为 VM 分配的首要决策因素</li>
+                                <li>适用于多节点 GPU 集群中的训练任务放置</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利对云环境中的 GPU 资源调度有革命性影响。在传统云平台中,VM 调度器通常不考虑底层互连拓扑。该专利使 NVIDIA 能够在调度层面优化通信密集型工作负载 (如分布式训练) 的性能。对 NVIDIA DGX Cloud 和 OVX 平台的资源利用率有直接提升。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-vm-placement-based-hardware-path-speed/" target="_blank" class="ref-link">Patentlyze - US20260195187A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 13: US20230289189A1 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">分布式共享内存 (Distributed Shared Memory - DSMEM)</h3>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="company-badge">US20230289189A1</span>
+                            <span class="text-xs text-slate-500 self-center">申请: 2022-03-10 | 公开: 2023-09-14</span>
+                            <span class="tag tag-comm">Communication</span>
+                            <span class="tag tag-memory">Memory</span>
+                            <span class="tag tag-interconnect">Interconnect</span>
+                        </div>
+                    </div>
+                    <div class="toggle-btn text-slate-400 hover:text-violet-400 ml-4" onclick="toggleDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> DSMEM 由分布在多个流式多处理器 (SM) 上的内存块组成,允许一个 SM 上的线程访问属于另一个 SM 的内存分配,前提是它们属于同一"协作组阵列 (CGA)"。支持跨 SM 的直接读写和原子操作,无需通过全局内存或 L2 缓存。
+                    </div>
+                    <div class="details-content">
+                        <div>
+                            <strong class="text-slate-300">技术实现:</strong>
+                            <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                                <li><strong>跨 SM 可访问性:</strong> DSMEM 允许一个 SM 直接写入另一个 SM 的本地内存,大幅降低延迟</li>
+                                <li><strong>硬件并发保证:</strong> 系统确保特定 CGA 内的所有 CTA 同时启动,co-residency 保证实现安全的低延迟数据共享</li>
+                                <li><strong>内存映射:</strong> DSMEM 集成到通用内存地址空间,专用内存窗口映射本地 DSMEM 段,使用逻辑 CTA 标识符索引</li>
+                                <li><strong>路由机制:</strong> 每个 SM 维护特定映射表,将逻辑 CTA 标识符转换为物理 SM 目标</li>
+                                <li><strong>性能优势:</strong> 减少 Split-K 并行归约等深度学习工作负载对全局内存的依赖</li>
+                            </ul>
+                        </div>
+                        <div class="mt-3">
+                            <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">DSMEM 是 NVIDIA GPU 片上通信架构的重大演进。传统上,GPU SM 之间只能通过全局内存 (经过 L2) 通信,延迟高。DSMEM 使 SM 间通信延迟降低一个数量级,对 Transformer 注意力计算、Split-K 归约等需要频繁跨 SM 数据交换的操作至关重要。该架构是 Blackwell 架构高效支持 LLM 推理的关键硬件特性之一。</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US20230289189A1/en" target="_blank" class="ref-link">Google Patents - US20230289189A1</a></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== COMPARISON SECTION ==================== -->
+        <section id="comparison" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-table text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-cyan-400">技术对比分析</h2>
+            </div>
+
+            <div class="glass-card rounded-xl p-6 mb-6">
+                <h3 class="text-md font-semibold text-violet-300 mb-4">本期 NVIDIA 专利技术领域分布</h3>
+                <div class="overflow-x-auto">
+                    <table class="comparison-table w-full text-sm text-left">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="px-4 py-3 rounded-tl-lg">技术领域</th>
+                                <th class="px-4 py-3">专利数量</th>
+                                <th class="px-4 py-3">关键专利号</th>
+                                <th class="px-4 py-3 rounded-tr-lg">核心创新方向</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-400">
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-green-400">Memory 管理</td>
+                                <td class="px-4 py-3">5</td>
+                                <td class="px-4 py-3 font-mono text-xs">DE102024121954A1, US20260133908A1, US20260203220A1, US20260220041A1, US20230393788A1</td>
+                                <td class="px-4 py-3">分层 KV Cache、局部化内存模式、缓存感知数据流</td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-blue-400">通信 / 同步</td>
+                                <td class="px-4 py-3">3</td>
+                                <td class="px-4 py-3 font-mono text-xs">US12326820B2, US20260170317A1, US20230315655A1</td>
+                                <td class="px-4 py-3">多播/反射内存、激活值预复制、store+arrive 同步</td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-yellow-400">MMU / 地址转换</td>
+                                <td class="px-4 py-3">2</td>
+                                <td class="px-4 py-3 font-mono text-xs">US20200356492A1, US12499065B2</td>
+                                <td class="px-4 py-3">多阶段地址翻译、API 驱动地址转换</td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-pink-400">互连技术</td>
+                                <td class="px-4 py-3">3</td>
+                                <td class="px-4 py-3 font-mono text-xs">US20260194956A1, US20260195187A1, US20230289189A1</td>
+                                <td class="px-4 py-3">AI 驱动链路速度调节、拓扑感知调度、DSMEM</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6 mb-6">
+                <h3 class="text-md font-semibold text-violet-300 mb-4">专利时间线 (2025-2026)</h3>
+                <div class="overflow-x-auto">
+                    <table class="comparison-table w-full text-sm text-left">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="px-4 py-3 rounded-tl-lg">专利号</th>
+                                <th class="px-4 py-3">标题</th>
+                                <th class="px-4 py-3">申请日期</th>
+                                <th class="px-4 py-3">公开/授权日期</th>
+                                <th class="px-4 py-3 rounded-tr-lg">领域</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-400">
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">DE102024121954A1</td>
+                                <td class="px-4 py-3">Localized Mode for Unified Memory GPU</td>
+                                <td class="px-4 py-3">2024-08-01</td>
+                                <td class="px-4 py-3 text-green-400">2025-03-06</td>
+                                <td class="px-4 py-3"><span class="tag tag-memory">Memory</span> <span class="tag tag-mmu">MMU</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US12326820B2</td>
+                                <td class="px-4 py-3">Multicast and Reflective Memory Behavior</td>
+                                <td class="px-4 py-3">2022-01-18</td>
+                                <td class="px-4 py-3 text-green-400">2025-06-10</td>
+                                <td class="px-4 py-3"><span class="tag tag-comm">Comm</span> <span class="tag tag-interconnect">Interconnect</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US12499065B2</td>
+                                <td class="px-4 py-3">Address Size Conversion via API</td>
+                                <td class="px-4 py-3">2024-01-25</td>
+                                <td class="px-4 py-3 text-green-400">2025</td>
+                                <td class="px-4 py-3"><span class="tag tag-mmu">MMU</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US20260133908A1</td>
+                                <td class="px-4 py-3">Dynamic KV Cache Scheduling for LLMs</td>
+                                <td class="px-4 py-3">2025-02-13</td>
+                                <td class="px-4 py-3 text-blue-400">2026-05-14</td>
+                                <td class="px-4 py-3"><span class="tag tag-memory">Memory</span> <span class="tag tag-cache">Cache</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US20260170317A1</td>
+                                <td class="px-4 py-3">Stop AI Chips From Waiting on Shared Data</td>
+                                <td class="px-4 py-3">2024-12-18</td>
+                                <td class="px-4 py-3 text-blue-400">2026-06-18</td>
+                                <td class="px-4 py-3"><span class="tag tag-comm">Comm</span> <span class="tag tag-memory">Memory</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US20260194956A1</td>
+                                <td class="px-4 py-3">AI Selects Chip Interconnect Speed</td>
+                                <td class="px-4 py-3">2025-01-06</td>
+                                <td class="px-4 py-3 text-blue-400">2026-07-09</td>
+                                <td class="px-4 py-3"><span class="tag tag-interconnect">Interconnect</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US20260195187A1</td>
+                                <td class="px-4 py-3">VM Placement Based on Hardware Path Speed</td>
+                                <td class="px-4 py-3">2026-03-03</td>
+                                <td class="px-4 py-3 text-blue-400">2026-07-09</td>
+                                <td class="px-4 py-3"><span class="tag tag-interconnect">Interconnect</span> <span class="tag tag-comm">Comm</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US20260203220A1</td>
+                                <td class="px-4 py-3">Cache-Aware GPU Memory Processing</td>
+                                <td class="px-4 py-3">2025-01-16</td>
+                                <td class="px-4 py-3 text-blue-400">2026-07-16</td>
+                                <td class="px-4 py-3"><span class="tag tag-cache">Cache</span> <span class="tag tag-memory">Memory</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US20260220041A1</td>
+                                <td class="px-4 py-3">Smarter KV Cache Memory for AI Models</td>
+                                <td class="px-4 py-3">2025-01-30</td>
+                                <td class="px-4 py-3 text-blue-400">2026-07-30</td>
+                                <td class="px-4 py-3"><span class="tag tag-memory">Memory</span> <span class="tag tag-cache">Cache</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-mono text-xs">US20230289189A1</td>
+                                <td class="px-4 py-3">Distributed Shared Memory (DSMEM)</td>
+                                <td class="px-4 py-3">2022-03-10</td>
+                                <td class="px-4 py-3">2023-09-14</td>
+                                <td class="px-4 py-3"><span class="tag tag-comm">Comm</span> <span class="tag tag-memory">Memory</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-md font-semibold text-violet-300 mb-4">技术关联矩阵</h3>
+                <div class="overflow-x-auto">
+                    <table class="comparison-table w-full text-sm text-left">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="px-4 py-3 rounded-tl-lg">专利组合</th>
+                                <th class="px-4 py-3">协同效应</th>
+                                <th class="px-4 py-3 rounded-tr-lg">目标架构</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-400">
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-green-400">KV Cache 双专利</td>
+                                <td class="px-4 py-3">US20260133908A1 (放在哪里) + US20260220041A1 (保留哪些) = 完整智能 KV Cache 管理</td>
+                                <td class="px-4 py-3">Blackwell / Rubin</td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-blue-400">互连功耗 + 拓扑感知</td>
+                                <td class="px-4 py-3">US20260194956A1 (动态链路速度) + US20260195187A1 (拓扑感知调度) = 端到端互连优化</td>
+                                <td class="px-4 py-3">NVLink 6 / NVSwitch 5</td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-yellow-400">局部化内存 + DSMEM</td>
+                                <td class="px-4 py-3">DE102024121954A1 (die 间局部化) + US20230289189A1 (SM 间共享) = 多层级内存局部化</td>
+                                <td class="px-4 py-3">Multi-chiplet GPU</td>
+                            </tr>
+                            <tr class="border-b border-slate-700">
+                                <td class="px-4 py-3 font-medium text-pink-400">多播 + 快速同步</td>
+                                <td class="px-4 py-3">US12326820B2 (硬件多播) + US20230315655A1 (store+arrive) = 超低延迟集合通信</td>
+                                <td class="px-4 py-3">NVLink / NVSwitch</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TRENDS SECTION ==================== -->
+        <section id="trends" class="section-block" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-orange-400">趋势展望</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="trend-card rounded-xl p-5">
+                    <h4 class="font-semibold text-violet-300 mb-3"><i class="fas fa-brain mr-2"></i>趋势 1: AI 驱动的内存管理</h4>
+                    <p class="text-sm text-slate-400">NVIDIA 正在将 AI 技术应用于内存管理本身。从 KV Cache 的智能调度 (US20260133908A1) 到智能淘汰 (US20260220041A1),再到互连速度的 AI 预测调节 (US20260194956A1),AI 正在成为系统资源管理的核心决策引擎。这预示着未来 GPU 将具备"自我优化"能力。</p>
+                </div>
+                <div class="trend-card rounded-xl p-5">
+                    <h4 class="font-semibold text-violet-300 mb-3"><i class="fas fa-layer-group mr-2"></i>趋势 2: 多层级内存层次结构</h4>
+                    <p class="text-sm text-slate-400">从片上 DSMEM (US20230289189A1) 到封装内 HBM (US20230393788A1),再到 die 间局部化 (DE102024121954A1),NVIDIA 正在构建越来越精细的内存层次结构。每一层都有专门的优化策略,从 SM 级到 chiplet 级到节点级,形成完整的内存拓扑。</p>
+                </div>
+                <div class="trend-card rounded-xl p-5">
+                    <h4 class="font-semibold text-violet-300 mb-3"><i class="fas fa-bolt mr-2"></i>趋势 3: 通信与计算的深度融合</h4>
+                    <p class="text-sm text-slate-400">多播/反射内存 (US12326820B2) 和 store+arrive 同步 (US20230315655A1) 表明 NVIDIA 正在模糊计算和通信的边界。未来的 GPU 互连将不再区分"本地"和"远程"操作,而是提供统一的内存语义,使分布式训练像单芯片编程一样简单。</p>
+                </div>
+                <div class="trend-card rounded-xl p-5">
+                    <h4 class="font-semibold text-violet-300 mb-3"><i class="fas fa-server mr-2"></i>趋势 4: 数据中心级优化</h4>
+                    <p class="text-sm text-slate-400">VM 拓扑感知放置 (US20260195187A1) 和互连功耗优化 (US20260194956A1) 显示 NVIDIA 的视野已从单芯片扩展到整个数据中心。未来的 NVIDIA 不仅优化 GPU 架构,还优化 GPU 在数据中心中的部署方式,实现从硅到系统的全栈优化。</p>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-md font-semibold text-violet-300 mb-4"><i class="fas fa-eye mr-2"></i>关注要点</h3>
+                <div class="space-y-3 text-sm text-slate-400">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-check-circle text-green-400 mt-1"></i>
+                        <p><strong class="text-slate-300">KV Cache 管理将成为 LLM 推理的核心竞争力:</strong> 两篇 KV Cache 专利 (US20260133908A1 + US20260220041A1) 的组合将显著提升 NVIDIA GPU 在 LLM 推理场景的内存效率,可能拉开与 AMD MI300X 的差距。</p>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-check-circle text-green-400 mt-1"></i>
+                        <p><strong class="text-slate-300">Multi-chiplet GPU 的内存局部化至关重要:</strong> DE102024121954A1 直接支持 Blackwell 及后续架构的多 chiplet 设计。随着 GPU die 数量增加,跨 die 通信延迟管理将成为性能瓶颈。</p>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-check-circle text-green-400 mt-1"></i>
+                        <p><strong class="text-slate-300">NCCL 的硬件级优化持续深化:</strong> 多播 (US12326820B2)、快速同步 (US20230315655A1) 和激活值预复制 (US20260170317A1) 从不同层面优化集合通信,NCCL 的性能将持续受益于硬件创新。</p>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-check-circle text-green-400 mt-1"></i>
+                        <p><strong class="text-slate-300">建议关注 NVIDIA 后续专利公开:</strong> 2025 年提交的大量专利 (特别是互连和内存管理领域) 将在 2026 年下半年至 2027 年陆续公开,可能揭示 Rubin 架构的更多技术细节。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="glass-card border-t border-slate-700 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            <p>NVIDIA 专利研究周报 | 数据来源: <a href="https://patents.google.com/" target="_blank" class="ref-link">Google Patents</a>, <a href="https://patentlyze.com/nvidia/" target="_blank" class="ref-link">Patentlyze</a>, <a href="https://www.uspto.gov/patents" target="_blank" class="ref-link">USPTO</a></p>
+            <p class="mt-2 text-xs">报告生成时间: 2026-07-29 | 所有专利信息均来自公开可验证来源</p>
+        </div>
+    </footer>
+
+    <script>
+        // Tab navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const section = tab.dataset.section;
+                document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
+                document.getElementById(section).style.display = 'block';
+            });
+        });
+
+        // Toggle details
+        function toggleDetails(btn) {
+            const card = btn.closest('.patent-card');
+            const content = card.querySelector('.details-content');
+            const icon = btn.querySelector('i');
+            content.classList.toggle('open');
+            if (content.classList.contains('open')) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+    </script>
+</body>
+</html>

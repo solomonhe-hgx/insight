@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通信库竞品动态周报 - 2026-W32</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .badge-nccl { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+        .badge-deepep { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .badge-nvshmem { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .badge-other { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .badge-trend { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .metric-card { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); }
+        .update-card { transition: all 0.3s ease; }
+        .update-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .table-row-hover:hover { background: rgba(59, 130, 246, 0.1); }
+        .trend-arrow { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .detail-section { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        .ref-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-radius: 4px; text-decoration: none; margin-left: 6px; white-space: nowrap; transition: all 0.15s; }
+        .ref-link:hover { background: rgba(59, 130, 246, 0.3); }
+        .ref-link.green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .ref-link.green:hover { background: rgba(16, 185, 129, 0.3); }
+        .ref-link.orange { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .ref-link.orange:hover { background: rgba(245, 158, 11, 0.3); }
+        .ref-link.purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .ref-link.purple:hover { background: rgba(139, 92, 246, 0.3); }
+        .ref-link.cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; }
+        .ref-link.cyan:hover { background: rgba(6, 182, 212, 0.3); }
+        .ref-link.red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .ref-link.red:hover { background: rgba(239, 68, 68, 0.3); }
+        .ref-link.amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .ref-link.amber:hover { background: rgba(245, 158, 11, 0.3); }
+        .feature-expand-btn { cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 11px; flex-shrink: 0; }
+        .feature-expand-btn:hover { background: rgba(59, 130, 246, 0.15); }
+        .feature-expand-icon { transition: transform 0.3s ease; display: inline-block; font-size: 10px; }
+        .feature-expand-icon.expanded { transform: rotate(90deg); }
+        .feature-detail { animation: slideDown 0.3s ease-out; }
+        .feature-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="text-slate-200">
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-network-wired text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">通信库竞品动态周报</h1>
+                        <p class="text-xs text-slate-400">NCCL / DeepEP / NVSHMEM / UCX / NIXL / torchcomms / RCCL / OneCCL | 2026年8月 W32</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-slate-300">报告周期</div>
+                        <div class="text-xs text-slate-400">2026-08-03 ~ 08-10</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-400">80+</div>
+                        <div class="text-xs text-slate-400">更新/动态</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('overview')" id="tab-overview" class="tab-active px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-chart-line"></i> 总览与趋势
+            </button>
+            <button onclick="showTab('nccl')" id="tab-nccl" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-microchip"></i> NCCL <span class="ml-1 bg-purple-500/20 text-purple-400 text-xs px-1.5 py-0.5 rounded">15 PRs</span>
+            </button>
+            <button onclick="showTab('deepep')" id="tab-deepep" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-rocket"></i> DeepEP <span class="ml-1 bg-cyan-500/20 text-cyan-400 text-xs px-1.5 py-0.5 rounded">9 PRs</span>
+            </button>
+            <button onclick="showTab('nvshmem')" id="tab-nvshmem" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-memory"></i> NVSHMEM <span class="ml-1 bg-amber-500/20 text-amber-400 text-xs px-1.5 py-0.5 rounded">35 commits</span>
+            </button>
+            <button onclick="showTab('others')" id="tab-others" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-layer-group"></i> 其他通信库 <span class="ml-1 bg-green-500/20 text-green-400 text-xs px-1.5 py-0.5 rounded">UCX v1.22</span>
+            </button>
+            <button onclick="showTab('comparison')" id="tab-comparison" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-balance-scale"></i> 技术对比
+            </button>
+            <button onclick="showTab('trends')" id="tab-trends" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-lightbulb"></i> 趋势展望
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <!-- ==================== Overview Tab ==================== -->
+        <section id="content-overview" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-microchip text-purple-400"></i></div>
+                        <div class="text-sm text-slate-400">NCCL 更新</div>
+                    </div>
+                    <div class="text-3xl font-bold text-purple-400">15 PRs</div>
+                    <div class="text-xs text-slate-500 mt-1">无新版本发布（最新 v2.30.7-1）。3 个新 PR 聚焦内存泄漏修复、Profiler 鲁棒性、GIN hang 修复。关键 Issue: RoCEv2 死锁 (#2334)。NCCL EP/M2N 迁移至 nccl-extensions。</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-rocket text-cyan-400"></i></div>
+                        <div class="text-sm text-slate-400">DeepEP 动态</div>
+                    </div>
+                    <div class="text-3xl font-bold text-cyan-400">9 PRs</div>
+                    <div class="text-xs text-slate-500 mt-1">4 个 PR 已合并: NVSHMEM 3.7 适配 (#711)、HybridEP dense top-k (#673)、GIN barrier 修复 (#715)、overflow_flag 初始化 (#709)。5 个新 PR 聚焦性能优化和构建修复。</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-memory text-amber-400"></i></div>
+                        <div class="text-sm text-slate-400">NVSHMEM 更新</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">35 commits</div>
+                    <div class="text-xs text-slate-500 mt-1">devel 分支 35 commits: Heap Registration 重构 (7 commits)、Rust bindings 合入、Fortran bitcode CI。Q3 Roadmap 推进 CFT/AI Skills Library/Batched RMA。</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center"><i class="fas fa-layer-group text-blue-400"></i></div>
+                        <div class="text-sm text-slate-400">其他库动态</div>
+                    </div>
+                    <div class="text-3xl font-bold text-green-400">UCX v1.22</div>
+                    <div class="text-xs text-slate-500 mt-1">UCX v1.22.0 正式发布 (8月2日) / RCCL 迁入 rocm-systems 高度活跃 (9 PRs) / NIXL v1.3.2 + 15 PRs / PyTorch c10d NCCL2 后端大重构 (14+ commits) / OneCCL 2022.1.0 已发布</div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-area text-blue-400"></i> 本周技术趋势</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-purple-300">NCCL: RoCEv2 死锁 + EP/M2N 生态重组 + NCCL 2.31 开发</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">NCCL 本周 3 个新 PR (#2328, #2326, #2318) 聚焦内存泄漏修复、Profiler proxy 初始化鲁棒性、GIN gdaki init hang 修复。关键 Issue #2334 报告 GB10/ConnectX-7 RoCEv2 死锁。重大生态变化: NCCL EP 和 M2N 迁移至 NVIDIA/nccl-extensions 仓库。NCCL 2.31 开发中，规划 Compute Fabric Transport、EFA GDA、Rubin 架构支持。</p>
+                        <div class="flex items-center gap-2 text-purple-400 text-sm"><i class="fas fa-microchip trend-arrow"></i><span>生态重组 + 2.31 开发</span></div>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-cyan-300">DeepEP: NVSHMEM 3.7 适配 + HybridEP 路由增强</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">DeepEP 本周 4 个 PR 已合并: PR #711 适配 NVSHMEM 3.7、PR #715 修复跨 NVLink/RDMA 的 GIN barrier、PR #709 修复 overflow_flag 垃圾值、PR #673 新增 HybridEP dense top-k 路由扫描路径。5 个新 PR 聚焦 buffer 复用优化、NCCL 版本兼容、RDMA 带宽检测。</p>
+                        <div class="flex items-center gap-2 text-cyan-400 text-sm"><i class="fas fa-code-branch trend-arrow"></i><span>HybridEP + NVSHMEM 3.7 适配</span></div>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-amber-300">UCX v1.22.0 正式发布 + NIXL/RCCL/c10d 高度活跃</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">UCX v1.22.0 正式发布（8月2日），新增 Vera 系统支持、SGL datatype、fault-tolerance 基础。RCCL 迁入 rocm-systems 后高度活跃（9 PRs，gfx1250 + AINIC CTS）。NIXL v1.3.2 修复 EFA hang，15+ PRs 推进 Rust bindings 和 GPUNetIO/DOCA 3.1。PyTorch c10d NCCL2 后端大重构（14+ commits）。</p>
+                        <div class="flex items-center gap-2 text-amber-400 text-sm"><i class="fas fa-bolt trend-arrow"></i><span>UCX GA + 多库高度活跃</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-purple-400"></i> 各库更新活跃度</h2>
+                <div class="h-80"><canvas id="activityChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ==================== NCCL Tab ==================== -->
+        <section id="content-nccl" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-nccl px-3 py-1 rounded text-xs text-white">NCCL</span> NVIDIA 集合通信库</h2>
+
+                <!-- Roadmap -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nccl-roadmap-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nccl-roadmap-w32"></i><h3 class="font-semibold text-white">NCCL Roadmap Aug-Oct 2026 (#2272) 持续更新</h3></div>
+                        <span class="text-xs bg-purple-700 px-2 py-1 rounded">2026-08-07 更新</span>
+                    </div>
+                    <div id="nccl-roadmap-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">NCCL <strong class="text-purple-400">Aug-Oct 2026 Roadmap</strong> 持续更新，规划 NCCL 2.31 及后续版本：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">NCCL 2.31 (开发中)</strong>: Compute Fabric Transport、EFA GDA 支持、Cost-model 重构、Per-collective 可配置性、JIT 重编译、Host-side 统一、RAS 诊断</span><a class="ref-link green" href="https://github.com/NVIDIA/nccl/issues/2272" target="_blank"><i class="fas fa-external-link-alt"></i>Roadmap</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nccl-231-design')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nccl-231-design"></i>设计原理</span>
+                            <div id="feature-nccl-231-design" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NCCL 2.31 设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>NCCL 当前存在多条 kernel 路径（legacy collective paths 和新的 Device API 路径），维护成本高且性能不一致。随着 Blackwell/Rubin 架构引入新硬件特性（CFT、symmetric memory），需要统一编程模型。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>通过 Device API 统一所有 collective 路径，使 CFT (Compute-Communication Fusion) 通过标准化 API 暴露。Cost-model 重构基于更精确的拓扑感知和负载模型自动选择最优算法。RAS diagnostics 提供运行时健康检查，帮助大规模集群快速定位通信故障。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>10K-100K+ GPU 大规模训练集群，需要统一 API 管理多种硬件拓扑（NVLink、NVSwitch、IB/RoCE）；需要低精度训练（MXFP8/MXFP4）的 MoE 模型。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-check-circle text-blue-400 mt-1 flex-shrink-0"></i><span><strong>秋季 2026</strong>: Rubin 架构支持、统一 legacy kernels、Symmetric A2A kernel、MIG 支持、NCCL Notify</span></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-check-circle text-amber-400 mt-1 flex-shrink-0"></i><span><strong>未来规划</strong>: MXFP8/MXFP4/NVFP4 低精度、Rust bindings (nccl4rust)、Windows 支持、SM-initiated CE collectives</span></div></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- New PRs this week -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nccl-prs-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nccl-prs-w32"></i><h3 class="font-semibold text-white">本周 3 个新 PR: 内存泄漏 + Profiler + GIN Hang 修复</h3></div>
+                        <span class="text-xs bg-purple-700 px-2 py-1 rounded">2026-08-04~07 | New PRs</span>
+                    </div>
+                    <div id="nccl-prs-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">NCCL 本周无新版本发布（最新: <strong>v2.30.7-1</strong>），但 <strong class="text-purple-400">3 个新 PR 聚焦稳定性修复</strong>：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">Spilled Allocation 内存泄漏修复</strong> (#2328) — 修复 allocateSpilled 中的内存泄漏</span><a class="ref-link green" href="https://github.com/NVIDIA/nccl/pull/2328" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a><a class="ref-link orange" href="https://github.com/NVIDIA/nccl/issues/2324" target="_blank"><i class="fas fa-bug"></i>Issue</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nccl-spill-fix')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nccl-spill-fix"></i>设计原理</span>
+                            <div id="feature-nccl-spill-fix" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Spilled Allocation 内存泄漏修复设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>NCCL 在 communicator 初始化时可能将 buffer  spill 到 host memory（当 GPU 内存不足时）。Issue #2324 报告 allocateSpilled 函数在分配路径中未正确释放已失败的分配，导致内存泄漏。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>在 allocateSpilled 的错误路径中添加正确的清理逻辑，确保当后续分配失败时，之前成功分配的 spill buffer 被正确释放。使用 RAII 模式或显式 cleanup 标签（goto cleanup）来保证所有错误路径都执行释放。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>长时间运行的训练作业中，communicator 反复创建/销毁时，内存泄漏会逐渐累积导致 OOM。修复后提升大规模集群的长期稳定性。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Profiler Proxy 初始化失败处理</strong> (#2326) — 处理 profiler proxy 初始化失败的情况</span><a class="ref-link green" href="https://github.com/NVIDIA/nccl/pull/2326" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-amber-400 mt-1 flex-shrink-0"></i><span><strong>GIN GDAKI Init Hang 修复</strong> (#2318) — 避免 gin gdaki init 中的无限 hang</span><a class="ref-link green" href="https://github.com/NVIDIA/nccl/pull/2318" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nccl-gin-hang')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nccl-gin-hang"></i>设计原理</span>
+                            <div id="feature-nccl-gin-hang" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>GIN GDAKI Init Hang 修复设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>GIN (GPU-Initiated Network Interface) 的 GDAKI (GPU Direct Access Kernel Interface) 初始化过程中，在某些拓扑或负载条件下可能出现无限等待，导致 communicator 初始化 hang。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>添加超时机制和错误恢复路径。当 GDAKI init 在预期时间内未完成时，触发 fallback 路径而非无限等待。同时修复竞争条件，确保所有 rank 的初始化顺序一致。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>使用 GIN 后端的大规模 MoE 训练，特别是 NVSwitch + IB 混合拓扑下的初始化阶段。</div>
+                                </div>
+                            </div>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Critical Issues -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-red-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nccl-issues-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nccl-issues-w32"></i><h3 class="font-semibold text-white">关键 Issues: RoCEv2 死锁 + EP/M2N 仓库迁移</h3></div>
+                        <span class="text-xs bg-red-700 px-2 py-1 rounded">2026-08-06~09</span>
+                    </div>
+                    <div id="nccl-issues-w32" class="detail-section mt-3">
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-bug text-red-400 mt-1 flex-shrink-0"></i><span><strong class="text-red-400">RoCEv2 接收死锁</strong> (#2334) — 4x GB10 + ConnectX-7 RoCEv2 上 tensor-parallel LLM 推理时，RDMA write 完成到已释放 slot 导致永久 freeze</span><a class="ref-link red" href="https://github.com/NVIDIA/nccl/issues/2334" target="_blank"><i class="fas fa-bug"></i>Issue</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nccl-roce-deadlock')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nccl-roce-deadlock"></i>设计原理</span>
+                            <div id="feature-nccl-roce-deadlock" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>RoCEv2 接收死锁设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>在 RoCEv2 网络上的 NCCL collectives 中，接收方处理已完成 RDMA write 的 completion 时，发现对应的 request slot 已被标记为"未使用"。这种 stale completion 处理导致同步状态损坏，进而永久死锁。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>根本原因是 completion 处理与 request slot 回收之间的竞争条件。修复方向包括：1) 为 completion 添加 generation tag 以检测 stale completion；2) 在 slot 回收前确保所有 in-flight completions 已处理；3) 添加超时检测以从死锁中恢复。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>GB10/GB200 + ConnectX-7 RoCEv2 环境上的 tensor-parallel 推理，特别是双 200G 链路配置。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-exchange-alt text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-400">NCCL EP & M2N 迁移至 nccl-extensions</strong> (#2308) — EP 和 M2N 原语从 contrib/ 迁移到独立仓库 NVIDIA/nccl-extensions</span><a class="ref-link orange" href="https://github.com/NVIDIA/nccl/issues/2308" target="_blank"><i class="fas fa-external-link-alt"></i>Announcement</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nccl-ep-move')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nccl-ep-move"></i>设计原理</span>
+                            <div id="feature-nccl-ep-move" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NCCL EP/M2N 仓库迁移设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>NCCL EP (Expert Parallelism) 和 M2N (mesh-to-mesh) 作为实验性贡献放在 NCCL 主仓库的 contrib/ 目录下，但它们的发布节奏、API 稳定性和 issue 跟踪需求与 NCCL 核心不同。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>迁移到独立的 NVIDIA/nccl-extensions 仓库，允许独立的版本管理、issue 跟踪和开发节奏。这类似于 Linux kernel 中 staging drivers 移到独立仓库的模式。同时保持与 NCCL 核心 API 的兼容性。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>MoE 训练框架开发者需要跟踪 EP 原语的最新进展；M2N 用户需要独立的 issue 跟踪和更快的修复周期。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-question-circle text-blue-400 mt-1 flex-shrink-0"></i><span><strong>NVLS 算法协议限制咨询</strong> (#2327) — 咨询 NVLS algorithm 协议的限制</span><a class="ref-link" href="https://github.com/NVIDIA/nccl/issues/2327" target="_blank"><i class="fas fa-question-circle"></i>Question</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-bug text-red-400 mt-1 flex-shrink-0"></i><span><strong>CUDA VMM 内存注册失败</strong> (#2332) — CUDA VMM 内存注册失败</span><a class="ref-link red" href="https://github.com/NVIDIA/nccl/issues/2332" target="_blank"><i class="fas fa-bug"></i>Issue</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-bug text-red-400 mt-1 flex-shrink-0"></i><span><strong>虚拟地址耗尽</strong> (#2331) — 多窗口注册期间虚拟地址耗尽</span><a class="ref-link red" href="https://github.com/NVIDIA/nccl/issues/2331" target="_blank"><i class="fas fa-bug"></i>Issue</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-bug text-red-400 mt-1 flex-shrink-0"></i><span><strong>PciInfo struct 栈溢出</strong> (#2325) — PciInfo 结构体不匹配导致栈缓冲区溢出</span><a class="ref-link red" href="https://github.com/NVIDIA/nccl/issues/2325" target="_blank"><i class="fas fa-bug"></i>Issue</a></div></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Papers -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-purple-400 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nccl-papers-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nccl-papers-w32"></i><h3 class="font-semibold text-white">学术论文与博客</h3></div>
+                        <span class="text-xs bg-purple-600 px-2 py-1 rounded">2026</span>
+                    </div>
+                    <div id="nccl-papers-w32" class="detail-section mt-3">
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-file-alt text-purple-400 mt-1 flex-shrink-0"></i><span><strong>NCCLbpf: Verified, Composable Policy Execution for GPU Collective Communication</strong> — 用户空间 eBPF 执行环境用于 NCCL 扩展，支持静态验证和原子策略重载</span><a class="ref-link purple" href="https://arxiv.org/html/2603.11438v2" target="_blank"><i class="fas fa-file-alt"></i>Paper</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-file-alt text-purple-400 mt-1 flex-shrink-0"></i><span><strong>An Efficient, Reliable and Observable Collective Communication Library in Large-scale GPU Training Clusters</strong> — CPU offloading P2P、冗余连接容错、10K+ GPU 网络瓶颈追踪</span><a class="ref-link purple" href="https://arxiv.org/html/2510.00991v2" target="_blank"><i class="fas fa-file-alt"></i>Paper</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-blog text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Real-Time Performance Monitoring with NCCL Inspector and Prometheus</strong> — NCCL 2.30 Prometheus 模式，Grafana 实时指标</span><a class="ref-link" href="https://developer.nvidia.com/blog/real-time-performance-monitoring-and-faster-debugging-with-nccl-inspector-and-prometheus/" target="_blank"><i class="fas fa-external-link-alt"></i>Blog</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-video text-amber-400 mt-1 flex-shrink-0"></i><span><strong>GTC 2026: Scale AI and HPC with NCCL, NIXL, and NVSHMEM</strong> — 消除通信瓶颈的 NVIDIA 通信栈</span><a class="ref-link amber" href="https://www.nvidia.com/en-us/on-demand/session/gtc26-s82407/" target="_blank"><i class="fas fa-external-link-alt"></i>GTC</a></div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== DeepEP Tab ==================== -->
+        <section id="content-deepep" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-deepep px-3 py-1 rounded text-xs text-white">DeepEP</span> DeepSeek 专家并行通信库</h2>
+
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('deepep-prs-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-deepep-prs-w32"></i><h3 class="font-semibold text-white">本周 4 Merged + 5 Open: NVSHMEM 3.7 适配 + HybridEP 路由</h3></div>
+                        <span class="text-xs bg-cyan-700 px-2 py-1 rounded">2026-08-01~10 | PRs</span>
+                    </div>
+                    <div id="deepep-prs-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">DeepEP 本周 <strong class="text-cyan-400">4 个 PR 已合并 + 5 个新 PR 开启</strong>：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">NVSHMEM 3.7 适配</strong> (#711) — 适配 NVSHMEM 3.7 API 变更</span><a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP/pull/711" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('deepep-nvshmem37')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-deepep-nvshmem37"></i>设计原理</span>
+                            <div id="feature-deepep-nvshmem37" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NVSHMEM 3.7 适配设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>NVSHMEM 3.7.0 引入了 API 变更（如 C++17 强制要求、heap registration 重构、flush API 新增），DeepEP 的 V2 架构依赖 NVSHMEM 底层 API 进行 GPU-initiated 通信，需要适配这些变更。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>更新 DeepEP 的 NVSHMEM 调用层以匹配 3.7 的新 API。包括：使用新的 heap registration backend、适配 transport capability view、更新 flush API 调用（nvshmemx_flush 用于 source-buffer 复用）。同时保持对 NVSHMEM 3.5.x/3.6.x 的向后兼容。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>使用 NVSHMEM 3.7+ 的 MoE 训练环境，需要 DeepEP 与新版本 NVSHMEM 保持兼容。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">HybridEP Dense Top-K 路由扫描</strong> (#673) — 为 HybridEP 添加 dense top-k routing scan path</span><a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP/pull/673" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('deepep-hybrid-ep')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-deepep-hybrid-ep"></i>设计原理</span>
+                            <div id="feature-deepep-hybrid-ep" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>HybridEP Dense Top-K 路由扫描设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>HybridEP 需要支持 dense top-k 路由（每个 token 路由到 top-k 个 expert），但当前的 scan 路径仅支持 sparse/moe routing。Dense top-k 要求对所有 token 进行全量扫描以确定 top-k 选择，计算量和通信模式与 sparse routing 不同。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>添加专用的 dense top-k scan kernel，利用 warp-level reduction 和 shared memory 进行高效 top-k 选择。对于 top-2 routing，每个 token 需要比较所有 expert 的 score 并选择最高的 2 个。kernel 使用 bitonic sort 或 radix select 算法在 GPU 上高效实现。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>Mixtral 等使用 top-2 routing 的 MoE 模型训练，需要在 dispatch 前进行高效的 dense top-k 路由计算。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">GIN Barrier System-Scope Release</strong> (#715) — 跨 NVLink/RDMA scaleup 时在 GIN barrier 前添加 system-scope release</span><a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP/pull/715" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('deepep-gin-barrier')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-deepep-gin-barrier"></i>设计原理</span>
+                            <div id="feature-deepep-gin-barrier" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>GIN Barrier System-Scope Release 设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>当 DeepEP 的 scaleup 同时跨越 NVLink（节点内）和 RDMA（节点间）时，GIN barrier 的内存可见性需要 system-scope 保证。缺少 system-scope release 会导致跨节点的 barrier 信号在其他 GPU 上不可见。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>在 GIN barrier 信号发送前添加 system-scope release fence（__threadfence_system），确保 barrier 信号对所有 GPU（包括不同节点上的）可见。这是 CUDA 内存模型中最强的可见性保证，对应 system-scope acquire 在接收端。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>多节点 MoE 训练，NVLink 域跨越 2+ 节点（如 DGX SuperPOD 的 NVSwitch 互联），需要保证跨节点 barrier 的正确性。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">Overflow Flag 零初始化</strong> (#709) — 零初始化 overflow_flag 防止残留垃圾值</span><a class="ref-link green" href="https://github.com/deepseek-ai/DeepEP/pull/709" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                        </ul>
+                        <p class="text-sm text-slate-400 mt-3">本周新开启的 PRs:</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>EP_BUFFER_DEBUG=0 修复</strong> (#719) — 修复 EP_BUFFER_DEBUG=0 仍开启 Python 端 debug 输出</span><a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/pull/719" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>HybridEP Routing Buffer 复用</strong> (#716, Draft) — 复用 HybridEP routing allgather buffer 减少内存占用</span><a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/pull/716" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>NCCL Runtime 版本检查</strong> (#712) — 拒绝低于构建版本的 NCCL runtime</span><a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/pull/712" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>RDMA Bonded NIC 带宽检测</strong> (#705) — 正确检测 bonded NIC 的 RDMA 带宽</span><a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/pull/705" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Elastic GIN Signal Backend-Agnostic</strong> (#706) — 使 elastic GIN signal 读取后端无关</span><a class="ref-link" href="https://github.com/deepseek-ai/DeepEP/pull/706" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                        </ul>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <a class="ref-link cyan" href="https://github.com/deepseek-ai/DeepEP/pulls" target="_blank"><i class="fab fa-github"></i>All PRs</a>
+                            <a class="ref-link cyan" href="https://github.com/deepseek-ai/DeepEP/releases" target="_blank"><i class="fas fa-tag"></i>Releases</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DeepEP Papers -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-cyan-400 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('deepep-papers-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-deepep-papers-w32"></i><h3 class="font-semibold text-white">论文与技术文章</h3></div>
+                        <span class="text-xs bg-cyan-600 px-2 py-1 rounded">2026</span>
+                    </div>
+                    <div id="deepep-papers-w32" class="detail-section mt-3">
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-file-alt text-cyan-400 mt-1 flex-shrink-0"></i><span><strong>NCCL EP Paper</strong> — NVIDIA NCCL EP 论文明确承认 DeepEP 为 "the state of the art implementation" for device-initiated MoE routing</span><a class="ref-link cyan" href="https://arxiv.org/html/2603.13606v1" target="_blank"><i class="fas fa-file-alt"></i>Paper</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-file-alt text-cyan-400 mt-1 flex-shrink-0"></i><span><strong>DeepEP V2 NCCL GIN Backend Deep-Dive</strong> — V2 架构从 NVSHMEM 切换到 NCCL GIN 后端的详细技术分析</span><a class="ref-link cyan" href="https://zhuanlan.zhihu.com/p/2043660020324290824" target="_blank"><i class="fas fa-external-link-alt"></i>知乎</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-file-alt text-cyan-400 mt-1 flex-shrink-0"></i><span><strong>DeepEP 全面分析</strong> — DeepEP 库的全方位技术分析</span><a class="ref-link cyan" href="https://zhuanlan.zhihu.com/p/2043806827222130742" target="_blank"><i class="fas fa-external-link-alt"></i>知乎</a></div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== NVSHMEM Tab ==================== -->
+        <section id="content-nvshmem" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-nvshmem px-3 py-1 rounded text-xs text-white">NVSHMEM</span> NVIDIA Symmetric Memory 通信库</h2>
+
+                <!-- Devel branch commits -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nvshmem-commits-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nvshmem-commits-w32"></i><h3 class="font-semibold text-white">Devel 分支 35 Commits: Heap 重构 + Rust Bindings + Fortran CI</h3></div>
+                        <span class="text-xs bg-amber-700 px-2 py-1 rounded">2026-07-15~28</span>
+                    </div>
+                    <div id="nvshmem-commits-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">NVSHMEM devel 分支 <strong class="text-amber-400">35 commits 聚焦三大方向</strong>：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">Heap Registration 重构</strong> (7 commits) — 引入 transport capability view、standalone heap handle table、heap registration backend、symmetric heaps 路由</span><a class="ref-link green" href="https://github.com/NVIDIA/nvshmem/commits/devel" target="_blank"><i class="fas fa-external-link-alt"></i>Commits</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nvshmem-heap-refactor')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nvshmem-heap-refactor"></i>设计原理</span>
+                            <div id="feature-nvshmem-heap-refactor" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>Heap Registration 重构设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>NVSHMEM 3.7 之前的 heap 管理将注册逻辑分散在各个 transport 中，导致代码重复且难以扩展新的 transport 类型（如 GPUNetIO、libfabric）。每次添加新 transport 都需要修改核心 heap 管理代码。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>引入独立的 heap registration backend，将 transport 相关的 heap 操作抽象为 capability view。每个 transport 声明自己支持的 heap 类型和操作（如 P2P、VMM、GDRCopy），heap 管理核心通过 backend 接口统一调度。standalone heap handle table 将句柄管理从 transport 解耦，支持跨 transport 的 heap 共享。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>需要多种 transport 共存的异构集群（如 NVLink + IB + EFA），以及需要动态注册/注销 heap 的弹性训练场景。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong class="text-blue-400">Rust Bindings</strong> — 添加独立 NVSHMEM Rust bindings 贡献</span><a class="ref-link" href="https://github.com/NVIDIA/nvshmem/commits/devel" target="_blank"><i class="fas fa-external-link-alt"></i>Commits</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nvshmem-rust')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nvshmem-rust"></i>设计原理</span>
+                            <div id="feature-nvshmem-rust" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NVSHMEM Rust Bindings 设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>随着 Rust 在系统编程中的普及（NCCL Roadmap 也列出了 nccl4rust），NVSHMEM 需要提供 Rust 语言绑定以支持 Rust 编写的高性能通信应用。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>通过 Rust FFI (Foreign Function Interface) 封装 NVSHMEM 的 C API，提供 safe Rust wrapper。使用 Rust 的 ownership 和 lifetime 系统确保 symmetric memory 的安全使用，避免 use-after-free 和数据竞争。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>Rust 编写的分布式推理服务、高性能计算应用，需要与 NVSHMEM 的 GPU-initiated 通信能力集成。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Fortran Bitcode CI</strong> — 添加 CUDA Fortran bitcode smoke test</span><a class="ref-link" href="https://github.com/NVIDIA/nvshmem/commits/devel" target="_blank"><i class="fas fa-external-link-alt"></i>Commits</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>TMA Block Limit 运行时可配</strong> — Make TMA block limit runtime configurable</span><a class="ref-link" href="https://github.com/NVIDIA/nvshmem/commits/devel" target="_blank"><i class="fas fa-external-link-alt"></i>Commit</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>NVSHMEM4Py 增强</strong> — 修复 peer-access 示例、添加 initialization 示例</span><a class="ref-link" href="https://github.com/NVIDIA/nvshmem/commits/devel" target="_blank"><i class="fas fa-external-link-alt"></i>Commits</a></div></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Q3 Roadmap -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nvshmem-roadmap-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nvshmem-roadmap-w32"></i><h3 class="font-semibold text-white">Q3 2026 Roadmap (#95): CFT + AI Skills + Batched RMA</h3></div>
+                        <span class="text-xs bg-amber-700 px-2 py-1 rounded">2026-06-29 发布</span>
+                    </div>
+                    <div id="nvshmem-roadmap-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">NVSHMEM <strong class="text-amber-400">Q3 2026 Roadmap</strong> 规划：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-check-circle text-green-500 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">已完成 (v3.7.0)</strong>: TMA NVLink put/get、GPUNetIO transport、Flush APIs、FP atomics、Apache-2.0 许可</span><a class="ref-link green" href="https://docs.nvidia.com/nvshmem/release-notes-install-guide/release-notes/release-3700.html" target="_blank"><i class="fas fa-external-link-alt"></i>Release Notes</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-check-circle text-blue-400 mt-1 flex-shrink-0"></i><span><strong>计划中</strong>: 完成 CFT 支持、AI Skills Library、NVSHMEM4Py for numba-cuda-mlir</span><a class="ref-link" href="https://github.com/NVIDIA/nvshmem/issues/95" target="_blank"><i class="fas fa-road"></i>Roadmap</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-check-circle text-amber-400 mt-1 flex-shrink-0"></i><span><strong>计划中</strong>: Multi-NIC IBRC/IBDevX、Batched RMA、SM-initiated CE Collectives</span></div></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Papers -->
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-amber-400 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nvshmem-papers-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nvshmem-papers-w32"></i><h3 class="font-semibold text-white">学术论文与博客</h3></div>
+                        <span class="text-xs bg-amber-600 px-2 py-1 rounded">2026</span>
+                    </div>
+                    <div id="nvshmem-papers-w32" class="detail-section mt-3">
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-file-alt text-amber-400 mt-1 flex-shrink-0"></i><span><strong>Demystifying NVSHMEM: System-Level Analysis on Symmetric Memory and Device-Initiated Operations</strong> — 深度分析 NVSHMEM 内部架构、执行路径和集合操作</span><a class="ref-link purple" href="https://arxiv.org/html/2606.05951v1" target="_blank"><i class="fas fa-file-alt"></i>Paper</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nvshmem-demystify')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nvshmem-demystify"></i>设计原理</span>
+                            <div id="feature-nvshmem-demystify" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NVSHMEM 系统级分析论文要点</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>NVSHMEM 作为 GPU-initiated 通信的核心运行时，其内部执行路径、symmetric memory 管理和 device-initiated 操作的性能特征缺乏系统性分析。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>论文深入分析了 NVSHMEM 的 symmetric memory 分配策略（VMM vs. gdrcopy）、GPU-initiated RDMA 的执行路径（IBGDA）、以及 collective 操作的内部实现。评估了 DeepEP 框架在稀疏 ML 场景的表现，并识别了多 CTA 执行和内置 collectives 等改进机会。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>理解 NVSHMEM 性能瓶颈、优化 GPU-initiated 通信策略、指导 DeepEP 等上层框架的设计决策。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-blog text-blue-400 mt-1 flex-shrink-0"></i><span><strong>A Practical Guide to GPU-Initiated Communication for Molecular Dynamics at Scale</strong> — GROMACS 使用 NVSHMEM GPU-initiated RDMA 实现 2x strong-scaling 效率</span><a class="ref-link" href="https://developer.nvidia.com/blog/a-practical-guide-to-gpu-initiated-communication-for-molecular-dynamics-at-scale/" target="_blank"><i class="fas fa-external-link-alt"></i>Blog</a></div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Others Tab ==================== -->
+        <section id="content-others" class="hidden space-y-6">
+            <!-- UCX -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-other px-3 py-1 rounded text-xs text-white">UCX</span> Unified Communication X</h2>
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('ucx-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-ucx-w32"></i><h3 class="font-semibold text-white">UCX v1.22.0 正式发布 + 25+ PRs</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">2026-08-02 | Release</span>
+                    </div>
+                    <div id="ucx-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">UCX <strong class="text-green-400">v1.22.0 正式发布</strong>（8月2日），本周 <strong>25+ PRs 高度活跃</strong>：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-tag text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">v1.22.0 正式发布</strong> — 新增 Vera 系统支持、SGL datatype、fault-tolerance 基础、Rendezvous RMA、GDRCopy PCIe BAR1</span><a class="ref-link green" href="https://github.com/openucx/ucx/releases/tag/v1.22.0" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('ucx-v122')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-ucx-v122"></i>设计原理</span>
+                            <div id="feature-ucx-v122" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>UCX v1.22.0 核心特性设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>下一代 AI 超级计算机（如 Vera Rubin）需要新的网络拓扑和内存架构支持，同时大规模训练的 fault-tolerance 需求日益增长。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>Vera 系统支持包括 4-rail 标准配置和 relaxed ordering 原生支持。SGL (Single Get/List) datatype 支持异步 PUT 任务（ucp_get_nbx），减少大消息传输的 CPU 开销。Fault-tolerance recovery foundation 在 UCP 层添加恢复基础，为上层 MPI/NCCL 提供容错能力。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>Vera Rubin 超级计算机系统、需要容错的大规模训练集群（10K+ GPU）、高性能 MPI 应用。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">SGL Datatype for ucp_get_nbx</strong> (#11734) — 添加 SGL datatype 支持异步 PUT</span><a class="ref-link green" href="https://github.com/openucx/ucx/pull/11734" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>CUDA IPC Base Address 修复</strong> (#11746) — 修复 cuIpcGetMemHandle 使用 base address</span><a class="ref-link" href="https://github.com/openucx/ucx/pull/11746" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>GDAKI IB HCA 过滤</strong> (#11727) — 仅包含可用的 IB HCAs 在 GDA matrix 中</span><a class="ref-link" href="https://github.com/openucx/ucx/pull/11727" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>ROCm Async Copy Signal 修复</strong> (#11743) — 传播异步 copy signal 失败</span><a class="ref-link" href="https://github.com/openucx/ucx/pull/11743" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Dmabuf Memory Map 参数</strong> (#11723) — 添加显式 dmabuf memory map 参数</span><a class="ref-link" href="https://github.com/openucx/ucx/pull/11723" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                        </ul>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <a class="ref-link" href="https://github.com/openucx/ucx/pulls" target="_blank"><i class="fab fa-github"></i>All PRs</a>
+                            <a class="ref-link" href="https://github.com/openucx/ucx/releases" target="_blank"><i class="fas fa-tag"></i>Releases</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RCCL -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-other px-3 py-1 rounded text-xs text-white">RCCL</span> AMD 集合通信库 (ROCm)</h2>
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-red-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('rccl-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-rccl-w32"></i><h3 class="font-semibold text-white">迁入 rocm-systems + 9 PRs: gfx1250 + AINIC CTS</h3></div>
+                        <span class="text-xs bg-red-700 px-2 py-1 rounded">2026-08-07~10</span>
+                    </div>
+                    <div id="rccl-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">RCCL 已迁入 <strong class="text-red-400">ROCm/rocm-systems</strong> 超级仓库，本周 <strong>9 个活跃 PRs</strong>：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">gfx1250 Unroll 修复</strong> (#9899) — 限制 unroll 8/16/32 到 gfx1250 防止其他架构崩溃</span><a class="ref-link green" href="https://github.com/ROCm/rocm-systems/pull/9899" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-amber-400 mt-1 flex-shrink-0"></i><span><strong>AINIC CTS 内存优化</strong> (#9887) — 修复 AI NIC inline data path 正确性和内存优化</span><a class="ref-link orange" href="https://github.com/ROCm/rocm-systems/pull/9887" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('rccl-ainic')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-rccl-ainic"></i>设计原理</span>
+                            <div id="feature-rccl-ainic" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>AINIC CTS Inline Data Path 设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>AMD 的 AI NIC (AINIC) 使用 CTS (Collective Transport Service) 进行集合通信加速。Inline data path 允许小消息直接在 NIC 上处理而不需要 GPU kernel 参与，但当前实现存在正确性问题和内存浪费。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>修复 inline data path 的边界条件处理，优化内存分配策略以减少 buffer 拷贝。对于小消息（< 64 bytes），直接在 NIC 的 SRAM 中完成 reduce 操作；对于大消息，使用 DMA 引擎传输到 NIC 的 DDR 进行处理。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>配备 AMD AI NIC 的 ROCm 集群，需要低延迟的小消息集合通信（如 AllReduce 的 gradient 同步）。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Accl-Profiler Plugin</strong> (#9882, Draft) — 添加集合通信计时分解插件</span><a class="ref-link" href="https://github.com/ROCm/rocm-systems/pull/9882" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>GIN Flush QP 修复</strong> (#9884) — 设置 isRMA after listen() 以启用 flush QP 创建</span><a class="ref-link" href="https://github.com/ROCm/rocm-systems/pull/9884" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>CE AllReduce Bias Buffer 修复</strong> (#9898) — 存在 bias buffer 时跳过 CE AllReduce 路径</span><a class="ref-link" href="https://github.com/ROCm/rocm-systems/pull/9898" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                        </ul>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <a class="ref-link red" href="https://github.com/ROCm/rocm-systems" target="_blank"><i class="fab fa-github"></i>rocm-systems</a>
+                            <a class="ref-link red" href="https://github.com/ROCm/rccl" target="_blank"><i class="fas fa-archive"></i>Old RCCL (retired)</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NIXL -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-other px-3 py-1 rounded text-xs text-white">NIXL</span> AI Dynamo 通信库</h2>
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-green-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('nixl-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-nixl-w32"></i><h3 class="font-semibold text-white">v1.3.2 发布 + 15 PRs: Rust Bindings + GPUNetIO/DOCA 3.1</h3></div>
+                        <span class="text-xs bg-green-700 px-2 py-1 rounded">2026-08-03~10</span>
+                    </div>
+                    <div id="nixl-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">NIXL <strong class="text-green-400">v1.3.2 修复 EFA hang</strong>，本周 <strong>15+ PRs 高度活跃</strong>：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-tag text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">v1.3.2 EFA Hang 修复</strong> — 修复 FI_MORE batching 导致的跨节点 EFA hang，实现 per-rail flush 策略</span><a class="ref-link green" href="https://github.com/ai-dynamo/nixl/releases/tag/v1.3.2" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('nixl-efa-fix')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-nixl-efa-fix"></i>设计原理</span>
+                            <div id="feature-nixl-efa-fix" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NIXL EFA Hang 修复设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>NIXL 使用 libfabric 的 FI_MORE batching 机制将多个小消息合并为一次提交，减少内核调用开销。但在某些网络 provider（特别是 EFA）上，batch 未正确关闭导致跨节点传输 hang。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>实现 per-rail flush 策略：每个 NIC rail 独立管理 FI_MORE batch，在 batch 关闭时确保该 rail 上所有 pending 操作被 flush。这保持了 batching 的吞吐优势，同时保证每个 rail 的 batch 正确关闭。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>使用 AWS EFA 或类似 fabric 的跨节点训练，需要可靠的大批量小消息传输。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Rust Bindings 扩展</strong> (#2060) — 添加 prepMemView/releaseMemView 到 C API 和 nixl-sys</span><a class="ref-link" href="https://github.com/ai-dynamo/nixl/pull/2060" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong>GPUNetIO Bonded RoCE + DOCA 3.1</strong> (#2052) — 支持 bonded RoCE 接口和 DOCA 3.1</span><a class="ref-link green" href="https://github.com/ai-dynamo/nixl/pull/2052" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>UCX Plugin: 单连接 per handle</strong> (#2040, 已合并) — 每个 handle 使用单个 UCX 连接</span><a class="ref-link green" href="https://github.com/ai-dynamo/nixl/pull/2040" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Libfabric Tracing via NVTX</strong> (#2038) — 通过 NVTX backend 添加 libfabric tracing</span><a class="ref-link" href="https://github.com/ai-dynamo/nixl/pull/2038" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong>Libfabric Handshake + Per-Rail Flush</strong> (#2035, #2034, 已合并) — 添加握手阶段 + per-rail FI_MORE flush</span><a class="ref-link green" href="https://github.com/ai-dynamo/nixl/pull/2035" target="_blank"><i class="fas fa-external-link-alt"></i>PR1</a><a class="ref-link green" href="https://github.com/ai-dynamo/nixl/pull/2034" target="_blank"><i class="fas fa-external-link-alt"></i>PR2</a></div></li>
+                        </ul>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <a class="ref-link" href="https://github.com/ai-dynamo/nixl/pulls" target="_blank"><i class="fab fa-github"></i>All PRs</a>
+                            <a class="ref-link" href="https://github.com/ai-dynamo/nixl/releases" target="_blank"><i class="fas fa-tag"></i>Releases</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PyTorch c10d -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-other px-3 py-1 rounded text-xs text-white">torchcomms</span> PyTorch c10d / Distributed</h2>
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-500 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('c10d-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-c10d-w32"></i><h3 class="font-semibold text-white">14+ Commits: NCCL2 后端大重构 + Symmetric Memory Multicast</h3></div>
+                        <span class="text-xs bg-blue-700 px-2 py-1 rounded">2026-08-05~09</span>
+                    </div>
+                    <div id="c10d-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">PyTorch c10d 本周 <strong class="text-blue-400">14+ commits 高度活跃</strong>，聚焦 NCCL2 后端重构和 symmetric memory 增强：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">NCCL2 Nonblocking Communicator Creation</strong> — 完成非阻塞 communicator 创建</span><a class="ref-link green" href="https://github.com/pytorch/pytorch/pull/192273" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('c10d-nonblock')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-c10d-nonblock"></i>设计原理</span>
+                            <div id="feature-c10d-nonblock" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>NCCL2 Nonblocking Communicator 设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>PyTorch c10d 的 NCCL communicator 创建是阻塞操作，需要所有 rank 同步完成初始化。在弹性训练或动态 subgroup 创建场景中，阻塞初始化会导致性能瓶颈。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>将 communicator 创建改为非阻塞模式：init 阶段只分配本地资源，实际的 NCCL communicator 在首次使用时 lazy-init。使用 split_from 语义支持 eager new_group 创建，允许部分 rank 先开始初始化。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>弹性训练（rank 动态加入/离开）、MoE 训练中动态创建 expert group communicator。</div>
+                                </div>
+                            </div>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">Symmetric Memory Multicast</strong> — 路由 multicast setup 通过 PG rendezvous、rank 0 self-import multicast handle</span><a class="ref-link green" href="https://github.com/pytorch/pytorch/pull/192623" target="_blank"><i class="fas fa-external-link-alt"></i>PR1</a><a class="ref-link green" href="https://github.com/pytorch/pytorch/pull/192530" target="_blank"><i class="fas fa-external-link-alt"></i>PR2</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>NCCL2 Window Puts Rank-Local</strong> — 使 nccl2 window puts rank-local 和 bounds-safe</span><a class="ref-link" href="https://github.com/pytorch/pytorch/pull/192278" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>NCCL2 Reconfigure Failures</strong> — 使 reconfigure failures rank-consistent 和可重试</span><a class="ref-link" href="https://github.com/pytorch/pytorch/pull/192275" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>NCCL Environment Controls</strong> — 遵守已建立的 NCCL 环境控制</span><a class="ref-link" href="https://github.com/pytorch/pytorch/pull/192280" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-code-commit text-blue-400 mt-1 flex-shrink-0"></i><span><strong>Flight Recorder</strong> — 为不支持原生 flight recorder 的后端添加支持</span><a class="ref-link" href="https://github.com/pytorch/pytorch/pull/192233" target="_blank"><i class="fas fa-external-link-alt"></i>PR</a></div></li>
+                        </ul>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <a class="ref-link" href="https://github.com/pytorch/pytorch/commits/main/torch/csrc/distributed" target="_blank"><i class="fab fa-github"></i>c10d Commits</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OneCCL -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-other px-3 py-1 rounded text-xs text-white">OneCCL</span> Intel 集合通信库</h2>
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-blue-400 mb-4">
+                    <div class="flex justify-between items-start mb-2 cursor-pointer" onclick="toggleDetail('oneccl-w32')">
+                        <div class="flex items-center gap-2"><i class="fas fa-chevron-down expand-icon text-slate-400" id="icon-oneccl-w32"></i><h3 class="font-semibold text-white">v2022.1.0 已发布 + 本周无新 PR</h3></div>
+                        <span class="text-xs bg-blue-600 px-2 py-1 rounded">2026-07-22 | Release</span>
+                    </div>
+                    <div id="oneccl-w32" class="detail-section mt-3">
+                        <p class="text-sm text-slate-300">OneCCL <strong class="text-blue-400">v2022.1.0</strong>（7月22日）已发布，本周无新 PR：</p>
+                        <ul class="text-sm text-slate-300 space-y-2 mt-2">
+                            <li class="flex flex-col gap-1"><div class="feature-row"><i class="fas fa-tag text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-400">v2022.1.0</strong>: 修复 alltoall 无效内存访问、GPU_RDMA for pt2pt、Battlemage custom reductions、custom pre-operations for allreduce/reduce-scatter</span><a class="ref-link green" href="https://github.com/oneapi-src/oneCCL/releases" target="_blank"><i class="fas fa-external-link-alt"></i>Release</a></div></li>
+                            <span class="feature-expand-btn text-xs text-purple-400 ml-2 cursor-pointer" onclick="toggleFeatureDetail('oneccl-2022')"><i class="fas fa-chevron-right feature-expand-icon" id="icon-feature-oneccl-2022"></i>设计原理</span>
+                            <div id="feature-oneccl-2022" class="hidden feature-detail mt-2 ml-8 p-4 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                                <h5 class="text-sm font-medium text-purple-300 mb-3"><i class="fas fa-cogs mr-2"></i>OneCCL 2022.1.0 GPU_RDMA 设计原理</h5>
+                                <div class="space-y-3 text-sm text-slate-400">
+                                    <div><strong class="text-slate-300">核心问题：</strong>OneCCL 的 point-to-point 操作之前只支持 CPU buffer，GPU 数据需要先拷贝到 CPU 再发送，增加了延迟和 CPU 开销。</div>
+                                    <div><strong class="text-slate-300">设计原理：</strong>添加 GPU_RDMA 支持，允许 GPU buffer 直接通过 RDMA 发送，绕过 CPU staging buffer。这利用 GPU Direct RDMA 技术，将 GPU 内存直接暴露给 NIC，减少一次 CPU-GPU 内存拷贝。</div>
+                                    <div><strong class="text-slate-300">适用场景：</strong>Intel GPU (Data Center GPU Max系列) 配合 Intel E810/E830 NIC 的 RDMA 环境。</div>
+                                </div>
+                            </div>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gloo -->
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span class="badge-other px-3 py-1 rounded text-xs text-white">Gloo</span> Meta 通信库</h2>
+                <div class="update-card glass-card rounded-lg p-5 border-l-4 border-slate-500 mb-4">
+                    <h3 class="font-semibold text-white"><i class="fas fa-pause-circle text-slate-400 mr-2"></i>本周无重大更新 — 维护模式</h3>
+                    <p class="text-sm text-slate-400 mt-2">Gloo 已于 2026年6月正式进入维护模式（<a class="ref-link" href="https://github.com/facebookincubator/gloo/pull/510" target="_blank"><i class="fas fa-external-link-alt"></i>PR #510</a>），无新功能开发。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Comparison Tab ==================== -->
+        <section id="content-comparison" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-balance-scale text-blue-400"></i> 技术对比表</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="text-left py-3 px-4 text-slate-300">特性</th>
+                                <th class="text-center py-3 px-4"><span class="badge-nccl px-2 py-0.5 rounded text-xs text-white">NCCL</span></th>
+                                <th class="text-center py-3 px-4"><span class="badge-deepep px-2 py-0.5 rounded text-xs text-white">DeepEP</span></th>
+                                <th class="text-center py-3 px-4"><span class="badge-nvshmem px-2 py-0.5 rounded text-xs text-white">NVSHMEM</span></th>
+                                <th class="text-center py-3 px-4"><span class="badge-other px-2 py-0.5 rounded text-xs text-white">UCX</span></th>
+                                <th class="text-center py-3 px-4"><span class="badge-other px-2 py-0.5 rounded text-xs text-white">RCCL</span></th>
+                                <th class="text-center py-3 px-4"><span class="badge-other px-2 py-0.5 rounded text-xs text-white">NIXL</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-400">
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">最新版本</td>
+                                <td class="text-center py-3 px-4">v2.30.7-1</td>
+                                <td class="text-center py-3 px-4">v1.2.1 (main: V2)</td>
+                                <td class="text-center py-3 px-4">v3.7.2</td>
+                                <td class="text-center py-3 px-4">v1.22.0</td>
+                                <td class="text-center py-3 px-4">therock-7.14</td>
+                                <td class="text-center py-3 px-4">v1.3.2</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">GPU-Initiated 通信</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> GIN</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> V2 NCCL GIN</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> IBGDA</td>
+                                <td class="text-center py-3 px-4 text-yellow-400"><i class="fas fa-minus"></i> 部分</td>
+                                <td class="text-center py-3 px-4 text-yellow-400"><i class="fas fa-minus"></i> 部分</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> GPUNetIO</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">MoE/EP 优化</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> EP 原语</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-star"></i> 核心定位</td>
+                                <td class="text-center py-3 px-4 text-yellow-400"><i class="fas fa-minus"></i> 底层支持</td>
+                                <td class="text-center py-3 px-4 text-red-400"><i class="fas fa-times"></i></td>
+                                <td class="text-center py-3 px-4 text-yellow-400"><i class="fas fa-minus"></i> 基础</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> EP 支持</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Symmetric Memory</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i></td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i></td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-star"></i> 核心定位</td>
+                                <td class="text-center py-3 px-4 text-yellow-400"><i class="fas fa-minus"></i> 部分</td>
+                                <td class="text-center py-3 px-4 text-red-400"><i class="fas fa-times"></i></td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i></td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Blackwell 支持</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> SM100</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> SM100+</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> B200/GB200</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i></td>
+                                <td class="text-center py-3 px-4 text-yellow-400"><i class="fas fa-minus"></i> gfx950</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i></td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Rust Bindings</td>
+                                <td class="text-center py-3 px-4 text-yellow-400"><i class="fas fa-clock"></i> 规划中</td>
+                                <td class="text-center py-3 px-4 text-red-400"><i class="fas fa-times"></i></td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> contrib</td>
+                                <td class="text-center py-3 px-4 text-red-400"><i class="fas fa-times"></i></td>
+                                <td class="text-center py-3 px-4 text-red-400"><i class="fas fa-times"></i></td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> nixl-sys</td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">Python Bindings</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> nccl4py</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i></td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> nvshmem4py</td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i> JUCX</td>
+                                <td class="text-center py-3 px-4 text-red-400"><i class="fas fa-times"></i></td>
+                                <td class="text-center py-3 px-4 text-green-400"><i class="fas fa-check"></i></td>
+                            </tr>
+                            <tr class="border-b border-slate-700 table-row-hover">
+                                <td class="py-3 px-4 text-slate-300 font-medium">本周活跃度</td>
+                                <td class="text-center py-3 px-4 text-purple-400 font-bold">中</td>
+                                <td class="text-center py-3 px-4 text-cyan-400 font-bold">高</td>
+                                <td class="text-center py-3 px-4 text-amber-400 font-bold">中</td>
+                                <td class="text-center py-3 px-4 text-green-400 font-bold">极高</td>
+                                <td class="text-center py-3 px-4 text-red-400 font-bold">高</td>
+                                <td class="text-center py-3 px-4 text-green-400 font-bold">极高</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Trends Tab ==================== -->
+        <section id="content-trends" class="hidden space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i> 趋势展望</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h3 class="font-medium text-green-300 flex items-center gap-2"><i class="fas fa-calendar-week"></i> 短期趋势 (1-3个月)</h3>
+                        <ul class="text-sm text-slate-400 space-y-3">
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-300">NCCL 2.31 开发加速</strong>: Compute Fabric Transport 和 cost-model 重构将是核心，预计秋季发布。NCCL EP/M2N 迁移到独立仓库后将有更快的迭代节奏。</span></li>
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-cyan-400 mt-1 flex-shrink-0"></i><span><strong class="text-cyan-300">DeepEP HybridEP 成熟</strong>: HybridEP dense top-k routing 和 NVSHMEM 3.7 适配完成后，HybridEP 将成为生产级 MoE 通信后端。</span></li>
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-300">NVSHMEM CFT + Batched RMA</strong>: Q3 Roadmap 的 CFT 完成和 Batched RMA 将显著提升 GPU-initiated 通信效率。</span></li>
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-blue-400 mt-1 flex-shrink-0"></i><span><strong class="text-blue-300">UCX v1.22.x 稳定化</strong>: v1.22.0 正式发布后，将进入 bug-fix 周期，Vera 系统支持将逐步完善。</span></li>
+                        </ul>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="font-medium text-purple-300 flex items-center gap-2"><i class="fas fa-telescope"></i> 中期趋势 (3-12个月)</h3>
+                        <ul class="text-sm text-slate-400 space-y-3">
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-purple-400 mt-1 flex-shrink-0"></i><span><strong class="text-purple-300">Rubin 架构支持</strong>: NCCL 和 NVSHMEM 都将支持 NVIDIA Rubin 架构，带来新的通信原语和性能优化。</span></li>
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-green-400 mt-1 flex-shrink-0"></i><span><strong class="text-green-300">统一 EP 通信 API</strong>: NCCL EP 论文承认 DeepEP 为 SOTA，未来可能形成统一的 EP 通信 API 标准，减少碎片化。</span></li>
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-amber-400 mt-1 flex-shrink-0"></i><span><strong class="text-amber-300">Rust 生态扩展</strong>: NVSHMEM 和 NIXL 都已添加 Rust bindings，NCCL 也在规划中。Rust 在高性能通信库中的地位将提升。</span></li>
+                            <li class="flex gap-2"><i class="fas fa-arrow-right text-red-400 mt-1 flex-shrink-0"></i><span><strong class="text-red-300">AMD RCCL 重组后加速</strong>: RCCL 迁入 rocm-systems 后开发活跃度显著提升，gfx1250 和 AINIC 支持将缩小与 NCCL 的差距。</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weekly Observation -->
+            <div class="glass-card rounded-xl p-6 border-l-4 border-blue-500">
+                <h2 class="text-lg font-semibold mb-3 flex items-center gap-2"><i class="fas fa-eye text-blue-400"></i> 本周观察</h2>
+                <p class="text-sm text-slate-300 leading-relaxed">本周通信库生态呈现<strong class="text-blue-400">「NVIDIA 三驾马车 + 多极化竞争」</strong>格局：NCCL 2.31 开发中推进 Device API 统一和 Rubin 支持，EP/M2N 迁移到独立仓库标志着 MoE 通信原语走向成熟独立；DeepEP V2 架构全面拥抱 NCCL GIN 后端，NVSHMEM 3.7 适配完成；UCX v1.22.0 正式发布带来 Vera 系统支持和 fault-tolerance 基础；RCCL 迁入 rocm-systems 后活跃度飙升，NIXL 在 Rust bindings 和 GPUNetIO 方向持续发力。整体趋势是<strong class="text-green-400">GPU-initiated 通信成为标配，Rust 生态加速渗透，MoE 通信原语走向标准化</strong>。</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="glass-card border-t border-slate-700 py-4">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            <p>通信库竞品动态周报 | 数据来源: GitHub, NVIDIA Developer, arXiv, 官方文档 | 生成时间: 2026-08-10</p>
+            <p class="mt-1">所有信息基于公开可验证来源，如有遗漏或错误请反馈</p>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            const tabs = ['overview', 'nccl', 'deepep', 'nvshmem', 'others', 'comparison', 'trends'];
+            tabs.forEach(t => {
+                document.getElementById('content-' + t).classList.add('hidden');
+                document.getElementById('tab-' + t).classList.remove('tab-active');
+                document.getElementById('tab-' + t).classList.add('tab-inactive');
+            });
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            document.getElementById('tab-' + tabName).classList.remove('tab-inactive');
+            document.getElementById('tab-' + tabName).classList.add('tab-active');
+        }
+
+        function toggleDetail(detailId) {
+            const el = document.getElementById(detailId);
+            const icon = document.getElementById('icon-' + detailId);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                icon.classList.add('expanded');
+            } else {
+                el.classList.add('hidden');
+                icon.classList.remove('expanded');
+            }
+        }
+
+        function toggleFeatureDetail(featureId) {
+            const el = document.getElementById('feature-' + featureId);
+            const icon = document.getElementById('icon-feature-' + featureId);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                icon.classList.add('expanded');
+            } else {
+                el.classList.add('hidden');
+                icon.classList.remove('expanded');
+            }
+        }
+
+        // Activity Chart
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['NCCL', 'DeepEP', 'NVSHMEM', 'UCX', 'RCCL', 'NIXL', 'c10d', 'OneCCL', 'Gloo'],
+                datasets: [{
+                    label: 'PRs/Commits 数量',
+                    data: [15, 9, 35, 25, 9, 15, 14, 0, 0],
+                    backgroundColor: [
+                        'rgba(124, 58, 237, 0.7)',
+                        'rgba(6, 182, 212, 0.7)',
+                        'rgba(245, 158, 11, 0.7)',
+                        'rgba(59, 130, 246, 0.7)',
+                        'rgba(239, 68, 68, 0.7)',
+                        'rgba(16, 185, 129, 0.7)',
+                        'rgba(99, 102, 241, 0.7)',
+                        'rgba(107, 114, 128, 0.7)',
+                        'rgba(75, 85, 99, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(124, 58, 237, 1)',
+                        'rgba(6, 182, 212, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(59, 130, 246, 1)',
+                        'rgba(239, 68, 68, 1)',
+                        'rgba(16, 185, 129, 1)',
+                        'rgba(99, 102, 241, 1)',
+                        'rgba(107, 114, 128, 1)',
+                        'rgba(75, 85, 99, 1)'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleColor: '#e2e8f0',
+                        bodyColor: '#94a3b8',
+                        borderColor: 'rgba(148, 163, 184, 0.2)',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8' }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

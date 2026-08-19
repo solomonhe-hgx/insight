@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA Open GPU Kernel 周报 - 2026-W33</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .tab-active { background: linear-gradient(135deg, #76b900 0%, #5a8f00 100%); color: white; box-shadow: 0 4px 15px rgba(118, 185, 0, 0.3); }
+        .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); color: #e2e8f0; }
+        .module-card { transition: all 0.3s ease; }
+        .module-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .badge-nvidia { background: linear-gradient(135deg, #76b900 0%, #5a8f00 100%); }
+        .badge-nvlink { background: linear-gradient(135deg, #76b900 0%, #5a8f00 100%); }
+        .badge-nvswitch { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .badge-c2c { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .badge-mmu { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .badge-uvm { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .badge-rubin { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .badge-blackwell { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .metric-card { background: linear-gradient(135deg, rgba(118, 185, 0, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); }
+        .trend-arrow { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .table-row-hover:hover { background: rgba(118, 185, 0, 0.1); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; }
+        .ref-link:hover { color: #93c5fd; border-bottom-style: solid; }
+        .detail-section { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .code-ref { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: rgba(118, 185, 0, 0.1); padding: 2px 6px; border-radius: 4px; color: #76b900; }
+    </style>
+</head>
+<body class="text-slate-200">
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">NVIDIA Open GPU Kernel 周报</h1>
+                        <p class="text-xs text-slate-400">NVLink / NVSwitch / NVLink-C2C / MMU | 2026年8月 W33</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-slate-300">报告日期</div>
+                        <div class="text-xs text-slate-400">2026-08-19</div>
+                    </div>
+                    <div class="metric-card px-4 py-2 rounded-lg">
+                        <div class="text-2xl font-bold text-green-400">610.57.05</div>
+                        <div class="text-xs text-slate-400">最新 Release</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('nvlink')" id="tab-nvlink" class="tab-active px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-link"></i> NVLink
+            </button>
+            <button onclick="showTab('nvswitch')" id="tab-nvswitch" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-network-wired"></i> NVSwitch
+            </button>
+            <button onclick="showTab('nvlink-c2c')" id="tab-nvlink-c2c" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-microchip"></i> NVLink C2C
+            </button>
+            <button onclick="showTab('mmu')" id="tab-mmu" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-memory"></i> MMU/UVM
+            </button>
+            <button onclick="showTab('community')" id="tab-community" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-comments"></i> 社区反馈
+            </button>
+            <button onclick="showTab('comparison')" id="tab-comparison" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-balance-scale"></i> 技术对比
+            </button>
+            <button onclick="showTab('trends')" id="tab-trends" class="tab-inactive px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                <i class="fas fa-chart-line"></i> 趋势展望
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+
+        <!-- ==================== NVLink Section ==================== -->
+        <section id="content-nvlink" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-tag text-green-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">最新 Release</div>
+                    </div>
+                    <div class="text-3xl font-bold text-green-400">610.57.05</div>
+                    <div class="text-xs text-slate-500 mt-1">2026-08-16 发布</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code-branch text-blue-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">本周 Commits</div>
+                    </div>
+                    <div class="text-3xl font-bold text-blue-400">22</div>
+                    <div class="text-xs text-slate-500 mt-1">自 2026-08-12 以来</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-exclamation-triangle text-amber-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">Open Issues</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">1,149</div>
+                    <div class="text-xs text-slate-500 mt-1">GitHub 仓库</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code-pull-request text-purple-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">本周 Merged PRs</div>
+                    </div>
+                    <div class="text-3xl font-bold text-purple-400">1</div>
+                    <div class="text-xs text-slate-500 mt-1">Documentation 修复</div>
+                </div>
+            </div>
+
+            <!-- NVLink Release Update -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-green-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvlink text-white text-xs px-2 py-1 rounded-full">NVLink</span>
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">Release</span>
+                    <span class="text-xs text-slate-400">2026-08-16</span>
+                </div>
+                <h3 class="font-medium text-green-300 mb-2">open-gpu-kernel-modules 610.57.05 发布</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>NVIDIA 于 8 月 16 日发布 <strong class="text-green-400">610.57.05</strong> 版本，为当前最新 stable 分支。此版本包含文档修复，修复了 README.md 中遗留的 570.xx 版本号引用。610 分支延续了对 Blackwell 架构 GPU 的全面支持。</p>
+                    <p>同期发布的还有 Vulkan Beta 驱动 <strong class="text-blue-400">595.44.16</strong>（8 月 17 日），以及 legacy 分支更新 <strong class="text-amber-400">580.178.05</strong>（8 月 16 日）。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/610.57.05" class="ref-link" target="_blank">GitHub Release 610.57.05</a> |
+                    <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases" class="ref-link" target="_blank">All Releases</a>
+                </div>
+            </div>
+
+            <!-- NVLink Commit Activity -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-green-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvlink text-white text-xs px-2 py-1 rounded-full">NVLink</span>
+                    <span class="text-xs text-slate-400">2026-08-12 ~ 08-19</span>
+                </div>
+                <h3 class="font-medium text-green-300 mb-2">本周 Commit 活动分析</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>本周共 22 个 commits 推送至 main 分支，主要集中在以下方面：</p>
+                    <p><strong class="text-green-400">文档维护：</strong>修复 README.md 中遗留版本号引用（<code class="code-ref">570.xx → 610.xx</code>），确保文档与实际 release 分支一致。</p>
+                    <p><strong class="text-blue-400">Bug 修复：</strong>多个 commits 包含 "Bug fixes" 消息，对应 610.57.05 和 580.178.05 的发布。具体修复内容未公开详细 changelog，但从 issue tracker 推断涉及内存管理和显示输出。</p>
+                    <p><strong class="text-amber-400">Release 分支同步：</strong>610、595、580 三个分支同步更新，确保各 driver branch 的代码一致性。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/commits/main" class="ref-link" target="_blank">Commits on main</a> |
+                    <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/compare/610.57.04...610.57.05" class="ref-link" target="_blank">610.57.04 → 610.57.05 Compare</a>
+                </div>
+            </div>
+
+            <!-- NVLink Fusion -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-green-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvlink text-white text-xs px-2 py-1 rounded-full">NVLink</span>
+                    <span class="badge-blackwell text-white text-xs px-2 py-1 rounded-full">Ecosystem</span>
+                    <span class="text-xs text-slate-400">2026-08</span>
+                </div>
+                <h3 class="font-medium text-green-300 mb-2">NVLink Fusion：开放定制硅集成</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>NVIDIA 宣布开放 <strong class="text-green-400">NVLink Fusion</strong> 计划，允许第三方合作伙伴将定制 CPU 通过 NVLink 互连连接到 NVIDIA GPU。这标志着 NVIDIA 从完全封闭的互连生态向半开放模式转变。</p>
+                    <p>此举被视为对 <strong class="text-blue-400">UALink 联盟</strong>（AMD、Intel 等主导）的竞争回应。UALink 2.0 规范已于 2026 年 4 月发布，提供每通道 200 Gbps 带宽，支持 in-network compute。NVIDIA NVLink 当前提供 1.8 TB/s 双向带宽/GPU，在性能和生态成熟度上仍领先。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://nvidianews.nvidia.com/news/nvidia-opens-nvlink-for-custom-silicon-integration" class="ref-link" target="_blank">NVIDIA Newsroom</a> |
+                    <a href="https://www.spheron.network/blog/ualink-vs-nvlink-open-gpu-interconnect-2026/" class="ref-link" target="_blank">UALink vs NVLink 对比分析</a>
+                </div>
+            </div>
+
+            <!-- nvidia-smi 66-day bug -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-amber-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvlink text-white text-xs px-2 py-1 rounded-full">NVLink</span>
+                    <span class="badge-mmu text-white text-xs px-2 py-1 rounded-full">Bug</span>
+                    <span class="text-xs text-slate-400">持续跟踪</span>
+                </div>
+                <h3 class="font-medium text-amber-300 mb-2">nvidia-smi 66 天溢出 Bug 持续影响</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>此前发现的 <code class="code-ref">uint32_t</code> 溢出 bug 仍在持续讨论中。该 bug 影响 NVLink topology 发现代码，在 B200 硬件上，当 <code class="code-ref">nvidia-persistenced</code> 运行超过 ~66 天（750Hz 计数器溢出）后，nvidia-smi 会挂起。</p>
+                    <p>临时解决方案：每 48 小时重启 <code class="code-ref">nvidia-persistenced</code> 守护进程。此 bug 被类比为经典的 Windows "49.7 天 bug"。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/971" class="ref-link" target="_blank">GitHub Issue #971</a> |
+                    <a href="https://news.ycombinator.com/item?id=46750425" class="ref-link" target="_blank">HN 讨论</a> |
+                    <a href="https://ubos.tech/news/nvidia-open-gpu-kernel-modules-issue-971-nvidia%E2%80%91smi-hang-after-66-days-analysis-workarounds/" class="ref-link" target="_blank">分析文章</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== NVSwitch Section ==================== -->
+        <section id="content-nvswitch" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-exclamation-circle text-blue-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">社区报告问题</div>
+                    </div>
+                    <div class="text-3xl font-bold text-blue-400">2</div>
+                    <div class="text-xs text-slate-500 mt-1">H200 NVLink / NVSwitch</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-server text-amber-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">影响平台</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">H200</div>
+                    <div class="text-xs text-slate-500 mt-1">Dell Server / ESXi</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-bug text-red-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">严重程度</div>
+                    </div>
+                    <div class="text-3xl font-bold text-red-400">High</div>
+                    <div class="text-xs text-slate-500 mt-1">生产环境部署受阻</div>
+                </div>
+            </div>
+
+            <!-- H200 NVLink Detection Issue -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-blue-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvswitch text-white text-xs px-2 py-1 rounded-full">NVSwitch</span>
+                    <span class="badge-blackwell text-white text-xs px-2 py-1 rounded-full">H200</span>
+                    <span class="text-xs text-slate-400">2026-08-11</span>
+                </div>
+                <h3 class="font-medium text-blue-300 mb-2">H200 NVL NVLink 连接检测失败</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>用户报告 4-GPU H200 NVL 阵列无法检测到 NVLink 连接，尽管已尝试以下操作：BIOS 设置调整、<code class="code-ref">FABRIC_MODE=1</code> 参数配置、driver sync、物理桥接器更换。</p>
+                    <p>NVIDIA 工作人员回复称物理桥接器属于"较旧技术"，通常对基于软件的协作不是必需的。此问题仍在排查中。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://forums.developer.nvidia.com/t/h200-nvl-nvlink-not-detected/379811" class="ref-link" target="_blank">NVIDIA Forums - H200 NVLink Not Detected</a>
+                </div>
+            </div>
+
+            <!-- NVSwitch Passthrough VM Issue -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-blue-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvswitch text-white text-xs px-2 py-1 rounded-full">NVSwitch</span>
+                    <span class="badge-uvm text-white text-xs px-2 py-1 rounded-full">Virtualization</span>
+                    <span class="text-xs text-slate-400">2026-06 ~ 08</span>
+                </div>
+                <h3 class="font-medium text-blue-300 mb-2">NVSwitch 在 ESXi 虚拟化环境中无法工作</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>用户在 Dell R760xa 服务器上运行 H200 + ESXi 8.0，通过 PCIe passthrough 将 GPU 传递给 VM。NVSwitch 在裸机上正常工作，但在 VM 内报错 <code class="code-ref">Error 802: system not yet initialized</code>。</p>
+                    <p>此问题影响数据中心多租户场景下的 NVSwitch 部署。线程已被移至 networking/hardware 分类，暂无官方解决方案。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://forums.developer.nvidia.com/t/nvswitch-on-h200-passthrough/372334" class="ref-link" target="_blank">NVIDIA Forums - NVSwitch on H200 Passthrough</a>
+                </div>
+            </div>
+
+            <!-- NVSwitch Firmware in open-gpu-kernel-modules -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-blue-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvswitch text-white text-xs px-2 py-1 rounded-full">NVSwitch</span>
+                    <span class="text-xs text-slate-400">代码层面</span>
+                </div>
+                <h3 class="font-medium text-blue-300 mb-2">open-gpu-kernel-modules 中 NVSwitch 相关代码</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>NVSwitch 管理代码主要分布在以下路径：</p>
+                    <p><code class="code-ref">src/nvidia/src/kernel/gpu/nvswitch/</code> — NVSwitch 内核管理逻辑</p>
+                    <p><code class="code-ref">src/nvidia/src/kernel/gpu/bus/pci.c</code> — PCIe 总线枚举与 NVSwitch 设备发现</p>
+                    <p><code class="code-ref">kernel-open/nvidia/</code> — 开源内核模块中的 NVSwitch fabric 接口</p>
+                    <p>本周无 NVSwitch 特定代码变更提交，但 610 分支的持续 bug 修复可能包含 fabric 管理相关的隐含修复。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules" class="ref-link" target="_blank">open-gpu-kernel-modules Repository</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== NVLink C2C Section ==================== -->
+        <section id="content-nvlink-c2c" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-microchip text-purple-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">本周更新</div>
+                    </div>
+                    <div class="text-3xl font-bold text-purple-400">0</div>
+                    <div class="text-xs text-slate-500 mt-1">代码变更</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-newspaper text-cyan-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">生态动态</div>
+                    </div>
+                    <div class="text-3xl font-bold text-cyan-400">2</div>
+                    <div class="text-xs text-slate-500 mt-1">NVLink Fusion / UALink 2.0</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-database text-green-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">DGX Spark 状态</div>
+                    </div>
+                    <div class="text-3xl font-bold text-green-400">Resolved</div>
+                    <div class="text-xs text-slate-500 mt-1">GB10 支持问题已修复</div>
+                </div>
+            </div>
+
+            <!-- NVLink C2C Overview -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-purple-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-c2c text-white text-xs px-2 py-1 rounded-full">NVLink-C2C</span>
+                    <span class="text-xs text-slate-400">本周概述</span>
+                </div>
+                <h3 class="font-medium text-purple-300 mb-2">本周无重大代码变更，生态持续演进</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>本周 open-gpu-kernel-modules 仓库中无 NVLink-C2C 特定的代码提交。NVLink-C2C 作为 coherent chip-to-chip 互连，其核心实现主要位于 GSP firmware 和 NVIDIA 私有代码中，开源模块主要提供接口层支持。</p>
+                    <p>生态层面，NVLink Fusion 的推出和 UALink 2.0 的竞争格局值得持续关注。</p>
+                </div>
+            </div>
+
+            <!-- NVLink Fusion -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-purple-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-c2c text-white text-xs px-2 py-1 rounded-full">NVLink-C2C</span>
+                    <span class="badge-blackwell text-white text-xs px-2 py-1 rounded-full">NVLink Fusion</span>
+                    <span class="text-xs text-slate-400">2026-08</span>
+                </div>
+                <h3 class="font-medium text-purple-300 mb-2">NVLink Fusion 开放定制硅集成</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>NVIDIA 正式发布 NVLink Fusion，允许第三方芯片通过 NVLink-C2C 协议与 NVIDIA GPU 进行 coherent 互连。这标志着 NVIDIA 在保持 NVLink 核心控制权的同时，向更广泛的 chiplet 生态系统开放。</p>
+                    <p>此计划直接回应了 UALink 联盟的挑战。NVLink-C2C 当前提供 1.8 TB/s 双向带宽，支持自定义 chiplet 集成，适用于异构计算场景。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://nvidianews.nvidia.com/news/nvidia-opens-nvlink-for-custom-silicon-integration" class="ref-link" target="_blank">NVIDIA Newsroom</a> |
+                    <a href="https://www.nvidia.com/en-us/data-center/nvlink-c2c/" class="ref-link" target="_blank">NVLink-C2C 产品页</a>
+                </div>
+            </div>
+
+            <!-- DGX Spark GB10 Resolved -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-green-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-c2c text-white text-xs px-2 py-1 rounded-full">NVLink-C2C</span>
+                    <span class="badge-blackwell text-white text-xs px-2 py-1 rounded-full">DGX Spark</span>
+                    <span class="text-xs text-slate-400">已解决</span>
+                </div>
+                <h3 class="font-medium text-green-300 mb-2">DGX Spark GB10 支持问题通过 System Recovery 解决</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>此前有用户报告 DGX Spark 2026 在恢复出厂设置后出现 <code class="code-ref">NVIDIA-GB10 not supported</code> 错误。用户误装了 NVSwitch fabric 管理工具，导致驱动状态异常。</p>
+                    <p>NVIDIA 工作人员澄清 DGX Spark 不包含 NVSwitch，并通过 System Recovery 恢复了正确的 kernel/driver 状态。此案例凸显了 NVLink-C2C 平台（Grace-Blackwell）的驱动部署需要特别注意。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://forums.developer.nvidia.com/t/nvidia-gb10-not-supported-on-dgx-spark-2026-after-restore-driver-580-open-troubleshooting/367655" class="ref-link" target="_blank">NVIDIA Forums - DGX Spark GB10</a>
+                </div>
+            </div>
+
+            <!-- UALink vs NVLink-C2C -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-cyan-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-c2c text-white text-xs px-2 py-1 rounded-full">NVLink-C2C</span>
+                    <span class="badge-rubin text-white text-xs px-2 py-1 rounded-full">Competition</span>
+                    <span class="text-xs text-slate-400">2026-08</span>
+                </div>
+                <h3 class="font-medium text-cyan-300 mb-2">UALink 2.0 vs NVLink-C2C 竞争格局</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>UALink 联盟（AMD、Intel、Broadcom 等）发布 2.0 规范，新增 in-network compute/communication 能力，每通道 200 Gbps 带宽。AMD 声称其 UALink 实现支持 ~3.6 TB scale-up capacity/accelerator。</p>
+                    <p>NVIDIA 以 NVLink Fusion 回应，允许定制 CPU 通过 NVLink-C2C 连接。NVLink 在绝对带宽（1.8 TB/s/GPU）和生态成熟度上仍保持领先，但 UALink 作为开放标准正在获得更多行业支持。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://www.sdxcentral.com/news/ualink-consortium-takes-another-swing-at-nvidias-nvlink-supremacy-with-specification-20/" class="ref-link" target="_blank">SDxCentral - UALink 2.0</a> |
+                    <a href="https://www.spheron.network/blog/ualink-vs-nvlink-open-gpu-interconnect-2026/" class="ref-link" target="_blank">UALink vs NVLink 对比</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== MMU/UVM Section ==================== -->
+        <section id="content-mmu" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-memory text-amber-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">MMU 相关 Issues</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">3</div>
+                    <div class="text-xs text-slate-500 mt-1">本周新增/活跃</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-red-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">安全漏洞</div>
+                    </div>
+                    <div class="text-3xl font-bold text-red-400">1</div>
+                    <div class="text-xs text-slate-500 mt-1">UVM use-after-free</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-file-alt text-blue-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">Mesa NVK</div>
+                    </div>
+                    <div class="text-3xl font-bold text-blue-400">1</div>
+                    <div class="text-xs text-slate-500 mt-1">Large Page 暂时禁用</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-exchange-alt text-purple-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">MMU_NOTIFIER</div>
+                    </div>
+                    <div class="text-3xl font-bold text-purple-400">Open</div>
+                    <div class="text-xs text-slate-500 mt-1">开源 vs 闭源差异</div>
+                </div>
+            </div>
+
+            <!-- BAR1 VA Space Exhaustion -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-amber-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-mmu text-white text-xs px-2 py-1 rounded-full">MMU</span>
+                    <span class="badge-uvm text-white text-xs px-2 py-1 rounded-full">Memory</span>
+                    <span class="text-xs text-slate-400">2026-08-17</span>
+                </div>
+                <h3 class="font-medium text-amber-300 mb-2">BAR1 VA 空间耗尽导致 GPU 锁定</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>用户报告 BAR1 Virtual Address 空间耗尽，导致 GPU locks。此问题与 MMU 的 VA 空间管理直接相关，当 BAR1 的虚拟地址池被耗尽后，新的内存映射请求失败，触发 GPU 级别的锁定。</p>
+                    <p>相关代码路径：<code class="code-ref">kernel-open/nvidia-uvm/uvm_mmu.c</code> 中的 VA 空间分配逻辑，以及 <code class="code-ref">src/nvidia/src/kernel/gpu/mmu/</code> 中的 GMMU 页面表管理。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues" class="ref-link" target="_blank">GitHub Issues (Aug 10-17)</a>
+                </div>
+            </div>
+
+            <!-- nvidia-drm ENOMEM -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-amber-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-mmu text-white text-xs px-2 py-1 rounded-full">MMU</span>
+                    <span class="text-xs text-slate-400">2026-08-17</span>
+                </div>
+                <h3 class="font-medium text-amber-300 mb-2">多 GPU 环境下 nvidia-drm 返回误导性 -ENOMEM</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>在多 GPU 配置中，<code class="code-ref">nvidia-drm</code> 模块返回 <code class="code-ref">-ENOMEM</code> 错误，但实际原因并非内存不足。此误导性错误信息增加了调试难度，可能与 MMU 层面的地址空间分配失败有关。</p>
+                    <p>影响驱动版本：595.84 和 610.57.04。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues" class="ref-link" target="_blank">GitHub Issues (Aug 10-17)</a>
+                </div>
+            </div>
+
+            <!-- Quarkslab UVM use-after-free -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-red-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-uvm text-white text-xs px-2 py-1 rounded-full">UVM</span>
+                    <span class="badge-mmu text-white text-xs px-2 py-1 rounded-full">Security</span>
+                    <span class="text-xs text-slate-400">持续讨论</span>
+                </div>
+                <h3 class="font-medium text-red-300 mb-2">Quarkslab 发现 nvidia-uvm.ko use-after-free 漏洞</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>安全研究机构 Quarkslab 披露了 <code class="code-ref">nvidia.ko</code> 和 <code class="code-ref">nvidia-uvm.ko</code> 中的漏洞链：通过 <code class="code-ref">NV01_MEMORY_DEVICELESS</code> 分配触发空指针解引用，加上跳过的内存释放路径，最终实现 use-after-free 利用。</p>
+                    <p>这些 ioctl 对非特权用户开放，攻击者可利用此链实现本地提权。研究人员拒绝了 NVIDIA 延迟公布的请求，在标准 90 天窗口后公开了细节。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://news.ycombinator.com/item?id=45592585" class="ref-link" target="_blank">HN - UAF Exploiting Nvidia GPU</a>
+                </div>
+            </div>
+
+            <!-- Mesa NVK Large Page -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-blue-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-mmu text-white text-xs px-2 py-1 rounded-full">MMU</span>
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">Ecosystem</span>
+                    <span class="text-xs text-slate-400">2026-08</span>
+                </div>
+                <h3 class="font-medium text-blue-300 mb-2">Mesa NVK 驱动暂时禁用大页面支持</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>Mesa 的开源 Vulkan 驱动 NVK（面向 NVIDIA GPU）被迫暂时禁用大页面（large page size）支持。此问题与 MMU/页面表处理直接相关，可能涉及 NVIDIA GPU 的 MMU 在大页面粒度下的行为差异。</p>
+                    <p>此变更影响使用 NVK 驱动的应用程序性能，特别是在需要大量 VRAM 分配的场景中。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://www.phoronix.com/news/Mesa-Disable-NVK-Large-Page" class="ref-link" target="_blank">Phoronix - Mesa NVK Large Page</a>
+                </div>
+            </div>
+
+            <!-- MMU_NOTIFIER discrepancy -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-purple-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-mmu text-white text-xs px-2 py-1 rounded-full">MMU</span>
+                    <span class="text-xs text-slate-400">持续跟踪</span>
+                </div>
+                <h3 class="font-medium text-purple-300 mb-2">开源模块 MMU_NOTIFIER 依赖差异</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>开源内核模块要求 <code class="code-ref">MMU_NOTIFIER</code> 内核配置，而闭源模块不需要。这一差异自 R550 以来持续存在，影响使用自定义内核编译的发行版。</p>
+                    <p>相关代码：<code class="code-ref">kernel-open/nvidia-uvm/</code> 中的 Kconfig 和 Makefile 依赖声明。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://forums.developer.nvidia.com/t/550-open-source-requires-mmu-notifier-whereas-proprietary-does-not/302259" class="ref-link" target="_blank">NVIDIA Forums - MMU_NOTIFIER</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Community Feedback Section ==================== -->
+        <section id="content-community" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-fire text-red-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">热门讨论</div>
+                    </div>
+                    <div class="text-3xl font-bold text-red-400">610</div>
+                    <div class="text-xs text-slate-500 mt-1">Driver 分支反馈</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-bug text-amber-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">GitHub Issues (本周)</div>
+                    </div>
+                    <div class="text-3xl font-bold text-amber-400">11</div>
+                    <div class="text-xs text-slate-500 mt-1">Aug 10-17 新增</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-newspaper text-green-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">Phoronix 报道</div>
+                    </div>
+                    <div class="text-3xl font-bold text-green-400">5</div>
+                    <div class="text-xs text-slate-500 mt-1">本周相关文章</div>
+                </div>
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-comments text-blue-400"></i>
+                        </div>
+                        <div class="text-sm text-slate-400">HN 讨论</div>
+                    </div>
+                    <div class="text-3xl font-bold text-blue-400">2</div>
+                    <div class="text-xs text-slate-500 mt-1">活跃话题</div>
+                </div>
+            </div>
+
+            <!-- 610 Release Feedback -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-red-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">NVIDIA Forums</span>
+                    <span class="text-xs text-slate-400">2026-08 活跃</span>
+                </div>
+                <h3 class="font-medium text-red-300 mb-2">610 驱动分支反馈集中爆发</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>NVIDIA 开发者论坛的 610 release 反馈帖成为本周最活跃的社区讨论。报告的问题包括：</p>
+                    <p><strong class="text-red-400">游戏冻结：</strong>Halo Infinite 等游戏启动时冻结，伴随 Xid 错误。</p>
+                    <p><strong class="text-amber-400">HDR 问题：</strong>桌面 HDR 色彩失真（washout）。</p>
+                    <p><strong class="text-blue-400">GPU 断连：</strong><code class="code-ref">dmaAllocMapping_GM107: can't alloc VA space</code> 错误导致 GPU 断开连接。</p>
+                    <p><strong class="text-purple-400">Xid 13：</strong>移动 GPU 上出现 fatal microcode 异常。</p>
+                    <p><strong class="text-green-400">RTX 5090：</strong>演示停顿 3-5 秒。</p>
+                    <p><strong class="text-cyan-400">正面反馈：</strong>Fedora 上休眠恢复现已正常工作。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://forums.developer.nvidia.com/t/610-release-feedback-discussion/371356/252" class="ref-link" target="_blank">610 Release Feedback Thread</a>
+                </div>
+            </div>
+
+            <!-- GitHub Issues Surge -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-amber-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">GitHub</span>
+                    <span class="text-xs text-slate-400">Aug 10-17, 2026</span>
+                </div>
+                <h3 class="font-medium text-amber-300 mb-2">GitHub Issues 激增：11 个新 Bug 报告</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>本周 GitHub 仓库新增 11 个 issue，涵盖以下类别：</p>
+                    <p><strong class="text-amber-400">内存管理：</strong>BAR1 VA 空间耗尽、<code class="code-ref">nvidia-drm</code> 误导性 -ENOMEM 错误。</p>
+                    <p><strong class="text-red-400">电源管理：</strong>笔记本 GPU 卡在低功率状态、亮度控制失效。</p>
+                    <p><strong class="text-blue-400">显示输出：</strong>RTX 5080 HDR atomic commit 返回 EINVAL。</p>
+                    <p><strong class="text-purple-400">稳定性：</strong>Strinova 游戏在无效 sync FD 上崩溃、内核启动挂起、Wayland 下休眠/恢复死锁。</p>
+                    <p><strong class="text-green-400">Xid 79：</strong>RTX 5080/5060 Ti/5070/5090 随机出现 "zero precursor" 错误，GPU 从总线消失。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues" class="ref-link" target="_blank">GitHub Issues</a> |
+                    <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1151" class="ref-link" target="_blank">Issue #1151 - Xid 79</a>
+                </div>
+            </div>
+
+            <!-- Phoronix Coverage -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-green-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">Phoronix</span>
+                    <span class="text-xs text-slate-400">2026-08</span>
+                </div>
+                <h3 class="font-medium text-green-300 mb-2">Phoronix 本周重点报道</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p><strong class="text-green-400">R560 默认使用开源内核模块：</strong>NVIDIA 宣布从 R560 驱动分支开始，开源 GPU 内核模块将成为新 GPU 的默认选项。这是里程碑式的转变。</p>
+                    <p><strong class="text-blue-400">KubeCon 2026 开源战略：</strong>NVIDIA 在 KubeCon 2026 上展示了 "Expanding The Open-Source Horizon" 主题，讨论开源组件在整个技术栈中的扩展。</p>
+                    <p><strong class="text-amber-400">Nova Rust 驱动：</strong>社区开发的 Rust 语言 NVIDIA 驱动 "Nova" 在 Linux 7.3 中获得更多功能支持。</p>
+                    <p><strong class="text-purple-400">UALink 联盟：</strong>AMD 和 Intel 联手成立 UALink 联盟，作为 NVLink 的开放替代方案。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源:
+                    <a href="https://www.phoronix.com/news/NVIDIA-R560-Open-Default" class="ref-link" target="_blank">R560 Open Default</a> |
+                    <a href="https://www.phoronix.com/news/NVIDIA-Open-Source-KubeCon-2026" class="ref-link" target="_blank">KubeCon 2026</a> |
+                    <a href="https://www.phoronix.com/news/NVIDIA-Nova-Rust-Linux-7.3" class="ref-link" target="_blank">Nova Rust</a> |
+                    <a href="https://www.phoronix.com/news/Ultra-Accelerator-Link-UALink" class="ref-link" target="_blank">UALink</a>
+                </div>
+            </div>
+
+            <!-- Reddit Discussions -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-blue-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">Reddit</span>
+                    <span class="text-xs text-slate-400">2026-08</span>
+                </div>
+                <h3 class="font-medium text-blue-300 mb-2">Reddit 社区讨论热点</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p><strong class="text-red-400">内核污染争议：</strong>r/LinuxCirclejerk 上 "2026 and Nvidia still requires you to taint your kernel" 引发讨论，社区对 NVIDIA 内核模块仍然污染 Linux 内核表示不满。</p>
+                    <p><strong class="text-amber-400">驱动兼容性问题：</strong>r/voidlinux 用户报告 NVIDIA open 595 在 kernel 6.18 上无法工作。</p>
+                    <p><strong class="text-green-400">光纤互连：</strong>r/hardware 讨论 NVLink/UALink 的新型光纤互连系统。</p>
+                    <p><strong class="text-blue-400">性能对比：</strong>r/linux_gaming 讨论 Phoronix 对 Nouveau vs NVIDIA open kernel modules 的性能基准测试。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源:
+                    <a href="https://www.reddit.com/r/LinuxCirclejerk/comments/1v30l4j/" class="ref-link" target="_blank">Kernel Taint</a> |
+                    <a href="https://www.reddit.com/r/voidlinux/comments/1t169ef/" class="ref-link" target="_blank">Void Linux 595</a> |
+                    <a href="https://www.reddit.com/r/hardware/comments/1rsls6k/" class="ref-link" target="_blank">Fiber NVLink</a>
+                </div>
+            </div>
+
+            <!-- Hacker News -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-cyan-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">Hacker News</span>
+                    <span class="text-xs text-slate-400">2026</span>
+                </div>
+                <h3 class="font-medium text-cyan-300 mb-2">Hacker News 深度讨论</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p><strong class="text-green-400">开源转型讨论：</strong>"NVIDIA Transitions Fully Towards Open-Source Linux GPU Kernel Modules" 引发广泛讨论。社区观点分化：部分人认为意义有限（NVIDIA 仍控制用户态库和签名固件），另一部分人认为这使完全开源用户态驱动和 Mesa 互操作成为可能。</p>
+                    <p><strong class="text-red-400">安全研究：</strong>Quarkslab 的 use-after-free 漏洞利用研究引发 "Rust 是否能防止此类问题" 的辩论。</p>
+                    <p><strong class="text-amber-400">66 天 Bug：</strong>nvidia-smi 在 ~66 天后挂起的 uint32_t 溢出 bug 被广泛讨论，与经典 Windows "49.7 天 bug" 类比。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源:
+                    <a href="https://news.ycombinator.com/item?id=40988954" class="ref-link" target="_blank">Open Source Transition</a> |
+                    <a href="https://news.ycombinator.com/item?id=45592585" class="ref-link" target="_blank">UAF Exploit</a> |
+                    <a href="https://news.ycombinator.com/item?id=46750425" class="ref-link" target="_blank">66-day Bug</a>
+                </div>
+            </div>
+
+            <!-- openSUSE Migration -->
+            <div class="module-card glass-card rounded-lg p-4 border-l-4 border-amber-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="badge-nvidia text-white text-xs px-2 py-1 rounded-full">Distribution</span>
+                    <span class="text-xs text-slate-400">2026-08-04</span>
+                </div>
+                <h3 class="font-medium text-amber-300 mb-2">openSUSE G06 → G07 驱动迁移问题</h3>
+                <div class="text-sm text-slate-400 space-y-2">
+                    <p>openSUSE 用户在从 G06 (580) 升级到 G07 (595) 时遇到驱动不匹配问题，Wayland 会话无法启动。修复方法：清除残留的 G06 包（如 <code class="code-ref">libnvidia-gpucomp-G06</code>），安装开源元包。G07 分支没有闭源内核模块。</p>
+                </div>
+                <div class="mt-2 text-xs">
+                    来源: <a href="https://forums.opensuse.org/t/problems-updating-nvidia-driver-g06-580-to-g07-595/195315" class="ref-link" target="_blank">openSUSE Forums</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Comparison Section ==================== -->
+        <section id="content-comparison" class="hidden space-y-6">
+            <h2 class="text-xl font-bold text-white mb-4"><i class="fas fa-balance-scale mr-2 text-green-400"></i>技术对比分析</h2>
+
+            <!-- Driver Version Comparison -->
+            <div class="glass-card rounded-lg p-5">
+                <h3 class="font-semibold text-white mb-4"><i class="fas fa-code-branch mr-2 text-green-400"></i>驱动版本对比 (2026-08)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="text-left py-3 px-4 text-slate-300 font-semibold">维度</th>
+                                <th class="text-left py-3 px-4 text-green-400 font-semibold">610.57.05</th>
+                                <th class="text-left py-3 px-4 text-blue-400 font-semibold">595.44.16</th>
+                                <th class="text-left py-3 px-4 text-amber-400 font-semibold">580.178.05</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">分支类型</td>
+                                <td class="py-3 px-4">Latest Stable</td>
+                                <td class="py-3 px-4">Vulkan Beta</td>
+                                <td class="py-3 px-4">Legacy / Production</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">发布日期</td>
+                                <td class="py-3 px-4">2026-08-16</td>
+                                <td class="py-3 px-4">2026-08-17</td>
+                                <td class="py-3 px-4">2026-08-16</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">Blackwell 支持</td>
+                                <td class="py-3 px-4"><span class="text-green-400">完整支持</span></td>
+                                <td class="py-3 px-4"><span class="text-green-400">完整支持</span></td>
+                                <td class="py-3 px-4"><span class="text-amber-400">部分支持</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">开源内核模块</td>
+                                <td class="py-3 px-4"><span class="text-green-400">默认 (新 GPU)</span></td>
+                                <td class="py-3 px-4"><span class="text-green-400">默认 (新 GPU)</span></td>
+                                <td class="py-3 px-4"><span class="text-blue-400">可选</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">已知严重问题</td>
+                                <td class="py-3 px-4"><span class="text-red-400">游戏冻结、Xid 错误</span></td>
+                                <td class="py-3 px-4"><span class="text-amber-400">Beta 稳定性</span></td>
+                                <td class="py-3 px-4"><span class="text-green-400">相对稳定</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">Wayland 支持</td>
+                                <td class="py-3 px-4"><span class="text-green-400">改进</span></td>
+                                <td class="py-3 px-4"><span class="text-green-400">改进</span></td>
+                                <td class="py-3 px-4"><span class="text-amber-400">基础</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-xs">
+                    来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases" class="ref-link" target="_blank">GitHub Releases</a>
+                </div>
+            </div>
+
+            <!-- NVLink vs UALink Comparison -->
+            <div class="glass-card rounded-lg p-5">
+                <h3 class="font-semibold text-white mb-4"><i class="fas fa-network-wired mr-2 text-blue-400"></i>GPU 互连技术对比: NVLink vs UALink</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="text-left py-3 px-4 text-slate-300 font-semibold">维度</th>
+                                <th class="text-left py-3 px-4 text-green-400 font-semibold">NVIDIA NVLink</th>
+                                <th class="text-left py-3 px-4 text-red-400 font-semibold">UALink 2.0</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">带宽 (双向/GPU)</td>
+                                <td class="py-3 px-4"><span class="text-green-400">1.8 TB/s</span></td>
+                                <td class="py-3 px-4">200 Gbps/lane</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">Scale-up 容量</td>
+                                <td class="py-3 px-4">576 GPU (HGX)</td>
+                                <td class="py-3 px-4">~3.6 TB/accelerator (AMD 声称)</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">开放性</td>
+                                <td class="py-3 px-4"><span class="text-amber-400">半开放 (Fusion)</span></td>
+                                <td class="py-3 px-4"><span class="text-green-400">完全开放标准</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">生态成熟度</td>
+                                <td class="py-3 px-4"><span class="text-green-400">成熟 (4 代产品)</span></td>
+                                <td class="py-3 px-4"><span class="text-amber-400">发展中 (2.0 spec)</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">In-network Compute</td>
+                                <td class="py-3 px-4">NVSwitch</td>
+                                <td class="py-3 px-4"><span class="text-green-400">原生支持 (2.0)</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">主要支持者</td>
+                                <td class="py-3 px-4">NVIDIA</td>
+                                <td class="py-3 px-4">AMD, Intel, Broadcom, Google, Meta</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">Chip-to-Chip</td>
+                                <td class="py-3 px-4"><span class="text-green-400">NVLink-C2C</span></td>
+                                <td class="py-3 px-4">规划中</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-xs">
+                    来源: <a href="https://www.spheron.network/blog/ualink-vs-nvlink-open-gpu-interconnect-2026/" class="ref-link" target="_blank">UALink vs NVLink 对比</a> |
+                    <a href="https://www.sdxcentral.com/news/ualink-consortium-takes-another-swing-at-nvidias-nvlink-supremacy-with-specification-20/" class="ref-link" target="_blank">SDxCentral - UALink 2.0</a>
+                </div>
+            </div>
+
+            <!-- Open vs Proprietary Comparison -->
+            <div class="glass-card rounded-lg p-5">
+                <h3 class="font-semibold text-white mb-4"><i class="fas fa-lock-open mr-2 text-amber-400"></i>开源 vs 闭源内核模块对比</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-600">
+                                <th class="text-left py-3 px-4 text-slate-300 font-semibold">维度</th>
+                                <th class="text-left py-3 px-4 text-green-400 font-semibold">开源模块</th>
+                                <th class="text-left py-3 px-4 text-red-400 font-semibold">闭源模块</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">MMU_NOTIFIER 要求</td>
+                                <td class="py-3 px-4"><span class="text-red-400">必须启用</span></td>
+                                <td class="py-3 px-4"><span class="text-green-400">不需要</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">内核污染 (Taint)</td>
+                                <td class="py-3 px-4"><span class="text-amber-400">仍然污染</span></td>
+                                <td class="py-3 px-4"><span class="text-red-400">污染</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">GSP 固件</td>
+                                <td class="py-3 px-4">需要签名固件</td>
+                                <td class="py-3 px-4">需要签名固件</td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">代码可审计性</td>
+                                <td class="py-3 px-4"><span class="text-green-400">完全可审计</span></td>
+                                <td class="py-3 px-4"><span class="text-red-400">不可审计</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">发行版集成</td>
+                                <td class="py-3 px-4"><span class="text-green-400">AlmaLinux, Fedora 改进</span></td>
+                                <td class="py-3 px-4"><span class="text-amber-400">传统方式</span></td>
+                            </tr>
+                            <tr class="border-b border-slate-800 table-row-hover">
+                                <td class="py-3 px-4 font-medium">安全漏洞暴露面</td>
+                                <td class="py-3 px-4"><span class="text-amber-400">更大 (代码公开)</span></td>
+                                <td class="py-3 px-4"><span class="text-green-400">较小 (security by obscurity)</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-xs">
+                    来源: <a href="https://forums.developer.nvidia.com/t/550-open-source-requires-mmu-notifier-whereas-proprietary-does-not/302259" class="ref-link" target="_blank">MMU_NOTIFIER 讨论</a> |
+                    <a href="https://news.ycombinator.com/item?id=40988954" class="ref-link" target="_blank">HN 开源转型讨论</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== Trends Section ==================== -->
+        <section id="content-trends" class="hidden space-y-6">
+            <h2 class="text-xl font-bold text-white mb-4"><i class="fas fa-chart-line mr-2 text-green-400"></i>趋势展望</h2>
+
+            <!-- Short-term Trends -->
+            <div class="glass-card rounded-lg p-5">
+                <h3 class="font-semibold text-white mb-4">
+                    <i class="fas fa-bolt mr-2 text-amber-400 trend-arrow"></i>短期趋势 (1-3 个月)
+                </h3>
+                <div class="space-y-4">
+                    <div class="module-card glass-card rounded-lg p-4 border-l-4 border-amber-500">
+                        <h4 class="font-medium text-amber-300 mb-2">610 分支稳定性修复周期</h4>
+                        <p class="text-sm text-slate-400">610 驱动分支当前处于早期采用阶段，社区反馈的大量 bug（游戏冻结、Xid 错误、HDR 问题）预计将在后续点版本中集中修复。建议生产环境暂时继续使用 580 分支。</p>
+                    </div>
+                    <div class="module-card glass-card rounded-lg p-4 border-l-4 border-green-500">
+                        <h4 class="font-medium text-green-300 mb-2">R560 开源默认化推进</h4>
+                        <p class="text-sm text-slate-400">NVIDIA 将在 R560 分支正式将开源内核模块设为新 GPU 的默认选项。这将加速开源模块的采用率，同时暴露更多兼容性问题。各发行版（AlmaLinux、Fedora、openSUSE）的集成经验将为后续提供参考。</p>
+                    </div>
+                    <div class="module-card glass-card rounded-lg p-4 border-l-4 border-red-500">
+                        <h4 class="font-medium text-red-300 mb-2">安全漏洞持续关注</h4>
+                        <p class="text-sm text-slate-400">Quarkslab 的 use-after-free 漏洞利用研究表明开源模块的安全审计正在加强。预计 NVIDIA 将在后续版本中加强 ioctl 权限检查和内存管理安全性。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Medium-term Trends -->
+            <div class="glass-card rounded-lg p-5">
+                <h3 class="font-semibold text-white mb-4">
+                    <i class="fas fa-rocket mr-2 text-blue-400 trend-arrow"></i>中期趋势 (3-12 个月)
+                </h3>
+                <div class="space-y-4">
+                    <div class="module-card glass-card rounded-lg p-4 border-l-4 border-purple-500">
+                        <h4 class="font-medium text-purple-300 mb-2">NVLink Fusion 生态建设</h4>
+                        <p class="text-sm text-slate-400">NVLink Fusion 的推出标志着 NVIDIA 互连生态从封闭走向半开放。预计将有更多第三方芯片厂商宣布通过 NVLink-C2C 与 NVIDIA GPU 集成的产品。这将对数据中心异构计算格局产生深远影响。</p>
+                    </div>
+                    <div class="module-card glass-card rounded-lg p-4 border-l-4 border-cyan-500">
+                        <h4 class="font-medium text-cyan-300 mb-2">UALink vs NVLink 竞争加剧</h4>
+                        <p class="text-sm text-slate-400">UALink 2.0 规范的发布和 NVLink Fusion 的推出表明 GPU 互连领域的竞争正在加速。NVIDIA 在绝对带宽和生态成熟度上领先，但 UALink 作为开放标准正在获得更多行业支持。中期来看，两者可能形成互补而非替代的关系。</p>
+                    </div>
+                    <div class="module-card glass-card rounded-lg p-4 border-l-4 border-green-500">
+                        <h4 class="font-medium text-green-300 mb-2">Vera-Rubin 平台与 NVLink 演进</h4>
+                        <p class="text-sm text-slate-400">NVIDIA 下一代 Vera-Rubin 平台预计将搭载新一代 NVLink，进一步提升带宽和 scale-up 能力。开源内核模块需要提前适配新硬件的 MMU、NVLink 和 NVSwitch 寄存器变化。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Insights -->
+            <div class="glass-card rounded-lg p-5">
+                <h3 class="font-semibold text-white mb-4">
+                    <i class="fas fa-lightbulb mr-2 text-yellow-400"></i>核心洞察
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="glass-card rounded-lg p-4 border-l-4 border-green-500">
+                        <h4 class="font-medium text-green-300 mb-2">开源转型不可逆转</h4>
+                        <p class="text-sm text-slate-400">从 R560 默认开源、AlmaLinux 集成、KubeCon 战略展示来看，NVIDIA 的开源转型已进入加速阶段。尽管 GSP 固件仍为闭源，但内核模块的开源化正在成为新常态。</p>
+                    </div>
+                    <div class="glass-card rounded-lg p-4 border-l-4 border-amber-500">
+                        <h4 class="font-medium text-amber-300 mb-2">稳定性仍是最大挑战</h4>
+                        <p class="text-sm text-slate-400">610 分支的大量 bug 报告、66 天溢出 bug、BAR1 VA 耗尽等问题表明，开源模块在生产环境中的稳定性仍有较大提升空间。社区期望更严格的 QA 流程。</p>
+                    </div>
+                    <div class="glass-card rounded-lg p-4 border-l-4 border-blue-500">
+                        <h4 class="font-medium text-blue-300 mb-2">互连生态走向开放</h4>
+                        <p class="text-sm text-slate-400">NVLink Fusion 和 UALink 2.0 的共同出现表明 GPU 互连正在从单一厂商控制走向更开放的生态。这对数据中心的灵活性和创新速度是积极信号。</p>
+                    </div>
+                    <div class="glass-card rounded-lg p-4 border-l-4 border-red-500">
+                        <h4 class="font-medium text-red-300 mb-2">安全意识觉醒</h4>
+                        <p class="text-sm text-slate-400">Quarkslab 的研究和社区的广泛讨论表明，开源模块的安全审计正在加强。NVIDIA 需要在透明度和安全性之间找到平衡，特别是在 ioctl 接口和内存管理方面。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="glass-card rounded-lg p-5">
+                <h3 class="font-semibold text-white mb-4">
+                    <i class="fas fa-calendar-alt mr-2 text-green-400"></i>关键时间线
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <span class="text-sm font-medium text-green-400">2026-08-16</span>
+                            <span class="text-sm text-slate-400 ml-2">610.57.05 发布，修复文档版本号引用</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <span class="text-sm font-medium text-blue-400">2026-08-17</span>
+                            <span class="text-sm text-slate-400 ml-2">595.44.16 Vulkan Beta 驱动发布</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-amber-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <span class="text-sm font-medium text-amber-400">2026-08-11</span>
+                            <span class="text-sm text-slate-400 ml-2">H200 NVLink 检测失败问题报告</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <span class="text-sm font-medium text-purple-400">2026-08</span>
+                            <span class="text-sm text-slate-400 ml-2">NVLink Fusion 正式开放定制硅集成</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-cyan-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <span class="text-sm font-medium text-cyan-400">2026-08</span>
+                            <span class="text-sm text-slate-400 ml-2">Mesa NVK 暂时禁用大页面支持</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <span class="text-sm font-medium text-red-400">2026-08-10~17</span>
+                            <span class="text-sm text-slate-400 ml-2">GitHub 新增 11 个 issue，涵盖内存/显示/稳定性</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <span class="text-sm font-medium text-green-400">预期 R560</span>
+                            <span class="text-sm text-slate-400 ml-2">开源内核模块成为新 GPU 默认选项</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="glass-card border-t border-slate-700 py-6">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-microchip text-green-400"></i>
+                    <span class="text-sm text-slate-400">NVIDIA Open GPU Kernel Weekly Tracker</span>
+                </div>
+                <div class="text-xs text-slate-500">
+                    数据来源: <a href="https://github.com/NVIDIA/open-gpu-kernel-modules" class="ref-link" target="_blank">GitHub</a> |
+                    <a href="https://developer.nvidia.com/blog/" class="ref-link" target="_blank">NVIDIA Blog</a> |
+                    <a href="https://forums.developer.nvidia.com/" class="ref-link" target="_blank">Forums</a> |
+                    <a href="https://www.phoronix.com/" class="ref-link" target="_blank">Phoronix</a> |
+                    <a href="https://news.ycombinator.com/" class="ref-link" target="_blank">HN</a>
+                </div>
+                <div class="text-xs text-slate-500">
+                    报告生成: 2026-08-19 | Powered by QoderWork
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            const tabs = ['nvlink', 'nvswitch', 'nvlink-c2c', 'mmu', 'community', 'comparison', 'trends'];
+            tabs.forEach(tab => {
+                const content = document.getElementById('content-' + tab);
+                const tabBtn = document.getElementById('tab-' + tab);
+                if (tab === tabName) {
+                    content.style.display = 'block';
+                    tabBtn.className = tabBtn.className.replace('tab-inactive', 'tab-active');
+                } else {
+                    content.style.display = 'none';
+                    tabBtn.className = tabBtn.className.replace('tab-active', 'tab-inactive');
+                }
+            });
+        }
+
+        function toggleDetail(id) {
+            const detail = document.getElementById(id + '-detail');
+            const icon = document.getElementById('icon-' + id);
+            if (detail.classList.contains('hidden')) {
+                detail.classList.remove('hidden');
+                icon.classList.add('expanded');
+            } else {
+                detail.classList.add('hidden');
+                icon.classList.remove('expanded');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US20230315655A1 深度解读 · 快速数据同步与 Store+Arrive 合并指令 | NVIDIA 专利</title>
+<style>
+:root{
+  --nvidia-green:#76b900;
+  --nvidia-green-dim:#5a8f00;
+  --bg:#0f1624;
+  --bg2:#0b111c;
+  --card-bg:#16213e;
+  --card-bg2:#1b294c;
+  --border:#2a3a5c;
+  --text:#e8eefc;
+  --text-dim:#a9b6d0;
+  --text-faint:#7f8daa;
+  --amber:#f0b429;
+  --red:#e5484d;
+  --blue:#4d9cf0;
+  --purple:#a06bf0;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#0f1624 0%,#0b111c 100%);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  line-height:1.75;
+  font-size:15px;
+}
+a{color:var(--nvidia-green);text-decoration:none;border-bottom:1px dotted rgba(118,185,0,.5);}
+a:hover{color:#9ee02a;border-bottom-style:solid;}
+code{
+  background:#0a1020;color:#9ee02a;
+  padding:1px 6px;border-radius:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.88em;border:1px solid #23314f;
+}
+pre{
+  background:#0a1020;border:1px solid #23314f;border-radius:8px;
+  padding:14px 16px;overflow-x:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px;line-height:1.6;color:#c8d6f0;
+}
+pre code{background:none;border:none;padding:0;color:inherit;}
+
+/* ---------- hero ---------- */
+.hero{
+  padding:56px 24px 40px;
+  text-align:center;
+  background:
+    radial-gradient(900px 320px at 50% -60px, rgba(118,185,0,.18), transparent 70%),
+    linear-gradient(180deg,#111b2e 0%,#0f1624 100%);
+  border-bottom:1px solid var(--border);
+}
+.hero .eyebrow{
+  display:inline-block;
+  font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--nvidia-green);
+  border:1px solid rgba(118,185,0,.4);
+  border-radius:999px;padding:4px 14px;margin-bottom:18px;
+}
+.hero h1{
+  margin:0 0 10px;font-size:31px;line-height:1.35;font-weight:700;
+}
+.hero h1 .pn{color:var(--nvidia-green);}
+.hero .sub{
+  margin:0 auto 22px;max-width:860px;
+  color:var(--text-dim);font-size:15.5px;
+}
+.hero .meta{
+  display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+  max-width:960px;margin:0 auto;
+}
+.hero .meta span{
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  border-radius:6px;padding:5px 12px;
+  font-size:12.5px;color:var(--text-dim);
+}
+.hero .meta span b{color:var(--text);font-weight:600;}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:50;
+  display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+  padding:12px 16px;
+  background:rgba(11,17,28,.94);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.nav button{
+  background:transparent;color:var(--text-dim);
+  border:1px solid var(--border);border-radius:6px;
+  padding:7px 13px;font-size:13px;cursor:pointer;
+  font-family:inherit;transition:all .15s;
+}
+.nav button:hover{color:var(--text);border-color:#3d5280;}
+.nav button.active{
+  background:var(--nvidia-green);color:#0b1400;
+  border-color:var(--nvidia-green);font-weight:600;
+}
+
+/* ---------- layout ---------- */
+.container{max-width:1120px;margin:0 auto;padding:32px 20px 60px;}
+.tab{display:none;}
+.tab.active{display:block;animation:fade .25s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+section{margin-bottom:34px;}
+h2{
+  font-size:23px;margin:0 0 6px;
+  padding-bottom:10px;border-bottom:2px solid rgba(118,185,0,.35);
+}
+h3{font-size:17.5px;margin:26px 0 10px;color:#dce6ff;}
+h4{font-size:15px;margin:18px 0 8px;color:var(--nvidia-green);}
+.lead{color:var(--text-dim);margin:12px 0 20px;font-size:15px;}
+
+.card{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-left:3px solid var(--nvidia-green);
+  border-radius:8px;padding:16px 18px;margin:14px 0;
+}
+.card.info{border-left-color:var(--blue);}
+.card.warning{border-left-color:var(--amber);}
+.card.danger{border-left-color:var(--red);}
+.card.highlight{
+  border-left-color:var(--nvidia-green);
+  background:linear-gradient(135deg,rgba(118,185,0,.09),var(--card-bg) 60%);
+}
+.card.purple{border-left-color:var(--purple);}
+.card h4{margin-top:0;}
+.card p:last-child{margin-bottom:0;}
+
+.grid{display:grid;gap:14px;}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+
+table{
+  width:100%;border-collapse:collapse;margin:14px 0;
+  font-size:13.5px;background:var(--card-bg);
+  border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+th{
+  background:#1d2b4d;color:#dce6ff;text-align:left;
+  padding:10px 12px;font-weight:600;font-size:13px;
+  border-bottom:1px solid var(--border);
+}
+td{padding:9px 12px;border-bottom:1px solid rgba(42,58,92,.6);vertical-align:top;color:var(--text-dim);}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:rgba(118,185,0,.05);}
+td b,td strong{color:var(--text);}
+
+ul,ol{padding-left:22px;margin:10px 0;}
+li{margin:6px 0;color:var(--text-dim);}
+li b,li strong{color:var(--text);}
+
+.quote{
+  background:#0a1020;border:1px solid #23314f;
+  border-left:3px solid var(--amber);
+  border-radius:6px;padding:12px 16px;margin:12px 0;
+  font-size:13.5px;color:#c8d6f0;font-style:italic;
+}
+.quote .src{
+  display:block;margin-top:8px;font-style:normal;
+  font-size:12px;color:var(--text-faint);
+}
+
+.tag{
+  display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:999px;
+  border:1px solid var(--border);color:var(--text-dim);
+  margin:2px 4px 2px 0;background:rgba(255,255,255,.03);
+}
+.tag.g{color:var(--nvidia-green);border-color:rgba(118,185,0,.45);background:rgba(118,185,0,.08);}
+.tag.a{color:var(--amber);border-color:rgba(240,180,41,.45);background:rgba(240,180,41,.08);}
+.tag.r{color:var(--red);border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.08);}
+.tag.b{color:var(--blue);border-color:rgba(77,156,240,.45);background:rgba(77,156,240,.08);}
+
+.ref{font-size:12.5px;color:var(--text-faint);margin-top:10px;}
+.ref a{border-bottom-style:solid;}
+
+.footer{
+  border-top:1px solid var(--border);
+  padding:26px 20px 40px;text-align:center;
+  color:var(--text-faint);font-size:13px;
+}
+.footer a{color:var(--text-dim);}
+
+.kbd{
+  display:inline-block;background:#0a1020;border:1px solid #2a3a5c;
+  border-bottom-width:2px;border-radius:4px;padding:0 6px;
+  font-size:12px;color:#9ee02a;font-family:ui-monospace,Menlo,monospace;
+}
+.center{text-align:center;}
+
+/* ---------- latency bars ---------- */
+.lat{margin:18px 0;}
+.lat .row{display:flex;align-items:center;gap:12px;margin:10px 0;}
+.lat .lbl{flex:0 0 190px;font-size:13px;color:var(--text-dim);text-align:right;}
+.lat .bar{
+  height:26px;border-radius:5px;display:flex;align-items:center;
+  padding:0 10px;font-size:12px;font-weight:600;color:#0b1400;
+  white-space:nowrap;
+}
+.lat .b-red{background:linear-gradient(90deg,#e5484d,#f0757a);color:#fff;}
+.lat .b-amber{background:linear-gradient(90deg,#f0b429,#f7d072);}
+.lat .b-green{background:linear-gradient(90deg,#76b900,#9ee02a);}
+
+@media(max-width:640px){
+  .hero h1{font-size:23px;}
+  h2{font-size:19px;}
+  .nav button{font-size:12px;padding:6px 10px;}
+  .lat .lbl{flex:0 0 110px;font-size:11.5px;}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">NVIDIA Patent Deep Dive · 2026-08-27</div>
+  <h1><span class="pn">US 2023/0315655 A1</span><br>快速数据同步：Store + Arrive 合并指令</h1>
+  <p class="sub">Fast data synchronization in processors and memory —— 把「写数据」和「更新屏障」压进<b>同一条消息</b>，让生产者-消费者同步从传统的 3~4 个往返压缩到约 <b>0.5 个往返</b>，逼近所谓「光速（SOL, speed-of-light）同步」。这是 Hopper 架构 2022-03-10 同日提交的十余篇专利簇中的<b>同步基石</b>，也是今天 PTX <code>st.async</code> / <code>mbarrier</code> tx-count 事务屏障的专利底座。截至今日仍处 Pending，且已两次收到 Final Rejection。</p>
+  <div class="meta">
+    <span><b>公开号</b> US 2023/0315655 A1</span>
+    <span><b>申请号</b> US 17/691,303</span>
+    <span><b>申请/优先日</b> 2022-03-10</span>
+    <span><b>公开日</b> 2023-10-05</span>
+    <span><b>受让人</b> NVIDIA Corporation</span>
+    <span><b>发明人</b> 11 位</span>
+    <span><b>权利要求</b> 27 项（独立 1 / 19 / 26 / 27）</span>
+    <span><b>法律状态</b> Pending（2 次 Final Rejection）</span>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="active" data-tab="t-overview">① 专利速览</button>
+  <button data-tab="t-bg">② 背景与问题</button>
+  <button data-tab="t-lat">③ 延迟阶梯</button>
+  <button data-tab="t-inst">④ Store+Arrive 指令</button>
+  <button data-tab="t-barrier">⑤ 分裂屏障</button>
+  <button data-tab="t-fence">⑥ 栅栏复制方案</button>
+  <button data-tab="t-l2">⑦ L2 中介模型</button>
+  <button data-tab="t-claims">⑧ 权利要求与审查史</button>
+  <button data-tab="t-eco">⑨ 产业对照与参考</button>
+</div>
+
+<div class="container">
+
+<!-- ============ TAB 1 ============ -->
+<div class="tab active" id="t-overview">
+
+<section>
+<h2>一句话读懂这篇专利</h2>
+<p class="lead">生产者写完数据、消费者才能读——这个再朴素不过的握手，在 GPU 上代价高得惊人。传统做法是：写数据 → 发内存栅栏（membar）等确认 → 写标志位 → 消费者轮询标志位 → acquire → 读数据，一共 <b>3~4 个网络往返</b>。这篇专利的做法是：<b>让一条指令同时完成「把数据写到对端共享内存」和「更新对端的屏障计数」</b>，两个动作装在同一条消息里，于是根本不存在「谁先谁后」的排序问题，同步代价塌缩到约 <b>0.5 个往返</b>——即数据单程飞到对面所需的时间，一秒也不多。</p>
+
+<div class="card highlight">
+<h4>为什么「合并成一条指令」不是小聪明，而是关键突破</h4>
+<p>直觉上会觉得「不就是把两条指令合成一条、省了一次发射吗」。但专利的原文点出了真正的痛处：在 GPU 里，<b>store 操作和 arrive 操作经常被重排</b>——原因是 hit-under-miss（命中越过未命中），以及不同 L2 slice 到目标的传输距离不同。</p>
+<div class="quote">"the store operation and the arrive operation may be often reordered in the GPU e.g., due to hit under miss, or differing transfer distances from L2 slices."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span></div>
+<p>也就是说，如果 store 和 arrive 是两条独立的消息，你就<b>必须</b>用栅栏（fence/membar）去强制顺序，而栅栏就是延迟的来源。把两者塞进同一条消息，排序问题被<b>定义掉了</b>而不是被解决掉——消息到了，数据就在那儿，屏障也已经更新。专利明确指出这样「避免了必须传输栅栏冲刷指令或任何其他排序要求」。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">Google Patents · US20230315655A1 全文</a></p>
+</div>
+
+<div class="card info">
+<h4>第二个突破：分裂屏障，消灭「远程等待」</h4>
+<p>双向流水还有一半问题：消费者读完数据后要告诉生产者「缓冲区空了，可以再写」。如果生产者去轮询消费者那边的屏障，就变成<b>远程轮询（remote polling）</b>。专利说这件事「代价昂贵、某些情况下甚至不切实际」。</p>
+<p style="margin-top:10px">解法是把屏障<b>拆成两个</b>：<b>c-barrier</b> 放在消费者本地（消费者 wait、生产者远程 arrive），<b>p-barrier</b> 放在生产者本地（生产者 wait、消费者远程 arrive）。结果是——<b>没有任何一个 SM 需要等待不在自己本地共享内存里的屏障</b>，上一代 GPU 的 <code>wait()</code> 实现可以原样复用，不需要任何修改。</p>
+</div>
+
+<div class="card warning">
+<h4>第三条路：栅栏复制（备选实施例）</h4>
+<p>合并指令有个前提——消费者必须<b>事先知道会收到多少字节</b>。可现实里往往不知道（专利举了个极好的例子：如果写操作是在一个被调用的子程序里完成的，调用方根本不知道子程序写了多少字节）。于是专利给了第二套方案：写完数据后发一条栅栏，并把这条栅栏<b>复制到源到目的之间所有 N 条可能路径上</b>。每条栅栏抵达就把屏障加一，消费者等到计数达到 N 即知全部写入已落地。代价是互连流量放大 N 倍，延迟略高于 0.5 但仍低于 1 个往返。</p>
+</div>
+</section>
+
+<section>
+<h2>书目信息（Bibliographic Data）</h2>
+<table>
+<thead><tr><th style="width:22%">字段</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><b>标题</b></td><td>Fast data synchronization in processors and memory<br><span style="color:var(--text-faint)">（处理器与内存中的快速数据同步）</span></td></tr>
+<tr><td><b>公开号</b></td><td><b>US 2023/0315655 A1</b>，公开日 <b>2023-10-05</b></td></tr>
+<tr><td><b>申请号</b></td><td>US 17/691,303</td></tr>
+<tr><td><b>申请日 / 最早优先日</b></td><td><b>2022-03-10</b>（同日，无更早临时申请）</td></tr>
+<tr><td><b>受让人</b></td><td>NVIDIA Corporation（转让登记于 2022-06-09）</td></tr>
+<tr><td><b>法律状态</b></td><td><span class="tag a">Pending</span> 已收到 <b>两次 Final Rejection</b>（2024-12-02、2026-02-25），至今未授权</td></tr>
+<tr><td><b>同族成员</b></td><td>美国本篇 + 德国 <b>DE102023105554A1</b>（DE 申请号 102023105554.2，2023-03-07 提交，2023-09-14 公开）。<b>无中国同族</b></td></tr>
+<tr><td><b>权利要求</b></td><td>共 <b>27 项</b>，独立项 <b>1（方法）/ 19（系统）/ 26（方法，单消息）/ 27（方法，兜底）</b></td></tr>
+<tr><td><b>引用 / 被引</b></td><td>引用 13~14 篇；被引 13~16 篇（含上海壁仞 CN118885428A）</td></tr>
+<tr><td><b>CPC 分类号</b></td><td><code>G06F9/544</code>（进程间通信，共享内存）· <code>G06F9/522</code>（同步，屏障）· <code>G06F13/1668</code> · <code>G06F13/1673</code> · <code>G06F13/1689</code>（内存总线/时序控制）</td></tr>
+</tbody>
+</table>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">Google Patents · US20230315655A1</a> ｜ 德国同族 <a href="https://patents.google.com/patent/DE102023105554A1/en" target="_blank">DE102023105554A1</a></p>
+</section>
+
+<section>
+<h2>11 位发明人：一份 Hopper 核心团队名单</h2>
+<p class="lead">这份名单本身就是这篇专利重要性的证明——它几乎是 Hopper SM 微架构与 CUDA 内存模型的核心作者集合。</p>
+<div class="grid g3">
+<div class="card">
+<h4>微架构主线</h4>
+<ul>
+<li><b>Jack Choquette</b> —— NVIDIA Fellow，Hopper/Ampere SM 首席架构师</li>
+<li><b>Ronny Krashinsky</b> —— GPU 架构总监，Hopper 架构公开演讲人</li>
+<li><b>Steve Heinrich</b>、<b>John Edmondson</b> —— 内存子系统</li>
+</ul>
+</div>
+<div class="card info">
+<h4>编程模型主线</h4>
+<ul>
+<li><b>Olivier Giroux</b> —— C++/CUDA 内存模型的主要设计者，ISO C++ 委员会成员，<code>cuda::barrier</code> 的思想来源</li>
+<li><b>Carter Edwards</b> —— Kokkos 项目创始核心成员，HPC 编程模型专家</li>
+</ul>
+</div>
+<div class="card purple">
+<h4>其他</h4>
+<ul>
+<li><b>Timothy Guo</b>、<b>Prakash Bangalore Prabhakar</b>、<b>Apoorv Parle Jr.</b>、<b>Manan Patel</b></li>
+<li><b>Michael Pellauer</b> —— NVIDIA Research，加速器架构与数据流</li>
+</ul>
+</div>
+</div>
+<div class="card warning">
+<h4>解读</h4>
+<p>Giroux 与 Edwards 同时出现在发明人名单里，是一个强信号：这不是一个纯硬件优化，而是<b>硬件机制与 C++/CUDA 内存模型协同设计</b>的产物。专利里那句「事务计数由硬件管理、对软件不透明（opaque to software）」的设计取舍，正是这种协同的痕迹——把复杂性藏在硬件里，让软件侧仍然只看到一个干净的 <code>arrive</code> / <code>wait</code> 语义。</p>
+</div>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 发明人字段</a></p>
+</section>
+
+<section>
+<h2>摘要原文与逐句拆解</h2>
+<div class="quote">
+"A new synchronization system synchronizes data exchanges between producer processes and consumer processes which may be on the same or different processors in a multiprocessor system. The synchronization incurs less than one roundtrip of latency - in some implementations, in approximately 0.5 roundtrip times. A key aspect of the fast synchronization is that the producer's data store is followed without delay with the updating of a barrier on which the consumer is waiting."
+<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 Abstract</a></span>
+</div>
+<table>
+<thead><tr><th style="width:38%">摘要原句</th><th>技术含义</th></tr></thead>
+<tbody>
+<tr><td>"on the same or different processors"</td><td>刻意写宽：既覆盖同 SM 内的 CTA 间通信，也覆盖跨 SM（DSMEM）与跨 NUMA 节点。权利要求 1 落在<b>跨处理器</b>，权利要求 26 则把处理器限制去掉，只保留「单消息」特征</td></tr>
+<tr><td>"less than one roundtrip"</td><td>这是权利要求 3 的字面来源：从生产者发出到消费者被通知，<b>总时间小于一个往返</b>。这在传统同步里是不可能的，因为「等确认」本身就是一个往返</td></tr>
+<tr><td>"approximately 0.5 roundtrip times"</td><td>0.5 往返 = 单程飞行时间。这是<b>物理下界</b>——数据必须至少飞到对面一次。故专利称之为 SOL（speed of light）同步</td></tr>
+<tr><td>"followed <b>without delay</b> with the updating of a barrier"</td><td>「without delay」是整篇专利的技术核心，也是权利要求 1 中那句限定的散文版：<b>从存储到更新屏障的耗时，小于从生产者到第二处理器的单程时间</b>。换言之屏障更新必须发生在接收端本地，而不是再发一趟消息回来</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>本篇在 Hopper 专利簇中的位置</h2>
+<p class="lead">2022-03-10 这一天，NVIDIA 集中提交了十余篇交叉引用的专利，共同构成 Hopper（H100）的新执行与通信模型。本篇是其中的<b>同步层</b>。</p>
+<table>
+<thead><tr><th style="width:14%">申请号</th><th style="width:32%">主题</th><th>授权情况</th></tr></thead>
+<tbody>
+<tr><td>17/691,621</td><td>Cooperative Group Arrays（CGA，即 thread block cluster）</td><td>执行模型基础</td></tr>
+<tr><td>17/691,690</td><td>Distributed Shared Memory（DSMEM）</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12248788B2/en" target="_blank">US12248788B2</a>（2025-03-11）</td></tr>
+<tr><td><b>17/691,303</b></td><td><b>本篇 · Fast Data Synchronization</b></td><td><span class="tag r">Pending，2 次 Final Rejection</span></td></tr>
+<tr><td>17/691,296</td><td>Hardware Accelerated Synchronization With Asynchronous Transaction Support（本篇 FIG. 8 的屏障支持单元）</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12536056B2/en" target="_blank">US12536056B2</a>（2026-01-27）</td></tr>
+<tr><td>17/691,288</td><td>Programmatically Controlled Data Multicasting（多播，本篇多播扇出的依据）</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12020035B2/en" target="_blank">US12020035B2</a>（2024-06-25）· <a href="https://patents.google.com/patent/US12608212B2/en" target="_blank">US12608212B2</a>（2026-04-21）</td></tr>
+<tr><td>17/691,276 + 17/691,422</td><td>Efficient Access To Multidimensional Data Structures（TMA）</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12141082B2/en" target="_blank">US12141082B2</a>（2024-11-12）· <a href="https://patents.google.com/patent/US12499052B2/en" target="_blank">US12499052B2</a>（2025-12-16）</td></tr>
+<tr><td>17/691,759</td><td>Virtualizing Hardware Processing Resources</td><td>—</td></tr>
+<tr><td>17/691,406</td><td>Efficient Matrix Multiply and Add with a Group of Warps（WGMMA）</td><td><a href="https://patents.google.com/patent/US20230289398A1/en" target="_blank">US20230289398A1</a></td></tr>
+<tr><td>17/691,872</td><td>Scalable Load Balancing of Thread Groups</td><td>—</td></tr>
+<tr><td>17/691,808</td><td>Flexible Migration of Executing Software</td><td>—</td></tr>
+</tbody>
+</table>
+
+<div class="card danger">
+<h4>一个耐人寻味的反差</h4>
+<p>整个专利簇里，TMA、DSMEM、多播、硬件屏障支持单元<b>全部已经授权</b>，唯独这篇「快速数据同步」——在技术上最靠近整个体系的语义中枢——<b>四年多来两次被 Final Rejection，至今 Pending</b>。这不太可能是技术价值的问题；更可能的解释是：把「写数据 + 更新屏障合并成一条消息」这个想法用权利要求语言表达出来时，很难与 2002 年 IBM 的软件内存屏障专利、以及 NVIDIA 自己 2011 年的「跨多并行线程合并内存屏障操作」（<a href="https://patents.google.com/patent/US20110078692A1/en" target="_blank">US20110078692A1</a>）等在先技术划出清晰的界线。第 ⑧ 页有完整的审查历史时间线与权利要求分析。</p>
+</div>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 交叉引用段（Cross-reference to related applications）</a>及各同族专利页面</p>
+</section>
+
+</div>
+<!-- ============ TAB 2 ============ -->
+<div class="tab" id="t-bg">
+
+<section>
+<h2>问题的起点：强扩展与「线不缩放」</h2>
+<p class="lead">专利的背景段落是一段相当坦诚的架构自白。它先指出用户想要什么，再指出物理上做不到什么，最后给出唯一剩下的出路。</p>
+
+<div class="grid g2">
+<div class="card info">
+<h4>用户想要强扩展（strong scaling）</h4>
+<div class="quote">"Users... typically want strong scaling"<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 背景段</a></span></div>
+<p><b>强扩展</b>是指：问题规模固定，加更多硬件就要更快出结果。<b>弱扩展</b>则是：加硬件的同时把问题也放大，保持每个单元的工作量不变。弱扩展容易——因为通信占比不变；强扩展难——因为计算被切碎，通信占比不断上升，最终<b>同步延迟成为唯一的瓶颈</b>。这一句话就锁定了整篇专利的靶心。</p>
+</div>
+<div class="card warning">
+<h4>但线（wire）不缩放</h4>
+<p>晶体管随工艺持续变小变快，但<b>导线的延迟与能耗几乎不随工艺改善</b>。于是长距离数据搬运的相对代价越来越高。专利给出的结论是：</p>
+<div class="quote">"embracing locality is viewed as a more promising design choice"<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 背景段</a></span></div>
+<p>「拥抱局部性」正是 Hopper 引入 CGA / DSMEM 的根本动机：与其让所有 SM 都通过 L2 和 HBM 交换数据，不如让邻近的一小群 SM 直接互访彼此的共享内存。</p>
+</div>
+</div>
+
+<div class="card highlight">
+<h4>于是设计目标被精确地表述为</h4>
+<div class="quote">"efficient data sharing and localized communication at a level greater than one SM while minimizing synchronization latency"<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 背景段</a></span></div>
+<p>拆成三个约束：<b>(1)</b> 粒度要大于单个 SM（否则退化为老的 CTA 内共享内存）；<b>(2)</b> 通信要局部化（不能走 L2/HBM 长路径）；<b>(3)</b> 同步延迟要最小化。前两条由 CGA + DSMEM 解决（同族专利 <a href="https://patents.google.com/patent/US12248788B2/en" target="_blank">US12248788B2</a>），<b>第三条正是本篇的任务</b>。</p>
+</div>
+</section>
+
+<section>
+<h2>为什么已有的同步原语都不够用</h2>
+<p class="lead">专利用了两段相当具体的批评，逐一否决了 GPU 上已有的两种屏障实现。这两段是理解本篇创新点的关键前提。</p>
+
+<h3>① 硬件命名屏障（hardware named barrier）</h3>
+<div class="quote">
+"a dedicated processor-local resource that provides a limited number of barriers and which is difficult to expose to software, may be incompatible with the thread programming model, may provide inefficient support for producer-consumer communication, and may be hard to extend to cross-processor synchronization"
+<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 背景段</a></span>
+</div>
+<table>
+<thead><tr><th style="width:30%">批评点</th><th>具体含义</th></tr></thead>
+<tbody>
+<tr><td><b>数量有限</b></td><td>命名屏障是固定的硬件寄存器资源（历史上 SM 内只有 16 个），无法按需分配</td></tr>
+<tr><td><b>难以暴露给软件</b></td><td>屏障是静态编号的物理资源，无法当作一个「对象」传参、放数组、动态创建</td></tr>
+<tr><td><b>与线程编程模型不兼容</b></td><td>它以 warp 为单位工作，而 CUDA 的编程模型是以线程为单位的；且无法表达「部分线程参与」</td></tr>
+<tr><td><b>对生产者-消费者支持低效</b></td><td>命名屏障本质是「全员到齐」的会合点（rendezvous），而生产者-消费者需要的是<b>非对称</b>的单向通知</td></tr>
+<tr><td><b>难以扩展到跨处理器</b></td><td>致命缺陷：它是 processor-local 的专用资源，跨 SM 根本无从谈起</td></tr>
+</tbody>
+</table>
+
+<h3>② arrive-wait 屏障（共享内存实现）</h3>
+<div class="quote">
+"implemented as a shared-memory backed resource that provides a software-polling based wait operation... may incur a latency exposure and a substantial bandwidth cost to shared memory traffic."
+<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 背景段</a>，引述其自家早期申请 <a href="https://patents.google.com/patent/US20210183005A1/en" target="_blank">U.S. App. 16/712,236（2019-12-12）</a></span>
+</div>
+<div class="card danger">
+<h4>软件轮询的双重代价</h4>
+<p>arrive-wait 屏障（也就是 Ampere 引入、CUDA 里以 <code>cuda::barrier</code> / <code>mbarrier</code> 暴露的那一套）解决了「数量有限」和「难以暴露」的问题——它就是共享内存里的一个普通字，可以随便创建多少个。但它把等待实现为<b>软件轮询</b>，代价有两条：</p>
+<ul>
+<li><b>延迟暴露（latency exposure）</b>：轮询有周期，屏障实际清零的时刻与线程「发现」它清零的时刻之间存在间隔，这段间隔是纯浪费。</li>
+<li><b>可观的共享内存带宽成本</b>：所有等待中的线程都在反复读同一个共享内存位置。共享内存带宽是 SM 内最宝贵的资源之一，被轮询白白吃掉。</li>
+</ul>
+<p style="margin-top:10px">这解释了为什么本篇要配合同族的<b>硬件屏障支持单元</b>（<a href="https://patents.google.com/patent/US12536056B2/en" target="_blank">US12536056B2</a>，见第 ⑤ 页 FIG. 8）：让硬件替线程做等待，把轮询彻底消掉。</p>
+</div>
+</section>
+
+<section>
+<h2>被统一的两个问题：tile 的「生」与「死」</h2>
+<p class="lead">这是整篇专利在概念层面最漂亮的一步。生产者-消费者流水线看似有两个不同的同步需求，专利指出它们是同一枚硬币的两面。</p>
+
+<div class="quote">
+"(A) When is the consumer ready to receive new data (e.g., a tile has become dead)? and (B) When is the consumer ready to begin processing filled data (e.g., a tile has become alive)?" —— 二者 "fundamentally two sides of the same coin."
+<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span>
+</div>
+
+<div class="grid g2">
+<div class="card">
+<h4>问题 A：缓冲区什么时候空了？（tile becomes dead）</h4>
+<p>生产者需要知道消费者已经把上一批数据读完，才能往同一块缓冲区写新数据——否则会覆盖尚未被消费的数据。</p>
+<p style="margin-top:8px">在专利的表述里，这体现为<b>消费者在 p-barrier 上 arrive</b>，语义是「tile has become dead」（这块 tile 已经死了，可以回收）。</p>
+</div>
+<div class="card highlight">
+<h4>问题 B：数据什么时候到齐了？（tile becomes alive）</h4>
+<p>消费者需要知道生产者已经把整批数据写完并且全部可见，才能开始读。</p>
+<p style="margin-top:8px">这体现为<b>生产者在 c-barrier 上 arrive</b>，语义是「tile has become live」（这块 tile 活了，可以消费）。</p>
+</div>
+</div>
+
+<div class="card info">
+<h4>为什么「统一」很重要</h4>
+<p>因为一旦承认二者同构，就可以用<b>同一套机制</b>（同一种屏障结构 + 同一条 arrive 语义）解决两个方向，而不需要设计两种不同的原语。这直接导出了第 ⑤ 页的<b>分裂屏障（p-barrier / c-barrier）</b>设计：两个屏障结构完全相同，只是摆放的位置和谁 wait / 谁 arrive 互换。对称性带来了实现上的极大简化——硬件只需要实现一种屏障。</p>
+</div>
+</section>
+
+<section>
+<h2>CGA 的并发保证到哪里为止</h2>
+<p class="lead">Hopper 的 CGA（Cooperative Group Array，即 CUDA 里的 thread block cluster）保证同一 CGA 内的所有 CTA <b>并发驻留</b>。但专利特意指出了这个保证的边界，而这个边界正是问题的来源。</p>
+<div class="quote">
+"the concurrency guarantee in one embodiment does not extend to ordering execution on one SM relative to execution on another SM(s)."
+<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span>
+</div>
+<div class="card warning">
+<h4>并发 ≠ 有序</h4>
+<p>CGA 保证的是<b>共存</b>（co-residency）——所有 CTA 同时在跑，所以可以安全地互相等待而不会死锁。但它<b>不</b>保证 SM0 上的指令 X 与 SM1 上的指令 Y 之间有任何执行顺序关系。</p>
+<p style="margin-top:10px">这就是为什么老的 <code>ARRIVES.LDGSTSBAR</code> 指令救不了场。专利明确指出它的限制：</p>
+<div class="quote">"depends on the producer performing the data store instruction 'LDGSTS' and the consumer issuing the load 'LDS' being on the <b>same SM</b>."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span></div>
+<p>同一个 SM 内，指令流有天然的程序序可依赖；跨 SM 则完全没有。因此当 Hopper 把数据交换从「CTA 内共享内存」扩展到「CGA 内跨 SM 共享内存」时，原有的同步指令<b>整体失效</b>，必须重新发明。</p>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 3 ============ -->
+<div class="tab" id="t-lat">
+
+<section>
+<h2>延迟阶梯：3~4 个往返 → 1.5 → 0.5</h2>
+<p class="lead">这是本篇专利最有说服力的部分。说明书用 FIG. 5A / 5B / 6D 三张图搭出一条清晰的量化阶梯，每下一级都对应一个具体的机制改变。下面的条形图按往返数（roundtrip）等比绘制。</p>
+
+<div class="lat">
+  <div class="row"><div class="lbl">FIG. 5A 传统 L2 中介</div><div class="bar b-red" style="width:88%">3 ~ 4 个往返</div></div>
+  <div class="row"><div class="lbl">FIG. 5B/5C DSMEM + 独立标志位</div><div class="bar b-amber" style="width:38%">约 1.5 个往返</div></div>
+  <div class="row"><div class="lbl">FIG. 6D Store+Arrive 合并</div><div class="bar b-green" style="width:14%">约 0.5 个往返（SOL）</div></div>
+</div>
+
+<div class="card danger">
+<h4>第一级：FIG. 5A —— 经 L2 的传统同步，3~4 个往返</h4>
+<p>完整序列是：生产者 <code>store</code> 数据到 L2 → 发 <code>membar</code> 内存栅栏并<b>等待确认回来</b> → 确认到达后 <code>store</code> 标志位 → 消费者<b>轮询</b>标志位直到看见 → 执行 <code>acquire</code> → 最后 <code>load</code> 数据。</p>
+<p style="margin-top:10px">代价拆解：<b>membar 的确认</b>是一个完整往返；<b>标志位写入 + 消费者看见</b>是又一个；<b>消费者 load 数据</b>还要一个。加上轮询的抖动，总计 3~4 个往返。专利评价这个 fence 操作 "is generally expensive"。</p>
+</div>
+
+<div class="card warning">
+<h4>第二级：FIG. 5B / 5C —— DSMEM 远程写 + 独立标志位，约 1.5 个往返</h4>
+<p>Hopper 的 DSMEM 让 SM0 可以直接写 SM1 的共享内存，于是数据不必绕 L2。生产者远程 store 数据，再远程 store 一个标志位 F 到消费者的共享内存。</p>
+<p style="margin-top:10px">专利在这里用了一个非常生动的类比：这就像<b>把杂货放在门口</b>（groceries on the doorstep）——</p>
+<div class="quote">"except that the flag remains set for whenever the consumer SM1 cares to read it"<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span></div>
+<p>好处：数据和标志都推到了对端本地，消费者读它们是<b>本地共享内存访问</b>，几乎零延迟。这已经省掉了「消费者远程 load 数据」那个往返。</p>
+<p style="margin-top:10px"><b>但为什么还剩 1.5 个而不是 0.5 个？</b>因为 store 和标志位是<b>两条独立消息</b>，它们可能被重排（hit-under-miss、不同 L2 slice 距离差异）。必须插入栅栏保证「数据先于标志位可见」，那半个到一个往返就是栅栏的代价。</p>
+</div>
+
+<div class="card highlight">
+<h4>第三级：FIG. 6D —— Store+Arrive 合并，约 0.5 个往返 = 光速同步</h4>
+<p>既然问题出在「两条消息之间的顺序」，那就<b>不要两条消息</b>。一条合并的 store+arrive 消息抵达对端时，硬件在同一处理过程中完成写数据和更新屏障。顺序问题不是被解决，而是被<b>定义掉了</b>。</p>
+<p style="margin-top:10px">于是总延迟 = 消息从源 SM 飞到目标 SM 的单程时间 = <b>0.5 个往返</b>。这是物理下界，因此专利称之为 <b>SOL（speed of light）同步</b>。</p>
+</div>
+</section>
+
+<section>
+<h2>不同内存层级的完整延迟对照（FIG. 9D / 9E / 9F）</h2>
+<p class="lead">专利还给出了同一套同步逻辑落在三种不同内存路径上的延迟对照，这对理解「为什么必须是共享内存」很关键。</p>
+<table>
+<thead><tr><th style="width:14%">图号</th><th style="width:26%">数据交换路径</th><th style="width:18%">延迟</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><b>FIG. 9D</b></td><td>全局内存（global memory）</td><td><span class="tag r">3 ~ 4 个往返</span></td><td>数据要经 L2 甚至 HBM，加上 fence 确认与标志位轮询。这是没有 CGA 时的基线</td></tr>
+<tr><td><b>FIG. 9E</b></td><td><b>共享内存 SM2SM</b>（GPC-CGA 作用域）</td><td><span class="tag g">约 0.5 个往返</span></td><td>本篇的目标形态：合并 store+arrive 直达对端共享内存。<b>要求生产者与消费者的 CTA 在同一 CGA 内</b></td></tr>
+<tr><td><b>FIG. 9F</b></td><td>L2 中介（L2-mediated）</td><td><span class="tag a">约 2 个 L2 往返</span></td><td>第 ⑦ 页详解。第一个往返换取「缓冲区就绪」信息，第二个往返推数据 + arrive</td></tr>
+</tbody>
+</table>
+<div class="card info">
+<h4>一个必须说清的对比前提</h4>
+<p>专利自己给出了这个说明：FIG. 9F 的计数<b>包含了缓冲区可用性同步</b>（即消费者告知生产者「有空位」的那一轮），而 FIG. 9D / 9E 的计数<b>不包含</b>。因此若要做严格同口径比较，9E 也需要加上获知空位的开销——这正是第 ⑤ 页 <b>p-barrier</b> 存在的意义：把「空位通知」也做成 0.5 个往返的远程 arrive，并且让它与数据传输<b>流水重叠</b>，从而在稳态下完全隐藏。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 FIG. 9D–9F 描述</a></p>
+</div>
+</section>
+
+<section>
+<h2>根因剖析：为什么 store 和 arrive 会被重排</h2>
+<p class="lead">这一节值得单独展开，因为它是全篇的技术支点。如果 store 和 arrive 天然有序，本篇专利就不必存在。</p>
+<div class="grid g2">
+<div class="card warning">
+<h4>原因一：hit under miss（命中越过未命中）</h4>
+<p>现代缓存允许在一次未命中还在处理时，让后续的命中请求先完成。假设 <code>store 数据</code> 未命中（要去更远的地方取/写），而紧随其后的 <code>arrive</code> 恰好命中，那么 <b>arrive 会先于数据落地</b>。消费者被屏障放行时，数据还在路上。</p>
+</div>
+<div class="card warning">
+<h4>原因二：L2 slice 传输距离不同</h4>
+<p>GPU 的 L2 被切分为许多 slice，物理上散布在芯片各处，与 SM 的距离各不相同。数据地址和屏障地址一般会<b>哈希到不同的 slice</b>，两条消息的物理飞行距离因此不同。距离短的先到——而这与程序序无关。</p>
+</div>
+</div>
+<div class="card highlight">
+<h4>合并指令为什么能根治</h4>
+<p>把两件事合成一条消息后，<b>只存在一个目的地、一条路径、一次到达事件</b>。数据地址与屏障地址在同一条消息里携带（见第 ④ 页 FIG. 7C 的四字段格式），而且专利明确要求二者位于<b>同一个目标 CTA 的共享内存</b>：接收缓冲区和屏障在同一块共享内存中。硬件在本地原子地完成「写入 + 计数更新」（权利要求 11 明确要求 <b>atomically</b>）。既然没有第二条消息，就没有第二条路径，也就没有重排的可能。</p>
+<p style="margin-top:10px">更漂亮的推论在第 ④ 页：<b>不同的合并指令之间也不需要保序</b>。FIG. 7A 展示了 stA 走 path 0、stB/stC 走 path 1 的场景，三条指令各自更新同一个屏障，最终计数正确——因为正确性只依赖<b>计数总量</b>，不依赖到达顺序。</p>
+</div>
+</section>
+
+</div>
+<!-- ============ TAB 4 ============ -->
+<div class="tab" id="t-inst">
+
+<section>
+<h2>指令格式：FIG. 7C 的四个字段</h2>
+<p class="lead">一条合并 store+arrive 指令需要同时告诉硬件两个完全独立的目标地址：数据写到哪里、屏障更新在哪里。专利给出了极为具体的位宽分配。</p>
+
+<pre><code>FIG. 7C  合并 store + arrive 指令格式（非限制性示例尺寸）
+
+ +----------------+-------------------------+----------------+-------------------------+
+ |  Barrier       |  Barrier Address        |  Data          |  Data Address           |
+ |  CTA-ID        |  (目标 CTA 共享内存    |  CTA-ID        |  (目标 CTA 共享内存    |
+ |                |   中的屏障偏移)        |                |   中的数据偏移)        |
+ +----------------+-------------------------+----------------+-------------------------+
+ |    8 bits      |        24 bits          |    8 bits      |        24 bits          |
+ +----------------+-------------------------+----------------+-------------------------+
+
+ 备选实施例：把多个目标 CTA-ID 编码为 bit-mask  ==>  一次多播（multicast）
+                                              参见同族申请 17/691,288</code></pre>
+
+<div class="card info">
+<h4>位宽背后的信息量</h4>
+<ul>
+<li><b>CTA-ID 各 8 位</b> → 一个 CGA 最多可寻址 256 个 CTA。实际 Hopper 的 cluster 最大为 16 个 CTA（默认 8），因此 8 位是很宽裕的预留。</li>
+<li><b>地址各 24 位</b> → 16 MB 寻址空间。单个 SM 的共享内存只有百 KB 量级，所以 24 位足以覆盖整个 CGA 聚合后的分布式共享内存空间。</li>
+<li><b>关键设计：两个 CTA-ID 分开给</b> → 屏障和数据<b>原则上可以在不同 CTA</b>。不过专利在 ISA 章节又补一句：在某些实施例中屏障的 CTA_ID <b>必须与数据的 CTA_ID 相同</b>——这才能保证两个副作用在同一块本地共享内存上原子完成。</li>
+</ul>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 FIG. 7C 描述与 ISA 章节</a></p>
+</div>
+
+<div class="card warning">
+<h4>FIG. 7D：如何塞进固定大小的包结构</h4>
+<p>真实的互连传输不能发任意长度的指令，必须适配固定包格式。专利的方案是：<b>第一个包携带数据地址，第二个包携带屏障地址</b>。</p>
+<p style="margin-top:10px">这看上去是个妙论——不是又回到两条消息了吗？并不是。关键区别在于这是<b>同一条指令在链路层的分片</b>，包与包之间在同一个事务内、走同一条路径、按序交付，而不是两个可被任意重排的独立内存事务。专利还指出这个设计的额外好处：<b>若要存更多数据，可以继续追加包</b>（对应 32 / 64 / 128 字节等多种操作数尺寸）。</p>
+</div>
+</section>
+
+<section>
+<h2>ISA：两条新指令的原文语法</h2>
+<p class="lead">说明书的 <b>Instruction Set Architecture</b> 章节直接给出了指令助记符与操作数。这部分对应今天 PTX 的 <code>st.async</code> / <code>red.async</code>（第 ⑨ 页对照）。</p>
+
+<h3>① Store with Sync：<code>ST_CGA_Sync</code></h3>
+<pre><code>ST_CGA_Sync Ra, Rb
+
+  Ra: target addresses, contains
+        CTAID(s) of target CTA(s) - multicast by specifying multiple CTA IDs
+        DataAddr : shared memory (SMEM) offset in CTA to perform store to
+        BarAddr  : shared memory offset in CTA to perform barrier update to
+  Rb: data to store</code></pre>
+<div class="quote">
+"This instruction stores data to target/destination CTA(s) SMEM[DataAddr]. <b>After data store is guaranteed visible</b>, it decrements the transaction count field of barrier at target CTA(s) SMEM[BarAddr] <b>by the amount of data (e.g., number of bytes) being stored</b>."
+<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 ISA 章节</a></span>
+</div>
+<div class="card highlight">
+<h4>三个值得注意的语义细节</h4>
+<ul>
+<li><b>"After data store is guaranteed visible"</b> —— 这句是硬件层面的顺序保证，发生在<b>接收端本地</b>，而不是靠网络上的栅栏。硬件先把数据写进共享内存使其可见，再更新旁边的屏障字。本地操作，不花网络往返。</li>
+<li><b>计数以字节为单位（by the amount of data）</b> —— 不是「到达一条消息计一次」，而是「到达 N 字节就减 N」。这使得<b>任意数量的生产者可以以任意粒度向同一缓冲区写入</b>，只要总字节数对。这也直接支持了<b>动态大小的缓冲区</b>。</li>
+<li><b>作用域限制</b> —— 专利写得很重：该 store "may be regarded as <b>invalid</b> unless addressed to shared memory located in <b>another SM</b> belonging to a CTA that is part of the <b>same CGA</b> as the source CTA"。这就是今天 PTX 中 <code>.shared::cluster</code> 作用域限定的专利源头。</li>
+</ul>
+</div>
+
+<h3>② Reduction with Sync：<code>REDS_CGA.ARRIVE_TCNT</code></h3>
+<pre><code>REDS_CGA.ARRIVE_TCNT URa, URb
+
+  URa: target addresses, contains
+         CTAID(s) of target CTA(s) - multicast by specifying multiple CTA IDs
+         BarAddr : SMEM offset in CTA to perform barrier update to
+  URb: expected transaction count (e.g. in bytes)</code></pre>
+<div class="card info">
+<h4>为什么需要一条「只 arrive 不写数据」的指令</h4>
+<p>两个用途。第一，它做<b>共享内存原子归约而非存储</b>（atomic reductions instead of stores）。第二，它是「宣告预期值」的手段：<code>URb</code> 携带的是预期事务计数（字节数），指令会把它<b>加到</b>目标屏障的事务计数上。专利还提到一个工程细节：可以用归约操作<b>先把各个线程的字节数加总再存入 URb</b>，从而一个 warp 只需发一条消息而非 32 条。</p>
+<p style="margin-top:8px">这正是今天 PTX <code>mbarrier.expect_tx</code> 与 <code>red.async</code> 的雏形。</p>
+</div>
+
+<h3>③ 显式字节计数变体</h3>
+<p>专利还给了一对变体，把已写字节数<b>显式当作操作数跟踪</b>，适用于编译器/库需要自己累加计数的场景：</p>
+<pre><code>ST_CGA_Sync [Addrs], Data, TCount
+  Addrs : CTAID(s) + DataAddr + BarAddr
+  Data  : data to store
+  TCount: The running byte transaction count
+
+  操作：存入 SMEM[DataAddr]；确保可见后将 SMEM[BarAddr] 的 ByteTransactionCnt
+         减去已写字节数；同时把 TCount 加上已写字节数
+
+RED_CGA_Arrive [BarAddr], TCount
+  BarAddr: CTAID(s)（可多播）+ SMEM 屏障偏移
+  TCount : 本线程的字节事务计数
+
+  操作：先在所有线程间归约（reduce）TCount，再把总和加到
+         SMEM[BarAddr] 的 ByteTransactionCnt 字段</code></pre>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 Instruction Set Architecture 章节全文</a></p>
+</section>
+
+<section>
+<h2>FIG. 7A：多路径不保序仍然正确</h2>
+<p class="lead">这张图是本篇专利最有力的论证。它要证明的不是「快」，而是「可以完全不用栅栏」。</p>
+
+<pre><code>FIG. 7A  同一对 SM 之间的三条合并指令走不同路径
+
+      SM0 (生产者)                interconnect switch              SM1 (消费者)
+   +----------------+                                            +------------------+
+   |  stA[BarS] ----+---- path 0 ------------------------------->|  Receive Buffer  |
+   |                |                                            |   (数据目的地)   |
+   |  stB[BarS] ----+---- path 1 --\                              |                  |
+   |  stC[BarS] ----+---- path 1 ---+---------------------------->|  BarS  事务屏障   |
+   +----------------+                                            +------------------+
+
+   初始  arrive 操作将 transaction count 设为预期值 3
+   每条合并 store+arrive 到达时将 transaction count 递增 1
+   当 transaction count 归 0  ==>  屏障清零，消费者被放行
+
+   关键：stA 与 stB/stC 路径不同，到达顺序任意  ==>  仍然正确</code></pre>
+
+<div class="card highlight">
+<h4>为什么这个结论很重</h4>
+<p>传统方案里，多条 store 走不同路径是个<b>灾难</b>——你无法知道什么时候全部到齐，所以才需要向所有路径发栅栏去「扫清」（就是第 ⑥ 页那个备选方案）。但一旦每条 store 自己携带了 arrive，正确性就只依赖<b>计数总量是否凑齐</b>，而计数是可交换的（commutative）。专利的原句是：</p>
+<div class="quote">"Thus, by using the combined store and arrive instructions for performing full or partial updates of the same barrier upon each store, example embodiments <b>avoid imposing any requirements of having to transmit fence flush instructions or any other ordering requirements</b>."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 FIG. 7A 描述</a></span></div>
+<p>注意 "full or <b>partial</b> updates" ——单条指令只需完成屏障的<b>部分</b>更新。这才是事务屏障（transaction barrier）而非传统到达屏障的本质：它追踪的是<b>数据量</b>，不是参与者个数。</p>
+</div>
+
+<div class="card info">
+<h4>同一块共享内存同时扮演两个角色</h4>
+<p>专利特意强调：「同一个目标共享内存既是<b>数据目的地</b>也是<b>同步目的地</b>」——接收缓冲区和屏障字在同一块物理存储里。这是原子性能在本地廉价实现的前提（对应权利要求 11 与 20 的 <code>atomically</code>），也是为何该方案<b>必须</b>依赖 DSMEM 而不能用全局内存的原因。</p>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 5 ============ -->
+<div class="tab" id="t-barrier">
+
+<section>
+<h2>事务屏障的结构（FIG. 7B / 9C）</h2>
+<p class="lead">传统到达屏障只数「有多少个参与者到了」。事务屏障多了一个维度：「有多少数据到了」。两个维度必须同时满足才能清零。</p>
+
+<table>
+<thead><tr><th style="width:26%">字段</th><th style="width:20%">谁修改</th><th>语义</th></tr></thead>
+<tbody>
+<tr><td><b>expected arrive count</b><br>（预期到达计数）</td><td>软件初始化</td><td>预期有多少个参与者会 arrive。对应传统屏障的语义</td></tr>
+<tr><td><b>arrive count</b><br>（实际到达计数）</td><td>每次 arrive 递增</td><td>已经有多少个参与者 arrive 了</td></tr>
+<tr><td><b>transaction count</b><br>（事务计数 / ByteTransactionCnt）</td><td>每次 store 按<b>字节数</b>更新</td><td><b>本篇的核心新增</b>。追踪已到达/待到达的数据量。专利中两种方向都出现过（arrive 设预期值、store 递增至零；或 arrive 加预期值、store 递减），本质相同</td></tr>
+<tr><td><b>fence transaction count</b><br>（栅栏事务计数）</td><td>栅栏递增、arrive 递减 N</td><td>仅用于第 ⑥ 页的栅栏复制方案。专利明确：<b>由硬件管理，对软件不透明（opaque to software）</b>，且<b>可以为正或为负</b></td></tr>
+</tbody>
+</table>
+
+<div class="card info">
+<h4>「可以为负」为何重要</h4>
+<p>因为栅栏递增与 arrive 递减是<b>完全不保序</b>的（专利："the arrive may be unordered with respect to the fence transactions"）。如果 arrive 先到，计数就会先变成 −N，然后被 N 条陆续到达的栅栏一一抬回 0。允许负值是这个无序设计成立的必要条件。后面第 ⑨ 页会看到，PTX 规范里 <code>tx-count</code> 的法定最小值就是 <b>−(2<sup>20</sup>−1)</b>——专利的这个设计一字不改地落在了公开规范上。</p>
+</div>
+</section>
+
+<section>
+<h2>分裂屏障：p-barrier 与 c-barrier（FIG. 6B）</h2>
+<p class="lead">如果只有合并指令，你只解决了生产者 → 消费者这一个方向。反方向的「缓冲区可用」通知如果处理不当，会把前面省下的延迟全部吃回。</p>
+
+<div class="card danger">
+<h4>被否定的方案：远程 wait（remote polling）</h4>
+<p>最直接的写法是：只维护一个屏障，放在消费者那边，生产者需要知道缓冲区空了时就去读它。但专利直接否定了这条路：远程 wait 「can be expensive and/or in some cases even <b>impractical to implement</b> due, for example, to the cost of implementing <b>remote polling</b>」。</p>
+<p style="margin-top:10px">原因不难想：轮询一个<b>远程</b>内存位置，每次轮询都是一次完整的网络往返，并且持续占用互连带宽。上一代的硬件 <code>wait()</code> 实现也完全不支持这么做。</p>
+</div>
+
+<div class="grid g2">
+<div class="card highlight">
+<h4>c-barrier（consumer barrier）</h4>
+<p><b>位置</b>：与消费者同居（co-located with consumer）</p>
+<p><b>消费者</b>：在本地 <code>wait()</code></p>
+<p><b>生产者</b>：远程 <code>arrive</code>（随着合并 store+arrive 一起送达）</p>
+<p style="margin-top:8px">语义：<b>tile has become live</b>（数据到齐了）</p>
+</div>
+<div class="card purple">
+<h4>p-barrier（producer barrier）</h4>
+<p><b>位置</b>：与生产者同居（co-located with producer）</p>
+<p><b>生产者</b>：在本地 <code>wait()</code></p>
+<p><b>消费者</b>：远程 <code>arrive</code></p>
+<p style="margin-top:8px">语义：<b>tile has become dead</b>（缓冲区空了）</p>
+</div>
+</div>
+
+<div class="card highlight">
+<h4>设计的全部价值就在这一句里</h4>
+<div class="quote">结果是："no SM... is waiting on a barrier that is <b>not in its own local shared memory</b>"<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 FIG. 6B 描述</a></span></div>
+<p>这带来两个巨大的工程好处：</p>
+<ul>
+<li><b>等待永远是本地的</b> —— 轮询（或硬件阻塞）只碰本 SM 的共享内存，不占互连带宽。</li>
+<li><b>上一代的 <code>wait()</code> 可以原样复用</b> —— 专利明确指出无需任何修改。这是一个极具价值的向后兼容性论据：新特性只需要新增 <code>arrive</code> 侧的硬件，<code>wait</code> 侧零改动。</li>
+</ul>
+</div>
+
+<div class="card info">
+<h4>消费者如何远程 arrive 到 p-barrier？三种实现</h4>
+<ol>
+<li><b>复用合并指令，配一个假写地址</b>（"with a <b>dummy store address</b>"）—— 零硬件成本，直接用现有指令。代价是白白写了几个字节。</li>
+<li><b>优化为不带 store 的纯远程 arrive</b> —— 专利提到可以引入专用指令。</li>
+<li><b>多生产者场景</b> —— 向每个生产者各发一条；或者<b>用多播一次搞定</b>（引入同族申请 <a href="https://patents.google.com/patent/US12020035B2/en" target="_blank">17/691,288 → US12020035B2</a>）。</li>
+</ol>
+<p style="margin-top:8px">第三点很能说明专利簇的协同设计：多播不仅用于发数据，也用于发同步信号。</p>
+</div>
+</section>
+
+<section>
+<h2>FIG. 6C：完整的双缓冲流水时序</h2>
+<p class="lead">专利给出了逻辑时间步 0~4 的完整描述。这是理解两个屏障如何協同的关键。</p>
+
+<table>
+<thead><tr><th style="width:9%">时间步</th><th style="width:44%">生产者（SM0）</th><th>消费者（SM1）</th></tr></thead>
+<tbody>
+<tr><td><b>0</b></td><td>在 <b>p-barrier tile 0</b> 上 wait（等待「可以开工」信号）</td><td>—</td></tr>
+<tr><td><b>1</b></td><td>仍在等</td><td>向 <b>p-barrier 0 和 p-barrier 1 都 arrive</b>（两块 tile 初始都是 dead），然后在 <b>c-barrier 0</b> 上 wait</td></tr>
+<tr><td><b>2</b></td><td>p-barrier 0 被放行 → 用合并 <b>STS+Arrive</b> 填充 <b>Tile 0</b>（可选多播），arrive 目标为 c-barrier-0；随后在 <b>p-barrier 1</b> 上 wait</td><td>在 c-barrier 0 上等待</td></tr>
+<tr><td><b>3</b></td><td>因时间步 1 已经 arrive 过 p-barrier 1，<b>生产者立即被放行，开始填充 Tile 1</b></td><td>最后一条 STS+Arrive 使 c-barrier 0 清零 → 消费 Tile 0 → 向 <b>p-barrier-0 arrive</b>（告知 Tile 0 可重用）→ 在 <b>c-barrier 1</b> 上 wait</td></tr>
+<tr><td><b>4</b></td><td colspan="2"><b>稳态（steady state）</b>。专利的条件是：当平均往返延迟（或 tile 计算时间）超过 tile 尺寸 T 所对应的传输时间时达到。此时两侧均不再阻塞，同步开销完全隐藏在流水重叠中</td></tr>
+</tbody>
+</table>
+
+<div class="card highlight">
+<h4>为什么时间步 1 要「一次 arrive 两个 p-barrier」</h4>
+<p>这是整个时序里最精妙的一笔。消费者一开始就告诉生产者「两块 tile 都是空的」，于是当生产者填完 Tile 0 去等 p-barrier 1 时，<b>该屏障已经是放行状态</b>——生产者零等待地直接接着填 Tile 1。这就是双缓冲（double buffering）能把延迟完全隐藏的机制：<b>「申请下一块缓冲区」的往返与「传输当前块」的往返完全重叠</b>。</p>
+</div>
+
+<div class="card warning">
+<h4>tile 尺寸 T 是个自由参数</h4>
+<p>专利明确指出 T 是可调的，与<b>驻留 tile 数量</b>构成权衷：T 越大，单次传输越能摊薄同步开销，但共享内存里能同时存放的 tile 数越少，流水级数变少；T 越小则相反。这与今天 CUTLASS 里调 tile shape 与 stage 数量的实践完全一致。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 FIG. 6C 描述</a></p>
+</div>
+</section>
+
+<section>
+<h2>FIG. 8：硬件屏障支持单元——把轮询从软件里抿除</h2>
+<p class="lead">合并指令解决了「发」的一侧，但「等」的一侧如果仍用软件轮询，就会在最后一米把节省的延迟吃掉。FIG. 8 的硬件单元负责这一侧。</p>
+<div class="card highlight">
+<h4>它做的事情：让接收线程「只等屏障清零」</h4>
+<div class="quote">"The barrier support unit 800 may accelerate the barrier implementations by enabling the receiving thread to <b>simply wait on the barrier 'clearing'</b>... The hardware-implemented synchronization unit... handles the details of waiting for the count to be reached."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 FIG. 8 描述</a>，完整描述引入同族申请 <a href="https://patents.google.com/patent/US12536056B2/en" target="_blank">17/691,296 → US12536056B2</a></span></div>
+<p>从编程模型看，线程不再写「while (bar != 0) ;」，而是执行一条阻塞指令，由硬件在计数满足时唤醒它。共享内存带宽不再被轮询吃掉，且唤醒延迟从「轮询周期」降到「硬件响应」。</p>
+</div>
+<div class="card danger">
+<h4>但硬件代替不了一件事：告诉它预期多少字节</h4>
+<p>专利很诚实地写下了这个限制：<b>"the receiving thread software does have to know the expected byte count and supply it to the barrier support unit."</b></p>
+<p style="margin-top:10px">这一句直接导出了第 ⑥ 页的栅栏复制方案存在的全部理由——当软件真的无法提供预期字节数时，合并指令方案就用不了，必须换一套机制。设计上两套方案并不矛盾，而是互补。</p>
+</div>
+
+<h3>一个容易被忽略的硬件细节：<code>gpc_local_cga_id</code></h3>
+<div class="card info">
+<p>专利在环境描述中提到，SM2SM 消息包中包含一个 <code>U008</code> 类型的字段 <code>gpc_local_cga_id</code>，它同时扮演两个角色：</p>
+<ul>
+<li><b>DSMEM 段的指针</b> —— 定位目标 CTA 的共享内存段在哪里</li>
+<li><b>每个 GPC_CGA 的屏障状态跟踪 ID</b> —— "the id for tracking barrier state for each GPC_CGA"</li>
+</ul>
+<p style="margin-top:8px">一个 8 位字段同时完成内存寻址与同步状态寻址，这正是「数据与屏障同居一块共享内存」这个设计在硬件字段层面的直接体现，也是它能做到低开销的原因之一。</p>
+</div>
+</section>
+
+</div>
+<!-- ============ TAB 6 ============ -->
+<div class="tab" id="t-fence">
+
+<section>
+<h2>另一条设计路线：栅栏复制到所有路径</h2>
+<p class="lead">这不是「次要的备选方案」，而是一个独立成立的设计点，解决合并指令方案的一个硬性前提。理解它能帮你看清整篇专利的完整设计空间。</p>
+
+<div class="card danger">
+<h4>合并指令方案的硬前提：消费者必须事先知道字节数</h4>
+<p>事务屏障靠「已到达字节数是否等于预期字节数」判断完成。这意味着消费者在等待之前<b>必须先把预期字节数写进屏障</b>。多数情况下这没问题（比如 GEMM 里 tile 尺寸是编译期常量）。但专利举了一个非常有说服力的反例：</p>
+<div class="quote">"if a subroutine is called to do some of the data writes, it may be difficult for the calling code to know <b>how many bytes the subroutine writes</b>."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 Other Implementations 章节</a></span></div>
+<p>这是一个真实的抽象边界问题：一旦写操作被封装进库函数，调用方就丧失了字节数信息。要求调用方知道，等于打破封装。</p>
+</div>
+
+<div class="card highlight">
+<h4>解法：不数字节，改数路径</h4>
+<p>核心洞察是：<b>互连网络中任意两个处理器之间的路径条数 N 是有限且已知的</b>。专利明确写道，N 「可能与实现相关，但在启动时即可知，并且启动后保持固定」。</p>
+<p style="margin-top:10px">于是：生产者<b>随意写多少数据都行</b>，写完之后发一条内存写栅栏，并且把这条栅栏<b>复制到所有 N 条可能承载过写操作的路径上</b>。每条栅栏抵达目的地时把屏障计数加一。消费者等到计数达到 N，就知道所有写操作都已落地。</p>
+<div class="quote">"the fence is sent after the write on the same network paths that write could have taken, but the fence is <b>replicated to all paths on which writes might have travelled</b>."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span></div>
+</div>
+
+<pre><code>FIG. 9A  一条栅栏指令被复制成四条栅栏消息
+
+     SM0 (源)                 interconnect (4 条路径)              SM1 (目的)
+  +-------------+                                              +----------------+
+  |             |--- path 0 ---> fence(BarS) ----------------->|                |
+  |  fence      |--- path 1 ---> fence(BarS) ----------------->|  BarS          |
+  |  [BarS]     |--- path 2 ---> fence(BarS) ----------------->|   arrive count |
+  |             |--- path 3 ---> fence(BarS) ----------------->|   expected cnt |
+  |             |                                             |   fence count  |
+  |  arrive     |--- 任意一条路径 -----------------------------> |                |
+  +-------------+                                              +----------------+
+
+  每条 fence 抵达  ==>  fence transaction count += 1
+  arrive 抵达      ==>  arrive count += 1  且  fence transaction count -= N
+
+  清零条件： (arrive count == expected arrive count) && (fence transaction count == 0)</code></pre>
+
+<div class="card info">
+<h4>为什么这样能保证正确性</h4>
+<p>关键在于栅栏的<b>刷新（flush）语义</b>：栅栏指令在每条从源 SM 到目的 SM 的路径上「跟随并刷新此前的内存指令」。专利的表述非常精确：</p>
+<div class="quote">"the fence <b>cannot arrive at the destination SM on all paths</b> until all stores prior to the fence have arrived at the destination SM."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span></div>
+<p>注意 <b>on all paths</b> 三个字。单条路径上的栅栏只能保证那条路径被扫清；只有当<b>所有</b>路径上的栅栏都到齐，才能断言没有任何一个写操作还在飞行中。这就是为什么必须复制到全部路径，也是为什么计数目标恰好是 N。</p>
+</div>
+
+<div class="card purple">
+<h4>清零条件的两个分量各管一件事</h4>
+<p>专利给出的屏障等待指令返回「clear」状态的条件是：</p>
+<pre><code>(arrive count == expected arrive count) &amp;&amp; (fence transaction count == 0)</code></pre>
+<ul>
+<li><b>arrive count == expected arrive count</b> 管「<b>是否所有生产者都发过话了</b>」。多生产者场景下，需要等齐每个参与者。</li>
+<li><b>fence transaction count == 0</b> 管「<b>是否所有数据都真的落地了</b>」。栅栏 +1、arrive −N，两者相抵为零才说明每个 arrive 都配齐了它的 N 条栅栏。</li>
+</ul>
+<p style="margin-top:8px">这个加减配平的设计漂亮之处在于：它<b>天然支持多生产者且完全不需要顺序</b>。三个生产者各自发 1 个 arrive 和 4 条栅栏，共 3 个 arrive（−12）和 12 条栅栏（+12），无论以什么顺序抵达，最终都归零。</p>
+</div>
+
+<div class="card warning">
+<h4>N 未知怎么办</h4>
+<p>专利留了一手：「Note also the assumption that N is statically known in hardware (e.g. 4). <b>If N is not known, the arrive may carry the N.</b>」——把 N 放进 arrive 消息里当作操作数传过来。这让机制可以适应运行期才确定拓扑的场景（比如不同的 MIG 切分、不同的 GPC 配置）。</p>
+</div>
+</section>
+
+<section>
+<h2>两种方案的正面对比</h2>
+<table>
+<thead><tr><th style="width:20%">维度</th><th style="width:40%">合并 Store+Arrive（主方案）</th><th>栅栏复制（备选方案）</th></tr></thead>
+<tbody>
+<tr><td><b>延迟</b></td><td><span class="tag g">约 0.5 个往返</span>物理下界</td><td><span class="tag a">&gt; 0.5 且 &lt; 1 个往返</span>栅栏需在写之后发出</td></tr>
+<tr><td><b>是否需预知字节数</b></td><td><span class="tag r">需要</span>消费者必须写入预期事务计数</td><td><span class="tag g">不需要</span>这是它存在的全部理由</td></tr>
+<tr><td><b>互连流量</b></td><td><span class="tag g">低</span>一条消息干两件事，无额外流量</td><td><span class="tag r">高</span>每个栅栏被复制 N 份</td></tr>
+<tr><td><b>屏障字段</b></td><td>arrive count + expected + transaction count</td><td>额外需要 <b>fence transaction count</b>（硬件管理、软件不可见、可正可负）</td></tr>
+<tr><td><b>对封装的友好度</b></td><td><span class="tag r">差</span>字节数必须穿透抽象边界</td><td><span class="tag g">好</span>子程序可以随意写，调用方无需知情</td></tr>
+<tr><td><b>写入量的灵活性</b></td><td>支持动态大小缓冲区（按字节累加），但总量须最终对齐预期值</td><td><b>完全任意</b>——「write as much data as desired (and/or allowed)」</td></tr>
+<tr><td><b>权利要求归属</b></td><td>权利要求 <b>8 / 9 / 10 / 11</b>（单消息、合并指令、事务计数、原子性）</td><td>权利要求 <b>12–15</b> 与 <b>24–25</b>（每条互连路径一条第二消息）</td></tr>
+</tbody>
+</table>
+<div class="card highlight">
+<h4>解读：这不是取舍失败，而是覆盖了两个不同的客户</h4>
+<p>把两套方案都写进同一篇申请，并且分别用独立的权利要求组保护，说明 NVIDIA 清楚地知道它们服务不同场景。<b>合并指令服务于 CUTLASS 这类字节数编译期已知、追求极限延迟的库</b>；<b>栅栏复制服务于通用代码与库边界模糊的场景</b>。从今天回头看，PTX 里暴露给用户的 <code>st.async</code> + <code>mbarrier</code> tx-count（第 ⑨ 页）走的是前一条路——因为 CUDA 选择让库作者承担声明字节数的责任，换取极限性能。</p>
+</div>
+</section>
+
+<section>
+<h2>互连流量放大 N 倍怎么办：FIG. 9B 的缓解手段</h2>
+<div class="card warning">
+<p>专利自己承认了这个代价：栅栏「because of their replication to all paths between the source and destination, may generate <b>substantial additional traffic</b> on the interconnect」——源线程每发一个栅栏包，内存系统就要复制 N 个包分别发往每条路径。</p>
+<p style="margin-top:10px">FIG. 9B 给出的缓解思路是<b>限制 SM2SM 流量只走链路的一个子集</b>：例如用四条链路，每条承载 25% 的流量。这样 N 被人为压到 4 而不是全部可用路径数。</p>
+<p style="margin-top:10px">这是一个典型的架构权衡：<b>牺牲单对 SM 之间的峰值带宽，换取 N 变小、从而栅栏放大倍数变小</b>。对于同步密集但单次数据量不大的负载（正是 CGA 内 tile 传递的特征），这个交换是划算的。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 FIG. 9A–9B 描述</a></p>
+</div>
+</section>
+
+<section>
+<h2>专利对这条路线的延迟评估</h2>
+<div class="card info">
+<p>专利把它与 FIG. 5A 的传统方案对比，措辞很克制也很准确：</p>
+<div class="quote">"The latency for this alternative embodiment would be <b>higher than 0.5 roundtrip time due to the fence operations, but is expected to be less than a roundtrip time</b> since the fence operation can immediately follow the store operation and <b>no separate flag update operation is required</b> to be sent from the source processor."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书</a></span></div>
+<p>拆解一下这个「小于 1 个往返」是怎么来的：传统方案要等 membar 的<b>确认回来</b>才能写标志位，那是完整一个往返；而这里栅栏<b>紧跟 store 立即发出、不等确认</b>，并且不需要再发第三条标志位消息。所以总时间是「数据单程 + 栅栏单程的错位量」，仍在一个往返之内。</p>
+</div>
+<div class="card highlight">
+<h4>权利要求 1 的时间限定同样覆盖这条路线</h4>
+<p>值得注意的是，权利要求 1 的限定语是「<b>an elapsed time from the storing to the updating is less than a one-way time from the producer to the second processor</b>」——从<b>存储</b>到<b>更新屏障</b>的耗时小于单程时间。在栅栏复制方案里，数据先到、栅栏随后到，两者时间差远小于一个单程，因此同样落在这个限定内。专利用一个统一的时序限定同时罩住了两套机制，说明它想保护的抽象层次是「<b>屏障更新必须发生在接收端本地，而不是靠再跑一趟消息回来</b>」，而不是某一条具体指令。</p>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 7 ============ -->
+<div class="tab" id="t-l2">
+
+<section>
+<h2>第三种形态：L2 中介的 SM2SM 交换（FIG. 9F–9I）</h2>
+<p class="lead">前面两套方案都要求生产者与消费者的 CTA 在同一个 CGA 内、能互访共享内存。但如果二者不在同一 GPC、甚至不在同一个 GPU 分区上呢？专利给出了第三种形态：让 L2 缓存里的一个「代理（agent）」来撮合。</p>
+
+<div class="card info">
+<h4>为什么需要它</h4>
+<p>合并 store+arrive 的作用域限制是硬的——专利明确说该 store「除非寻址到属于同一 CGA 的另一个 SM 的共享内存，否则可视为无效」。CGA 的范围受 GPC 物理边界约束。一旦超出这个范围，数据就必须经过 L2。这时的目标不再是 0.5 个往返（不可能），而是<b>把 L2 路径上的往返次数从 3~4 压到 2</b>。</p>
+</div>
+
+<h3>协议流程</h3>
+<table>
+<thead><tr><th style="width:10%">步骤</th><th style="width:26%">角色</th><th>动作</th></tr></thead>
+<tbody>
+<tr><td><b>1</b></td><td>消费者</td><td>在本地准备三样东西：<b>接收缓冲区</b>、<b>事务屏障</b>、以及一张<b>数据接收重映射表（data receiving remap table）</b></td></tr>
+<tr><td><b>2</b></td><td>消费者</td><td>执行 <code>PushBuf</code>，把「我有空缓冲区可用」这一信息推送到 L2 中的队列，向生产者广告</td></tr>
+<tr><td><b>3</b></td><td>生产者</td><td>执行 <code>PopWait</code>，从队列里取出缓冲区信息（这消耗<b>第一个 L2 往返</b>）</td></tr>
+<tr><td><b>4</b></td><td>生产者</td><td>把数据推送到某个 L2 slice。<b>slice 由哈希选择</b>，目的是把负载摊到多个 slice 上而不是压在一个上</td></tr>
+<tr><td><b>5</b></td><td>L2 代理</td><td>数据被「<b>像加载数据一样反弹回消费者</b>」（bounced back to consumer like a load data），同时完成 arrive（这是<b>第二个 L2 往返</b>）</td></tr>
+<tr><td><b>6</b></td><td>消费者</td><td>事务屏障清零，从本地缓冲区读取数据</td></tr>
+</tbody>
+</table>
+
+<div class="card highlight">
+<h4>关键设计：把「缓冲区可用性」也纳入协议</h4>
+<p>注意步骤 1–3 干的正是第 ⑤ 页 <b>p-barrier</b> 干的事——反向的「有空位了」通知。区别在于这里用的是一个<b>硬件队列</b>而不是屏障。这解释了第 ③ 页那个对比前提：FIG. 9F 的两个往返里，<b>第一个往返完全用于交换缓冲区就绪信息</b>，第二个才是数据。而 FIG. 9E（共享内存路径）报的 0.5 个往返<b>不包含</b>这一部分，因为它被流水重叠隐藏掉了。</p>
+</div>
+
+<div class="card warning">
+<h4>硬件队列的容量：一个具体到令人意外的数字</h4>
+<p>专利给出了非常工程化的尺寸说明：</p>
+<div class="quote">"a single <b>256B queue</b> can fit on a single slice, can support up to <b>63 entries with 4B entry size</b>, or <b>126 entries with 2B entry size</b>."<span class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 FIG. 9F–9G 描述</a></span></div>
+<p>这个细节值得留意：256 字节恰好是一个 L2 sector 的整数倍，队列被设计成<b>刚好放进单个 slice</b>，这样入队出队都是单 slice 原子操作，不需要跨 slice 协调。63 而非 64 是因为要留一个槽位做满/空判别。这种「让同步元数据恰好装进一个物理单元」的思路，与主方案里「让屏障和数据同居一块共享内存」是同一种设计哲学。</p>
+</div>
+</section>
+
+<section>
+<h2>FIG. 9H / 9I：计算队列模型与常驻代理</h2>
+<p class="lead">专利在最后又推进了一步：既然已经有了一个撮合数据的代理，为什么不让它也撮合<b>计算</b>？</p>
+<div class="card purple">
+<h4>常驻代理与 CWD Workload Dispatch</h4>
+<p>FIG. 9H/9I 描述了一个<b>常驻代理（persistent agent）</b>模型，专利点名了硬件单元 <b>「CWD Workload Dispatch」</b>。它的职责是：<b>启动消费者</b>，并驱动生产者侧与消费者侧各自的 DMA 单元完成数据搬运。</p>
+<p style="margin-top:10px">这里有一个很有价值的资源管理细节：<b>生产者在把数据交给代理后就可以退休（retire），释放它占用的寄存器文件资源给消费者用</b>。这在寄存器压力极大的 GPU 上意义重大——传统的生产者-消费者模型里，生产者必须一直活着等到确认，它的寄存器就一直被占着。</p>
+</div>
+<div class="card info">
+<h4>为什么这一段值得关注</h4>
+<p>把「数据依赖」交给硬件代理管理之后，生产者与消费者不再需要在时间上共存，<b>producer-consumer 从「并发的两个线程」变成了「有依赖关系的两个任务」</b>。这条路线通向的是今天 Hopper/Blackwell 上的持久化 kernel、warp specialization、以及生产者 warp 提前退出把资源让给消费者 warp 的实践（CUTLASS 里的 warp-specialized persistent kernel 正是这个形态）。同族的「Scalable Load Balancing of Thread Groups」（17/691,872）与「Flexible Migration of Executing Software」（17/691,808）覆盖的正是这一侧。</p>
+</div>
+</section>
+
+<section>
+<h2>三种形态的完整选择矩阵</h2>
+<table>
+<thead><tr><th style="width:18%">形态</th><th style="width:20%">适用范围</th><th style="width:16%">延迟</th><th>代价与约束</th></tr></thead>
+<tbody>
+<tr><td><b>合并 Store+Arrive</b><br>FIG. 6D / 9E</td><td>同一 CGA 内<br>（GPC 范围）</td><td><span class="tag g">0.5 往返</span></td><td>须预知字节数；数据与屏障须在同一目标 CTA 共享内存；受 CGA 物理范围限制</td></tr>
+<tr><td><b>栅栏复制</b><br>FIG. 9A / 9C</td><td>SM 到 SM<br>（可跨 GPC）</td><td><span class="tag a">0.5 ~ 1 往返</span></td><td>互连流量放大 N 倍；需硬件维护 fence transaction count；需知道路径数 N（或由 arrive 携带）</td></tr>
+<tr><td><b>L2 中介 + 代理</b><br>FIG. 9F–9I</td><td>任意范围<br>（含跨分区）</td><td><span class="tag a">约 2 个 L2 往返</span></td><td>需要 L2 侧硬件队列与代理；协议复杂；但换来最大的作用域与生产者提前释放资源的能力</td></tr>
+<tr><td><b>传统全局内存</b><br>FIG. 5A / 9D</td><td>任意</td><td><span class="tag r">3 ~ 4 往返</span></td><td>基线。membar 确认 + 标志位写入 + 消费者轮询，三段串行</td></tr>
+</tbody>
+</table>
+<div class="card highlight">
+<h4>一个统一的抽象</h4>
+<p>四种形态的延迟相差近一个数量级，但它们共享<b>同一个软件接口</b>：消费者在一个屏障上 <code>wait</code>，生产者以某种方式 <code>arrive</code>。这正是专利在权利要求 1 中不提任何具体指令、只限定「<b>从存储到更新屏障的耗时小于单程时间</b>」的原因——它想保护的是这个抽象本身，而把具体实现留给后续的从属权利要求分别覆盖。这个策略在商业上是对的，但从第 ⑧ 页的审查历史看，恰恰是这种宽泛表述让它在美国审查中屡屡受挫。</p>
+</div>
+</section>
+
+<section>
+<h2>运行环境：MIG 与 micro-GPU 分区（FIG. 2）</h2>
+<div class="card info">
+<p>专利的环境描述部分交代了这些机制所处的硬件层级：<b>micro-GPU / MIG 分区</b> → <b>GPC</b> → 多个 <b>SM</b> → <b>MMU</b> → <b>crossbar</b> → <b>L2</b>。</p>
+<p style="margin-top:10px">这个层级图解释了三种形态的边界从何而来：合并 store+arrive 走的是 GPC 内 SM 之间的直连（不出 crossbar 到 L2）；栅栏复制走 crossbar 但仍是 SM 到 SM；L2 中介则要穿过 crossbar 抵达 L2 slice。<b>每往外走一层，作用域变大、延迟变高</b>——这与第 ② 页那句「拥抱局部性是更有前景的设计选择」首尾呼应。</p>
+<p style="margin-top:10px">专利还提到该方案适用于 <b>NUMA 组织的系统</b>（权利要求 18 明确写入 NUMA），并在备选实施例里用「NUMA associated with the destination thread」描述目标线程的内存归属。这提示该机制的适用面不止 GPU 内部——同样的思路可以用于多 GPU、多 socket 的 NUMA 拓扑。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 说明书 FIG. 2 与 Other Implementations 章节</a></p>
+</div>
+</section>
+
+</div>
+<!-- ============ TAB 8 ============ -->
+<div class="tab" id="t-claims">
+
+<h2>权利要求与审查史</h2>
+
+<div class="card danger">
+<h3>一句话结论</h3>
+<p>本申请共 <strong>27 项权利要求</strong>，其中 <strong>4 项独立要求（1 / 19 / 26 / 27）</strong>。它在 2022-03-10 那一批 Hopper 专利中处于枢纽位置，但截至 2026-08 仍是 <strong>Pending</strong>，且已经历 <strong>两次 Final Rejection</strong>（2024-12-02、2026-02-25）。同批的 TMA、DSMEM、多播、硬件屏障兄弟申请全部已授权 —— 这一反差本身就是本篇最值得玩味的信息。</p>
+<p class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">Google Patents US20230315655A1（Claims / Legal Events）</a></p>
+</div>
+
+<h3>独立权利要求逐条拆解</h3>
+
+<div class="card highlight">
+<h3>Claim 1（方法，跨处理器）—— 用「时间」限定新颖性</h3>
+<p>Claim 1 的写法非常特殊：它不去描述指令编码，而是直接把 <strong>时间关系</strong>写进权利要求。四个步骤是：</p>
+<table>
+<thead><tr><th>步骤</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td>①</td><td>接收来自 producer 的第一数据消息，该消息标识待写数据</td></tr>
+<tr><td>②</td><td>把数据 store 到与第二处理器关联的 memory buffer</td></tr>
+<tr><td>③</td><td>更新 barrier memory structure</td></tr>
+<tr><td>④</td><td>使数据可被读取</td></tr>
+</tbody>
+</table>
+<div class="quote">"wherein an elapsed time from the storing to the updating is less than a one-way time from the producer to the second processor"
+<div class="src">Claim 1，<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1</a></div></div>
+<p>换句话说：<strong>store 到 arrive 之间的间隔，必须短于 producer 到 consumer 的单程时间</strong>。这在物理上只有一种可能 —— 两件事在同一个消息里一起送达。这是把「0.5 roundtrip」这个性能目标反写成了结构限定。</p>
+</div>
+
+<div class="card info">
+<h3>Claim 26 —— 去掉时间限定，只保留「单一消息」</h3>
+<div class="quote">"the first data message represents, in a single message, a write of the data to the memory buffer and an update to the memory barrier structure."
+<div class="src">Claim 8 的措辞，Claim 26 以独立形式重述，<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1</a></div></div>
+<p>Claim 26 是 Claim 1 的「结构版备胎」：不谈延迟，只主张 <strong>一个消息同时承载数据写入与屏障更新</strong>。审查过程中同时保留时间型与结构型两套独立要求，是典型的抗驳回布局 —— 若审查员认为「时间限定」属于结果性表述（result-oriented），还能退守到结构表述。</p>
+</div>
+
+<div class="card warning">
+<h3>Claim 27 —— 全篇最含糊的一条</h3>
+<div class="quote">"...wherein precautions prevent opportunistic execution reordering from defeating the conditioned access."
+<div class="src">Claim 27，<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1</a></div></div>
+<p>「precautions（预防措施）」这种词出现在独立权利要求里是罕见的。它没有说明是什么机制 —— 可以是合并指令、可以是栅栏复制、也可以是任何别的手段。这类「功能性上位概括」在实践中极易被以 §112 不确定性或缺乏支持为由驳回，也很可能是本申请两次收到 Final Rejection 的原因之一（公开信息只显示驳回事实，不显示驳回理由，故此处仅为基于要求书文本的推断，非事实陈述）。</p>
+</div>
+
+<div class="card">
+<h3>Claim 19 —— 装置版本</h3>
+<p>Claim 19 把方法转成 multiprocessor system。其从属链条覆盖了三条重要变体：</p>
+<table>
+<thead><tr><th>从属项</th><th>限定内容</th></tr></thead>
+<tbody>
+<tr><td>20</td><td>store 与 barrier 更新 <strong>原子性</strong>完成</td></tr>
+<tr><td>21</td><td>第一、第二处理器都是 <strong>streaming multiprocessor</strong>（明确落到 GPU SM）</td></tr>
+<tr><td>22</td><td>buffer 与 barrier 都位于第二处理器的第二存储器（即 DSMEM）</td></tr>
+<tr><td>23</td><td><strong>combined store and arrive instruction</strong></td></tr>
+<tr><td>24–25</td><td>每条预定路径发一个栅栏（fence per predetermined path）</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>从属要求中的关键技术锚点</h3>
+
+<table>
+<thead><tr><th>要求</th><th>锚定的技术点</th><th>对应正文</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>producer / consumer 位于<strong>同一 CGA 的不同 CTA</strong>；buffer 与 barrier 都在 shared memory</td><td>DSMEM 分布式共享内存</td></tr>
+<tr><td>3</td><td>总时间「less than a latency of a roundtrip」</td><td>0.5 roundtrip 目标</td></tr>
+<tr><td>4–5</td><td>第二个 producer 写<strong>同一 buffer</strong>；屏障清零条件</td><td>多生产者汇聚 + transaction count</td></tr>
+<tr><td>7</td><td><strong>分裂屏障</strong>（p-barrier / c-barrier）</td><td>TAB ⑤</td></tr>
+<tr><td>8</td><td>「in a single message」</td><td>合并指令的本质</td></tr>
+<tr><td>9</td><td>合并指令含三要素：<strong>buffer 地址 + barrier 地址 + 数据</strong></td><td>FIG. 7C 位域格式</td></tr>
+<tr><td>10</td><td>arrive count 与 transaction count 按<strong>数据量</strong>更新</td><td>字节计数语义</td></tr>
+<tr><td>11</td><td><strong>原子性</strong></td><td>不可被中间观察者拆开</td></tr>
+<tr><td>12–15</td><td>「a respective second data message for each path configured in an interconnect switch」+ expected/actual arrive count + <strong>fence transaction count</strong></td><td>TAB ⑥ 栅栏复制</td></tr>
+<tr><td>16–17</td><td>buffer queue 位于<strong>外部存储</strong>；agent + DMA</td><td>TAB ⑦ L2 中介</td></tr>
+<tr><td>18</td><td><strong>NUMA</strong> 组织的子系统</td><td>多 GPU / 多 die 扩展</td></tr>
+</tbody>
+</table>
+
+<div class="card info">
+<p>注意 12–15 与 16–17 的存在意义：它们把 <strong>栅栏复制</strong>与 <strong>L2 中介</strong>两条完全不同的实现路径都写进了从属链。即使合并指令那一支被现有技术打掉，这两支仍可作为修改基础。这是把一篇说明书里的三种形态全部纳入保护的标准做法。</p>
+</div>
+
+<h3>完整审查时间线</h3>
+
+<table>
+<thead><tr><th>日期</th><th>事件</th><th>解读</th></tr></thead>
+<tbody>
+<tr><td>2022-03-10</td><td>申请 + 优先日（US 17/691,303）</td><td>与 10 篇兄弟申请同日提交</td></tr>
+<tr><td>2022-04-06</td><td>DOCKETED NEW CASE – READY FOR EXAMINATION</td><td>进入审查队列</td></tr>
+<tr><td>2022-06-09</td><td>Assignment 记录至 NVIDIA</td><td>权利归属确认</td></tr>
+<tr><td>2023-03-07</td><td>德国同族 DE102023105554.2 提交</td><td>唯一境外同族</td></tr>
+<tr><td>2023-09-14</td><td>DE102023105554A1 公开</td><td>德国先于美国公开</td></tr>
+<tr><td>2023-10-05</td><td>US20230315655A1 公开</td><td>18 个月常规公开</td></tr>
+<tr><td>2024-04-18</td><td>NON-FINAL ACTION MAILED</td><td>首次审查意见（申请后 2 年）</td></tr>
+<tr><td>2024-08-27</td><td>RESPONSE TO NON-FINAL ENTERED</td><td>答复受理</td></tr>
+<tr><td><strong>2024-12-02</strong></td><td><strong>FINAL REJECTION MAILED</strong></td><td><span class="tag r">第一次最终驳回</span></td></tr>
+<tr><td>2025-07-15</td><td>NON-FINAL ACTION MAILED</td><td>审查重开（通常意味 RCE 或修改被接受进入新一轮）</td></tr>
+<tr><td>2025-11-17 / 11-21</td><td>RESPONSE ENTERED（两次）</td><td>两次答复入卷</td></tr>
+<tr><td>2026-02-21</td><td>FINAL REJECTION COUNTED, NOT YET MAILED</td><td>已计数未寄出</td></tr>
+<tr><td><strong>2026-02-25</strong></td><td><strong>FINAL REJECTION MAILED</strong></td><td><span class="tag r">第二次最终驳回</span></td></tr>
+</tbody>
+</table>
+
+<div class="card danger">
+<h3>与同批兄弟申请的授权状况对照</h3>
+<p>同一天（2022-03-10）提交的 Hopper 专利簇，绝大多数已经拿到授权号，唯独这篇「同步基石」仍在挣扎：</p>
+<table>
+<thead><tr><th>申请号</th><th>主题</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>17/691,276 / 17/691,422</td><td>TMA 张量内存加速器</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12141082B2/en" target="_blank">US12141082B2</a>（2024-11-12）、<a href="https://patents.google.com/patent/US12499052B2/en" target="_blank">US12499052B2</a>（2025-12-16）</td></tr>
+<tr><td>17/691,690</td><td>DSMEM 分布式共享内存</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12248788B2/en" target="_blank">US12248788B2</a>（2025-03-11）</td></tr>
+<tr><td>17/691,288</td><td>可编程数据多播</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12020035B2/en" target="_blank">US12020035B2</a>（2024-06-25）、<a href="https://patents.google.com/patent/US12608212B2/en" target="_blank">US12608212B2</a>（2026-04-21）</td></tr>
+<tr><td>17/691,296</td><td>硬件加速同步与异步事务支持（即 FIG. 8 屏障单元）</td><td><span class="tag g">已授权</span> <a href="https://patents.google.com/patent/US12536056B2/en" target="_blank">US12536056B2</a>（2026-01-27）</td></tr>
+<tr><td><strong>17/691,303</strong></td><td><strong>本篇：Store + Arrive 快速同步</strong></td><td><span class="tag r">Pending，2 次 Final Rejection</span></td></tr>
+</tbody>
+</table>
+<p>一个合理的解读方向：<strong>硬件结构</strong>（TMA 引擎、DSMEM 地址空间、多播电路、屏障单元）容易用具体电路特征区分于现有技术；而本篇主张的是<strong>「两件事合成一条消息」这一组合动作</strong>，而 IBM 早在 2002 年（<a href="https://patents.google.com/patent/US20020194436A1/en" target="_blank">US20020194436A1</a>）和 2009 年（<a href="https://patents.google.com/patent/US20090100196A1/en" target="_blank">US20090100196A1</a>）就有内存屏障相关公开，NVIDIA 自己也有 <a href="https://patents.google.com/patent/US20110078692A1/en" target="_blank">US20110078692A1</a>（跨并行线程合并内存屏障操作）和 <a href="https://patents.google.com/patent/US20120198214A1/en" target="_blank">US20120198214A1</a>（N-way 内存屏障合并）。「合并」这个动词本身，在自家在先专利里已经用过了。</p>
+<p class="src">授权状态与引证均来自 <a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">Google Patents US20230315655A1</a> 的 Citations / Similar Documents / Also Published As 区块。</p>
+</div>
+
+<div class="card">
+<h3>值得注意的一点：驳回 ≠ 技术无效</h3>
+<p>本篇描述的机制<strong>已经出货</strong> —— Hopper 的 <code>st.async</code> / <code>red.async</code> / <code>mbarrier</code> tx-count 就是它（见下一页的逐项对照）。专利审查结果与技术是否落地是两条独立的轨道。从竞争分析角度看，真正的信号不是「NVIDIA 没拿到这个专利」，而是「<strong>这套同步语义已在 sm_90 上公开可用，且缺少稳固的专利护栏</strong>」。</p>
+</div>
+
+</div>
+
+<!-- ============ TAB 9 ============ -->
+<div class="tab" id="t-eco">
+
+<h2>产业对照与参考</h2>
+
+<div class="card highlight">
+<h3>核心发现：专利 ISA 与出货 PTX 逐项对应</h3>
+<p>把本专利的伪指令与 NVIDIA 官方 PTX ISA 文档并排看，对应关系几乎是一对一的。这说明专利说明书写的不是概念构想，而是 <strong>Hopper（sm_90）实际实现</strong>的内部视角。</p>
+</div>
+
+<table>
+<thead><tr><th>专利内部 ISA</th><th>出货 PTX 指令</th><th>对应依据</th></tr></thead>
+<tbody>
+<tr>
+<td><code>ST_CGA_Sync Ra, Rb</code><br><span style="color:var(--text-dim);font-size:12px;">Ra=目标 CTAID + DataAddr + BarAddr，Rb=数据</span></td>
+<td><code>st.async.shared::cluster<br>.mbarrier::complete_tx::bytes<br>[a], b, [mbar]</code></td>
+<td>三个操作数完全一致：目标共享内存地址 <code>[a]</code>、数据 <code>b</code>、屏障地址 <code>[mbar]</code>；<code>.ss=.shared::cluster</code> 对应专利「必须寻址到同一 CGA 内其他 SM 的共享内存」的合法性限制</td>
+</tr>
+<tr>
+<td><code>REDS_CGA.ARRIVE_TCNT URa, URb</code></td>
+<td><code>red.async</code></td>
+<td>做原子归约而非普通 store，同时递增 transaction count</td>
+</tr>
+<tr>
+<td>屏障的 <em>expected transaction count</em> 字段</td>
+<td><code>mbarrier.expect_tx</code></td>
+<td>软件预先声明本阶段预期的事务量</td>
+</tr>
+<tr>
+<td><em>transaction count</em> / <em>fence transaction count</em></td>
+<td>mbarrier 的 <strong>tx-count</strong></td>
+<td>tx-count 随 Hopper <code>sm_9x</code> 引入</td>
+</tr>
+</tbody>
+</table>
+
+<div class="card info">
+<h3>两个「决定性吻合」</h3>
+<p><strong>其一：负值。</strong>专利明确写 fence transaction count「may be positive or negative」。PTX 文档规定 tx-count 的合法取值区间为 <code>-(2^20 - 1) .. 2^20 - 1</code> —— <strong>负值确实合法</strong>。这不是一个会被巧合命中的细节。</p>
+<p><strong>其二：清零条件。</strong>专利写的完成条件是 <code>(arrive count == expected arrive count) &amp;&amp; (fence transaction count == 0)</code>。PTX 文档描述 mbarrier phase 完成需要同时满足「pending arrivals 已归零」<strong>且</strong>「tx-count 已归零」。两者逐字对应。</p>
+<p class="src">来源：<a href="https://docs.nvidia.com/cuda/parallel-thread-execution/" target="_blank">NVIDIA PTX ISA 官方文档 — Parallel Thread Execution</a>（st.async / red.async / mbarrier.expect_tx / tx-count 各节）</p>
+</div>
+
+<div class="card">
+<h3>对开发者的直接含义</h3>
+<p>如果你在 Hopper 或更新架构上写 cluster 级生产者-消费者流水线，本专利解释了<strong>为什么 API 长这样</strong>：</p>
+<table>
+<thead><tr><th>你在 CUDA / PTX 里看到的</th><th>专利给出的原因</th></tr></thead>
+<tbody>
+<tr><td>为什么 <code>st.async</code> 一定要带 mbarrier 操作数，不能写完再单独 arrive？</td><td>因为 store 与 arrive 分开会被 hit-under-miss 与 L2 slice 距离差重排（TAB ④）</td></tr>
+<tr><td>为什么 tx-count 用<strong>字节数</strong>而不是<strong>消息数</strong>？</td><td>硬件按数据量递减，天然支持多生产者向同一 buffer 汇聚（Claim 10）</td></tr>
+<tr><td>为什么 cluster 内同步这么快，跨 cluster 就慢？</td><td>0.5 roundtrip 依赖 DSMEM 直连；跨出去就退回 L2 中介的 ~2 L2 roundtrip 甚至全局内存的 3–4 roundtrip（TAB ③/⑦）</td></tr>
+<tr><td>为什么要在生产者和消费者<strong>各自</strong>本地放屏障？</td><td>远程 wait() 需要远程轮询，代价高甚至不可实现；分裂屏障让每个 SM 只等自己本地共享内存里的屏障（TAB ⑤）</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>国内厂商已在引用</h3>
+
+<div class="card warning">
+<h3>壁仞科技 CN118885428A</h3>
+<p>本申请的 Cited By 列表中出现了一条值得关注的中国专利：<strong>上海壁仞科技（Biren Technology）</strong>的 <a href="https://patents.google.com/patent/CN118885428A/en" target="_blank">CN118885428A《计算装置和数据访问同步方法》</a>，公开日 <strong>2024-07-23</strong>。</p>
+<p>这意味着国内 GPGPU 厂商已经在同一技术方向（片上多核间数据访问同步）上布局，并且把 NVIDIA 这篇申请作为在先技术纳入了视野。对做国产加速卡架构的团队来说，「store 与 arrive 是否合并」「屏障放在生产者侧还是消费者侧」已经是被专利地图覆盖的决策点，不是自由空白地带。</p>
+<p class="src">来源：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 — Cited By</a></p>
+</div>
+
+<div class="card">
+<h3>其他引用方</h3>
+<table>
+<thead><tr><th>公司</th><th>专利</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>Red Hat</td><td><a href="https://patents.google.com/patent/US20240264956A1/en" target="_blank">US20240264956A1</a> → US12579083B2</td><td>系统软件侧引用</td></tr>
+<tr><td>VMware</td><td><a href="https://patents.google.com/patent/US20250088449A1/en" target="_blank">US20250088449A1</a> → US12457164B2</td><td>虚拟化侧引用</td></tr>
+<tr><td>NVIDIA</td><td><a href="https://patents.google.com/patent/US20240036916A1/en" target="_blank">US20240036916A1</a></td><td>自引，后续架构延伸</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>先有技术版图</h3>
+
+<div class="card">
+<p>本申请引用的在先技术呈现清晰的两条线：<strong>IBM 的内存屏障线</strong>与 <strong>NVIDIA 自己的屏障合并线</strong>。</p>
+<table>
+<thead><tr><th>来源</th><th>专利</th><th>相关性</th></tr></thead>
+<tbody>
+<tr><td>IBM</td><td><a href="https://patents.google.com/patent/US20020194436A1/en" target="_blank">US20020194436A1</a></td><td>2002 年的内存屏障机制</td></tr>
+<tr><td>IBM</td><td><a href="https://patents.google.com/patent/US20090100196A1/en" target="_blank">US20090100196A1</a></td><td>2009 年的屏障相关公开</td></tr>
+<tr><td>NVIDIA</td><td><a href="https://patents.google.com/patent/US20110078692A1/en" target="_blank">US20110078692A1</a></td><td><strong>跨多并行线程合并内存屏障操作</strong> —— 与本篇「合并」思路最接近的自家在先技术</td></tr>
+<tr><td>NVIDIA</td><td><a href="https://patents.google.com/patent/US20120198214A1/en" target="_blank">US20120198214A1</a></td><td><strong>N-way 内存屏障操作合并</strong></td></tr>
+<tr><td>NVIDIA</td><td><a href="https://patents.google.com/patent/US7584342B1/en" target="_blank">US7584342B1</a></td><td>并行处理器内存架构基础</td></tr>
+<tr><td>NVIDIA</td><td><a href="https://patents.google.com/patent/US20160357560A1/en" target="_blank">US20160357560A1</a></td><td>较近的同步相关公开</td></tr>
+</tbody>
+</table>
+<p>背景部分另外引用了 <a href="https://patents.google.com/patent/US8381203B1/en" target="_blank">US8,381,203</a>、<a href="https://patents.google.com/patent/US9158595B2/en" target="_blank">9,158,595</a>、<a href="https://patents.google.com/patent/US9442755B2/en" target="_blank">9,442,755</a>、<a href="https://patents.google.com/patent/US9448803B2/en" target="_blank">9,448,803</a>、<a href="https://patents.google.com/patent/US10002031B2/en" target="_blank">10,002,031</a>、<a href="https://patents.google.com/patent/US10013290B2/en" target="_blank">10,013,290</a>，以及 arrive-wait 屏障的前身申请 <strong>US 16/712,236</strong>（2019-12-12 提交）。</p>
+</div>
+
+<div class="card info">
+<h3>与前一篇解读的交叉点</h3>
+<p>本申请的 Similar Documents 中出现了 <a href="https://patents.google.com/patent/US10769076B2/en" target="_blank">US10769076B2《Distributed address translation in a multi-node interconnect fabric》</a> —— 正是此前解读过的 US12326820B2（多播与反射内存行为一致性）技术脉络上的邻居。<strong>地址翻译、多播语义、快速同步</strong>三者构成了 NVIDIA 在「跨 SM / 跨节点数据交换」上的完整专利三角。</p>
+</div>
+
+<h3>趋势展望</h3>
+
+<div class="grid-2">
+<div class="card">
+<h3>方向一：同步语义继续下沉到硬件</h3>
+<p>从 Volta 的 arrive-wait 软件轮询屏障，到 Hopper 的硬件事务屏障 + 合并 store/arrive，趋势是把<strong>同步的正确性责任从编译器/程序员手里收回硬件</strong>。程序员不再需要手写 fence 序列，也不再需要知道字节数（栅栏复制方案的直接动机）。可以预期后续架构会继续消除剩余的显式同步点。</p>
+</div>
+<div class="card">
+<h3>方向二：0.5 roundtrip 是硬下限，突破只能靠拓扑</h3>
+<p>0.5 roundtrip 是「消息单程送达」的物理极限，指令层面已无优化空间。要再快，只能缩短物理距离 —— 这解释了为什么 cluster（CGA）这个中间层级必须存在，也预示后续会有更多「把通信关进更小物理域」的设计（更大的 cluster、die 内分区、chiplet 局部域）。</p>
+</div>
+<div class="card">
+<h3>方向三：栅栏复制会随互连带宽变便宜</h3>
+<p>栅栏复制方案的唯一代价是 N 倍栅栏流量，专利自己也承认「may generate substantial additional traffic」，并用 FIG. 9B 限制到 4 条链路各 25% 来缓解。随着片上互连带宽增长，这个代价占比下降，「不需要预先知道字节数」的编程模型优势会越来越突出 —— 尤其对<strong>调用子程序做数据写入</strong>这种字节数不可知的场景。</p>
+</div>
+<div class="card">
+<h3>方向四：NUMA 化不可避免</h3>
+<p>Claim 18 明确写入 NUMA 组织，FIG. 2 描绘 MIG / micro-GPU 分区。多 die、多封装成为常态后，「同步延迟」不再是单一数字而是一个阶梯，编程模型必须暴露层级。本篇的三种形态（DSMEM 直连 / L2 中介 / 全局内存）实际上就是这个阶梯的三级预演。</p>
+</div>
+</div>
+
+<h3>参考链接汇总</h3>
+
+<div class="card">
+<table>
+<thead><tr><th>类别</th><th>链接</th></tr></thead>
+<tbody>
+<tr><td>本篇专利</td><td><a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1 — Fast data synchronization in processors and memory</a></td></tr>
+<tr><td>德国同族</td><td><a href="https://patents.google.com/patent/DE102023105554A1/en" target="_blank">DE102023105554A1</a></td></tr>
+<tr><td>官方 ISA</td><td><a href="https://docs.nvidia.com/cuda/parallel-thread-execution/" target="_blank">NVIDIA PTX ISA — Parallel Thread Execution</a></td></tr>
+<tr><td>CUDA 编程模型</td><td><a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/" target="_blank">CUDA C++ Programming Guide（Thread Block Clusters）</a></td></tr>
+<tr><td>Warp 级原语</td><td><a href="https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/" target="_blank">Using CUDA Warp-Level Primitives（背景引用）</a></td></tr>
+<tr><td>兄弟：TMA</td><td><a href="https://patents.google.com/patent/US12141082B2/en" target="_blank">US12141082B2</a> · <a href="https://patents.google.com/patent/US12499052B2/en" target="_blank">US12499052B2</a></td></tr>
+<tr><td>兄弟：DSMEM</td><td><a href="https://patents.google.com/patent/US12248788B2/en" target="_blank">US12248788B2</a></td></tr>
+<tr><td>兄弟：数据多播</td><td><a href="https://patents.google.com/patent/US12020035B2/en" target="_blank">US12020035B2</a> · <a href="https://patents.google.com/patent/US12608212B2/en" target="_blank">US12608212B2</a></td></tr>
+<tr><td>兄弟：硬件屏障单元</td><td><a href="https://patents.google.com/patent/US12536056B2/en" target="_blank">US12536056B2</a></td></tr>
+<tr><td>兄弟：Warp 组矩阵乘加</td><td><a href="https://patents.google.com/patent/US20230289398A1/en" target="_blank">US20230289398A1</a></td></tr>
+<tr><td>国内引用</td><td><a href="https://patents.google.com/patent/CN118885428A/en" target="_blank">CN118885428A — 壁仞科技</a></td></tr>
+<tr><td>邻近技术</td><td><a href="https://patents.google.com/patent/US10769076B2/en" target="_blank">US10769076B2 — 多节点互连织物中的分布式地址翻译</a></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card highlight">
+<h3>三句话带走</h3>
+<p><strong>一、</strong>本篇解决的不是「让同步更快一点」，而是<strong>取消 store 与 arrive 之间的顺序要求</strong> —— 把两件事塞进一条消息，重排就无从发生，延迟自然落到 0.5 roundtrip 的物理下限。</p>
+<p><strong>二、</strong>分裂屏障（p-barrier 在生产者侧、c-barrier 在消费者侧）是配套的关键设计，它让「没有任何 SM 等待非本地屏障」成立，从而彻底消除远程轮询。</p>
+<p><strong>三、</strong>这套机制<strong>已经在 Hopper 上出货</strong>（<code>st.async</code> / <code>red.async</code> / mbarrier tx-count），但专利本身仍 Pending 且两次被最终驳回 —— 技术领先与专利护栏在这里出现了明显错位。</p>
+</div>
+
+</div>
+</div>
+
+<div class="footer">
+<p>本报告基于 Google Patents 公开文本与 NVIDIA 官方文档整理，所有技术点均标注可点击来源，未作事实推测之外的编造。</p>
+<p>生成日期：2026-08-27</p>
+</div>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('.nav button');
+  var tabs = document.querySelectorAll('.tab');
+  function show(id) {
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.remove('active');
+      if (tabs[i].id === id) { tabs[i].classList.add('active'); }
+    }
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].classList.remove('active');
+      if (buttons[j].getAttribute('data-tab') === id) { buttons[j].classList.add('active'); }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  for (var k = 0; k < buttons.length; k++) {
+    buttons[k].addEventListener('click', function () {
+      show(this.getAttribute('data-tab'));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

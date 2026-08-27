@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>arXiv:2607.19539 深度解读 · Tile 级信令与调度实现 MoE 计算-通信细粒度重叠</title>
+<style>
+:root{
+  --nvidia-green:#76b900;
+  --nvidia-green-dim:#5a8f00;
+  --bg:#0f1624;
+  --bg2:#0b111c;
+  --card-bg:#16213e;
+  --card-bg2:#1b294c;
+  --border:#2a3a5c;
+  --text:#e8eefc;
+  --text-dim:#a9b6d0;
+  --text-faint:#7f8daa;
+  --amber:#f0b429;
+  --red:#e5484d;
+  --blue:#4d9cf0;
+  --purple:#a06bf0;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#0f1624 0%,#0b111c 100%);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  line-height:1.75;
+  font-size:15px;
+}
+a{color:var(--nvidia-green);text-decoration:none;border-bottom:1px dotted rgba(118,185,0,.5);}
+a:hover{color:#9ee02a;border-bottom-style:solid;}
+code{
+  background:#0a1020;color:#9ee02a;
+  padding:1px 6px;border-radius:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.88em;border:1px solid #23314f;
+}
+pre{
+  background:#0a1020;border:1px solid #23314f;border-radius:8px;
+  padding:14px 16px;overflow-x:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px;line-height:1.6;color:#c8d6f0;
+}
+pre code{background:none;border:none;padding:0;color:inherit;}
+
+/* ---------- hero ---------- */
+.hero{
+  padding:56px 24px 40px;
+  text-align:center;
+  background:
+    radial-gradient(900px 320px at 50% -60px, rgba(118,185,0,.18), transparent 70%),
+    linear-gradient(180deg,#111b2e 0%,#0f1624 100%);
+  border-bottom:1px solid var(--border);
+}
+.hero .eyebrow{
+  display:inline-block;
+  font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--nvidia-green);
+  border:1px solid rgba(118,185,0,.4);
+  border-radius:999px;padding:4px 14px;margin-bottom:18px;
+}
+.hero h1{
+  margin:0 0 10px;font-size:31px;line-height:1.35;font-weight:700;
+}
+.hero h1 .pn{color:var(--nvidia-green);}
+.hero .sub{
+  margin:0 auto 22px;max-width:880px;
+  color:var(--text-dim);font-size:15.5px;
+}
+.hero .meta{
+  display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+  max-width:980px;margin:0 auto;
+}
+.hero .meta span{
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  border-radius:6px;padding:5px 12px;
+  font-size:12.5px;color:var(--text-dim);
+}
+.hero .meta span b{color:var(--text);font-weight:600;}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:50;
+  display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+  padding:12px 16px;
+  background:rgba(11,17,28,.94);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.nav button{
+  background:transparent;color:var(--text-dim);
+  border:1px solid var(--border);border-radius:6px;
+  padding:7px 13px;font-size:13px;cursor:pointer;
+  font-family:inherit;transition:all .15s;
+}
+.nav button:hover{color:var(--text);border-color:#3d5280;}
+.nav button.active{
+  background:var(--nvidia-green);color:#0b1400;
+  border-color:var(--nvidia-green);font-weight:600;
+}
+
+/* ---------- layout ---------- */
+.container{max-width:1120px;margin:0 auto;padding:32px 20px 60px;}
+.tab{display:none;}
+.tab.active{display:block;animation:fade .25s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+section{margin-bottom:34px;}
+h2{
+  font-size:23px;margin:0 0 6px;
+  padding-bottom:10px;border-bottom:2px solid rgba(118,185,0,.35);
+}
+h3{font-size:17.5px;margin:26px 0 10px;color:#dce6ff;}
+h4{font-size:15px;margin:18px 0 8px;color:var(--nvidia-green);}
+.lead{color:var(--text-dim);margin:12px 0 20px;font-size:15px;}
+
+.card{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-left:3px solid var(--nvidia-green);
+  border-radius:8px;padding:16px 18px;margin:14px 0;
+}
+.card.info{border-left-color:var(--blue);}
+.card.warning{border-left-color:var(--amber);}
+.card.danger{border-left-color:var(--red);}
+.card.highlight{
+  border-left-color:var(--nvidia-green);
+  background:linear-gradient(135deg,rgba(118,185,0,.09),var(--card-bg) 60%);
+}
+.card.purple{border-left-color:var(--purple);}
+.card h4{margin-top:0;}
+.card h3{margin-top:0;font-size:16px;}
+.card p:last-child{margin-bottom:0;}
+
+.grid{display:grid;gap:14px;}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+
+table{
+  width:100%;border-collapse:collapse;margin:14px 0;
+  font-size:13.5px;background:var(--card-bg);
+  border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+th{
+  background:#1d2b4d;color:#dce6ff;text-align:left;
+  padding:10px 12px;font-weight:600;font-size:13px;
+  border-bottom:1px solid var(--border);
+}
+td{padding:9px 12px;border-bottom:1px solid rgba(42,58,92,.6);vertical-align:top;color:var(--text-dim);}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:rgba(118,185,0,.05);}
+td b,td strong{color:var(--text);}
+
+ul,ol{padding-left:22px;margin:10px 0;}
+li{margin:6px 0;color:var(--text-dim);}
+li b,li strong{color:var(--text);}
+
+.quote{
+  background:#0a1020;border:1px solid #23314f;
+  border-left:3px solid var(--amber);
+  border-radius:6px;padding:12px 16px;margin:12px 0;
+  font-size:13.5px;color:#c8d6f0;font-style:italic;
+}
+.quote .src{
+  display:block;margin-top:8px;font-style:normal;
+  font-size:12px;color:var(--text-faint);
+}
+.src{font-size:12px;color:var(--text-faint);}
+
+.tag{
+  display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:999px;
+  border:1px solid var(--border);color:var(--text-dim);
+  margin:2px 4px 2px 0;background:rgba(255,255,255,.03);
+}
+.tag.g{color:var(--nvidia-green);border-color:rgba(118,185,0,.45);background:rgba(118,185,0,.08);}
+.tag.a{color:var(--amber);border-color:rgba(240,180,41,.45);background:rgba(240,180,41,.08);}
+.tag.r{color:var(--red);border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.08);}
+.tag.b{color:var(--blue);border-color:rgba(77,156,240,.45);background:rgba(77,156,240,.08);}
+
+.ref{font-size:12.5px;color:var(--text-faint);margin-top:10px;}
+.ref a{border-bottom-style:solid;}
+
+.footer{
+  border-top:1px solid var(--border);
+  padding:26px 20px 40px;text-align:center;
+  color:var(--text-faint);font-size:13px;
+}
+.footer a{color:var(--text-dim);}
+
+.kbd{
+  display:inline-block;background:#0a1020;border:1px solid #2a3a5c;
+  border-bottom-width:2px;border-radius:4px;padding:0 6px;
+  font-size:12px;color:#9ee02a;font-family:ui-monospace,Menlo,monospace;
+}
+.center{text-align:center;}
+
+/* ---------- bars ---------- */
+.lat{margin:18px 0;}
+.lat .row{display:flex;align-items:center;gap:12px;margin:10px 0;}
+.lat .lbl{flex:0 0 200px;font-size:13px;color:var(--text-dim);text-align:right;}
+.lat .bar{
+  height:26px;border-radius:5px;display:flex;align-items:center;
+  padding:0 10px;font-size:12px;font-weight:600;color:#0b1400;
+  white-space:nowrap;
+}
+.lat .b-red{background:linear-gradient(90deg,#e5484d,#f0757a);color:#fff;}
+.lat .b-amber{background:linear-gradient(90deg,#f0b429,#f7d072);}
+.lat .b-green{background:linear-gradient(90deg,#76b900,#9ee02a);}
+.lat .b-blue{background:linear-gradient(90deg,#4d9cf0,#7fb8f5);color:#04121f;}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0;}
+.stat{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;}
+.stat .v{font-size:25px;font-weight:700;color:var(--nvidia-green);line-height:1.2;}
+.stat .k{font-size:12px;color:var(--text-dim);margin-top:4px;}
+
+@media(max-width:640px){
+  .hero h1{font-size:23px;}
+  h2{font-size:19px;}
+  .nav button{font-size:12px;padding:6px 10px;}
+  .lat .lbl{flex:0 0 110px;font-size:11.5px;}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+<div class="eyebrow">arXiv 论文深度解读 · ICPP '26</div>
+<h1><span class="pn">arXiv:2607.19539</span><br>Tile 级信令与调度：MoE 计算-通信细粒度重叠</h1>
+<p class="sub">用 Tile 级设备端信令把 MoE 第二次 all-to-all 藏进专家 GEMM 里 —— 不融合内核、不改算子，靠"远端归属对齐的行布局 + 远端优先 tile 调度 + 分段传输"三件套，在 4×A100 上取得最高 2.64× 端到端加速。</p>
+<div class="hero meta">
+<span><b>类型</b> 学术论文（非专利）</span>
+<span><b>arXiv</b> 2607.19539v1 [cs.DC]</span>
+<span><b>提交</b> 2026-07-21</span>
+<span><b>会议</b> ICPP '26（第 55 届并行处理国际会议）</span>
+<span><b>作者</b> Minyu Cui, Anna Wingkvist, Morgan Ericsson</span>
+<span><b>机构</b> Linnaeus University（瑞典 Växjö）</span>
+<span><b>许可</b> CC BY 4.0</span>
+<span><b>平台</b> 4 × A100 / NVLink</span>
+</div>
+</div>
+
+<div class="nav">
+  <button class="active" data-tab="t-overview">① 论文速览</button>
+  <button data-tab="t-bg">② 问题与背景</button>
+  <button data-tab="t-routes">③ 三条技术路线</button>
+  <button data-tab="t-layout">④ 布局与调度</button>
+  <button data-tab="t-producer">⑤ 生产者内核</button>
+  <button data-tab="t-gran">⑥ 通信粒度</button>
+  <button data-tab="t-sched">⑦ 协同与资源划分</button>
+  <button data-tab="t-eval">⑧ 实验结果</button>
+  <button data-tab="t-crit">⑨ 批判性评估与参考</button>
+</div>
+
+<div class="container">
+<div class="tab active" id="t-overview">
+
+<h2>论文速览</h2>
+
+<div class="card warning">
+<h3>先澄清一件事：这是论文，不是专利</h3>
+<p>你提到的"这篇专利"实际是一篇 <strong>arXiv 预印本 + ICPP '26 会议论文</strong>，作者来自瑞典 Linnaeus University 的学术团队，不是企业专利申请。因此本页按论文结构组织（问题定义 → 方法设计 → 实验验证 → 局限），而不是按专利的权利要求 / 审查史组织。所有数据均来自论文原文，未作推测性补充；凡属我的分析判断均已明确标注。</p>
+<p class="src">来源：<a href="https://arxiv.org/abs/2607.19539" target="_blank">arXiv:2607.19539</a> · <a href="https://arxiv.org/html/2607.19539v1" target="_blank">全文 HTML</a></p>
+</div>
+
+<h3>一句话读懂这篇论文</h3>
+
+<div class="card highlight">
+<p>分布式 MoE 的每一层都要做两次 all-to-all：先把 token 分发给专家（dispatch），再把专家输出送回 token 的原属 rank（combine）。<strong>传统实现必须等整个专家 GEMM 算完才启动第二次 all-to-all</strong>，这段通信完全暴露在关键路径上。</p>
+<p>本文的做法是：让 GEMM 内核在<strong>每个 output tile 写完的瞬间</strong>就在设备端竖起一个 ready 标志，另一个常驻通信内核在旁边轮询这些标志，数据一凑够一个"段"就立刻发出远程写。计算还在跑，通信已经在搬 —— 两者真正并行。</p>
+<div class="quote">"Conventional MoE implementations launch this return all-to-all after expert compute completes, exposing communication latency on the critical path and reducing GPU utilization."
+<div class="src">摘要，<a href="https://arxiv.org/abs/2607.19539" target="_blank">arXiv:2607.19539</a></div></div>
+</div>
+
+<div class="card info">
+<h3>真正的技术难点在哪里</h3>
+<p>把通信切细本身不难，难的是 MoE 的 <strong>回程路由是运行时才确定的</strong>。论文明确指出这比张量并行的静态通信模式难得多：</p>
+<div class="quote">"The difficulty arises because each expert output row must return to the rank that originally held its input token, and this row-to-rank mapping is determined at runtime."
+<div class="src">§1 Introduction，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></div></div>
+<p>第一次 all-to-all 之后，一个本地专家收到的输入行来自<strong>多个不同的 peer rank</strong>。如果不重排，一个 output tile 里可能混着要发往不同 rank 的行 —— 细粒度重叠所依赖的"单目标"性质就被破坏了。本文的核心贡献正是用一个<strong>数据布局</strong>把这个运行时问题变成静态可查表的问题。</p>
+</div>
+
+<h3>四项贡献</h3>
+
+<table>
+<thead><tr><th>#</th><th>贡献</th><th>要点</th></tr></thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><b>MoE 回程的细粒度重叠机制</b></td>
+<td>GEMM 与通信作为两个<strong>常驻内核</strong>跑在<strong>互不重叠的 SM 分区</strong>上，通过 tile 级设备端信令协调。一个段内所有 tile 就绪即刻发出一次远程写，最小化"数据产出"到"数据发出"的间隔。</td>
+</tr>
+<tr>
+<td>2</td>
+<td><b>通信感知的远端归属对齐行布局</b></td>
+<td>让每个 output tile 只对应<strong>一个</strong>目标 rank。这同时使生产者能优先算远端关键路径上的 tile，也使消费者能把每段作为<strong>一次连续远程写</strong>发出。</td>
+</tr>
+<tr>
+<td>3</td>
+<td><b>Rank 级 GEMM 内核</b></td>
+<td>每个 rank <strong>只launch 一个</strong>常驻生产者内核覆盖<strong>全部本地专家</strong>，消除重复内核启动开销，并把调度成本摊薄到全部 GEMM tile 上。</td>
+</tr>
+<tr>
+<td>4</td>
+<td><b>跨模型、跨配置的系统性评估</b></td>
+<td>3 个 MoE 模型、3 种路由分布、多种 GEMM 形状、大范围生产者/消费者 SM 划分；含算子级、层级、端到端加速分析，SM 划分争用研究，以及正确性验证。</td>
+</tr>
+</tbody>
+</table>
+<p class="src">来源：§1 Contributions，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></p>
+
+<h3>关键数字一览</h3>
+
+<div class="stats">
+<div class="stat"><div class="v">2.64×</div><div class="k">端到端最高加速<br>（vs FasterMoE）</div></div>
+<div class="stat"><div class="v">2.74×</div><div class="k">MoE 层最高加速<br>（vs FasterMoE）</div></div>
+<div class="stat"><div class="v">3.01×</div><div class="k">算子级最高加速<br>（vs 顺序基线）</div></div>
+<div class="stat"><div class="v">71.9–99.9%</div><div class="k">重叠率区间<br>（第二次 all-to-all 被隐藏比例）</div></div>
+<div class="stat"><div class="v">1440</div><div class="k">正确性检查<br>全部通过</div></div>
+<div class="stat"><div class="v">4</div><div class="k">A100 GPU<br>单节点 NVLink</div></div>
+</div>
+
+<div class="card danger">
+<h3>但要看清"2.64×"的分母</h3>
+<p>端到端与 MoE 层的加速倍数<strong>全部归一化到 FasterMoE</strong>（PPoPP '22，四个基线中最老的一个）。换成更强的基线，差距立刻收窄，而在其中一个模型上论文<strong>诚实承认自己落后</strong>：</p>
+<table>
+<thead><tr><th>模型</th><th>vs FasterMoE</th><th>vs Tutel</th><th>vs Megatron-CUTLASS</th><th>vs Megatron-TE</th></tr></thead>
+<tbody>
+<tr><td>M-GPT</td><td><span class="tag g">1.57×</span></td><td>1.35×</td><td>1.15×</td><td>1.25×</td></tr>
+<tr><td>M-BERT</td><td><span class="tag g">1.66×</span></td><td>1.15×</td><td><span class="tag a">1.04×</span></td><td>1.09×</td></tr>
+<tr><td>M-Trans-xl</td><td><span class="tag g">2.64×</span></td><td colspan="3"><span class="tag r">略微落后于这三者</span></td></tr>
+</tbody>
+</table>
+<p>换句话说，<strong>头条数字 2.64× 恰好出现在本方法唯一打不过强基线的那个模型上</strong>。论文自己给出了原因：M-Trans-xl 的 hidden dim 只有 512，是三个模型中最小的，而 per-token 的 all-to-all 数据量随 dim 线性增长，所以可藏的通信本来就少；同时 per-tile 有效工作量也少，细粒度重叠的固定开销占比反而被放大。这是一段值得肯定的坦诚说明。</p>
+<p class="src">来源：§4.2.1，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a>（"but slightly trails Tutel, Megatron-CUTLASS, and Megatron-TE"）</p>
+</div>
+
+<h3>书目信息</h3>
+
+<table>
+<tbody>
+<tr><th>标题</th><td>Fine-grained Computation-Communication Overlap via Tile-level Signaling and Scheduling for Mixture-of-Experts</td></tr>
+<tr><th>中文题</th><td>通过 Tile 级信令与调度实现混合专家模型的细粒度计算-通信重叠</td></tr>
+<tr><th>arXiv</th><td><a href="https://arxiv.org/abs/2607.19539" target="_blank">arXiv:2607.19539v1</a> [cs.DC]，提交于 2026-07-21</td></tr>
+<tr><th>arXiv DOI</th><td><a href="https://doi.org/10.48550/arXiv.2607.19539" target="_blank">10.48550/arXiv.2607.19539</a></td></tr>
+<tr><th>会议</th><td>Proceedings of the 55th International Conference on Parallel Processing（ICPP '26），2026-09-28 至 10-01，新加坡</td></tr>
+<tr><th>ACM DOI / ISBN</th><td>10.1145/3832810.3832907 · ISBN 979-8-4007-2657-6/2026/09<br><span class="src">（该 DOI 截至本文整理时尚未在 doi.org 注册生效，会议尚未召开，故此处不作链接）</span></td></tr>
+<tr><th>作者</th><td>Minyu Cui（minyu.cui@lnu.se）、Anna Wingkvist（anna.wingkvist@lnu.se）、Morgan Ericsson（morgan.ericsson@lnu.se）</td></tr>
+<tr><th>机构</th><td>Linnaeus University，Växjö，Sweden，352 52（三位作者同属一个机构）</td></tr>
+<tr><th>学科分类</th><td>cs.DC（主）Distributed, Parallel, and Cluster Computing；cs.AI</td></tr>
+<tr><th>ACM CCS</th><td>Computing methodologies → Parallel algorithms</td></tr>
+<tr><th>关键词</th><td>Distributed machine learning · MoE · Compute–communication overlap · Multi-GPU systems · GPU resource utilization</td></tr>
+<tr><th>许可</th><td>CC BY 4.0</td></tr>
+</tbody>
+</table>
+
+<div class="card warning">
+<h3>适用范围的硬性限定：只做前向</h3>
+<div class="quote">"In this paper, we target distributed MoE inference and present a method that achieves fine-grained overlap... Accordingly, our design and evaluation cover forward-pass execution only. Supporting the backward pass for training is left for future work."
+<div class="src">§1 Introduction，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></div></div>
+<p>这一点在阅读全文时必须始终记住：本文面向 <strong>MoE 推理 / 前向传播</strong>。训练所需的反向传播不在设计与评估范围内，被明确列为未来工作。因此把它与 COMET 这类同时覆盖训练的系统直接对比时，需要注意适用面并不对等。</p>
+</div>
+
+<h3>摘要原文与逐句拆解</h3>
+
+<div class="quote">"Mixture-of-Experts (MoE) architectures increase model capacity without proportionally increasing computation cost and have become a key building block for scaling large language models (LLMs) to trillion-parameter regimes. Efficient deployment of these MoE models relies on distributed execution across multiple GPUs, where each MoE layer involves two all-to-all communications: dispatching tokens to expert ranks and returning the expert outputs to their source ranks. Conventional MoE implementations launch this return all-to-all after expert compute completes, exposing communication latency on the critical path and reducing GPU utilization. We present a fine-grained approach that overlaps expert compute with the second all-to-all via tile-level signaling and scheduling. Our producer-consumer co-design combines: (1) a persistent per-rank computation kernel (producer) that covers all local experts on the rank to eliminate repeated kernel launch overhead and prioritizes remote-critical tiles, and (2) a persistent communication kernel (consumer) on a small dedicated partition of streaming multiprocessors (SMs) that issues segment-granular transfers as tiles become ready. Our co-design avoids intrusive changes to the underlying computation operators or communication primitives, making it practical for improving distributed MoE execution efficiency on multi-GPU systems. On a 4-A100 GPU platform, evaluated on three MoE models against four state-of-the-art MoE systems, our approach achieves up to 2.64x end-to-end speedup and 2.74x MoE-layer speedup. Compared with a conventional non-overlap baseline, our approach consistently improves both operator- and MoE-layer-level performance across varying GEMM shapes, router modes, and a broad range of producer/consumer SM partitions, while preserving correctness."
+<div class="src">摘要全文，<a href="https://arxiv.org/abs/2607.19539" target="_blank">arXiv:2607.19539</a></div></div>
+
+<table>
+<thead><tr><th>摘要陈述</th><th>对应的技术含义</th><th>详见</th></tr></thead>
+<tbody>
+<tr><td>"two all-to-all communications"</td><td>dispatch（分发）与 combine（回收）。本文<strong>只优化第二次</strong>；第一次仍走 NCCL。</td><td>TAB ②</td></tr>
+<tr><td>"launch this return all-to-all after expert compute completes"</td><td>这就是被打击的靶子：串行的"算完再通信"。</td><td>TAB ②</td></tr>
+<tr><td>"persistent per-rank computation kernel... covers all local experts"</td><td>一个内核吃掉一个 rank 上的<strong>全部专家</strong>，且不靠矩阵拼接 —— 区别于 grouped GEMM。</td><td>TAB ⑤</td></tr>
+<tr><td>"prioritizes remote-critical tiles"</td><td>远端优先 tile 调度：先算需要发出去的，把重叠窗口拉到最长。</td><td>TAB ④</td></tr>
+<tr><td>"a small dedicated partition of SMs"</td><td>消费者独占少量 SM，与生产者互不干扰；这个数量是关键可调参数。</td><td>TAB ⑦</td></tr>
+<tr><td>"segment-granular transfers"</td><td>不是按 tile 发，而是按"段"（若干整行带）发 —— 为了压住带宽曲线。</td><td>TAB ⑥</td></tr>
+<tr><td>"avoids intrusive changes to the underlying computation operators or communication primitives"</td><td>本文最主要的<strong>工程卖点</strong>：不融合内核、不改 CUTLASS 主循环、不改通信原语。</td><td>TAB ③</td></tr>
+<tr><td>"while preserving correctness"</td><td>1440 次逐 token 输出比对，容差 8×10⁻³。</td><td>TAB ⑧</td></tr>
+</tbody>
+</table>
+
+<h3>设计全景：五阶段中被改造的那一段</h3>
+
+<pre><code>分布式 MoE 层的前向五阶段（论文 §2.1）
+
+  ① Routing        每个 rank 对本地 token 算门控，得到专家分配 + 门控权重
+        |
+  ② All-to-All #1  dispatch：token 发往托管其目标专家的 rank        [仍用 NCCL]
+        |
+  ③ Expert Compute 各 rank 对收到的 token 执行本地专家计算           ┐
+        |                                                          ├ 本文改造区
+  ④ All-to-All #2  combine：专家输出送回 token 的原属 rank           ┘
+        |
+  ⑤ Scale          原属 rank 按门控权重做加权求和
+
+传统实现：  ③ ────────────────► ④ ──────────►        （串行，④ 全暴露）
+本文实现：  ③ ═══════════════════════════►
+                 ④ ═════════════════════►            （重叠，④ 大部分被藏起）</code></pre>
+<p class="src">来源：§2.1 与 §3.1，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></p>
+
+<div class="card">
+<h3>三个协作组件的关系</h3>
+<p>论文把方案拆成"准备阶段"与"执行阶段"两个盒子（Figure 1 的左右两半）：</p>
+<table>
+<thead><tr><th>阶段</th><th>组件</th><th>解决什么</th></tr></thead>
+<tbody>
+<tr><td rowspan="3"><b>准备</b><br>（§3.2）</td><td>远端归属对齐行布局</td><td>让每个 tile 只有<strong>一个</strong>目标 rank，把运行时路由变成静态属性</td></tr>
+<tr><td>远端优先 tile 调度</td><td>让需要通信的数据<strong>最早</strong>产出，把重叠窗口拉满</td></tr>
+<tr><td>Combine Plan</td><td>把路由派生的传输元数据预解析成扁平设备端数组，消费者只需 <strong>3 次数组读</strong></td></tr>
+<tr><td rowspan="2"><b>执行</b><br>（§3.3）</td><td>常驻 GEMM 生产者 + Epilogue 信令</td><td>tile 写完即置 ready 标志，不扰动主循环</td></tr>
+<tr><td>常驻通信消费者</td><td>轮询 ready，按段发 NVSHMEM 非阻塞 put</td></tr>
+</tbody>
+</table>
+<p>两个内核跑在<strong>不同的 CUDA stream</strong> 上，消费者被赋予<strong>更高优先级</strong>，全程通过设备端标志协调，关键路径上<strong>没有 host 参与</strong>。</p>
+<p class="src">来源：§3.1 Overview，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></p>
+</div>
+
+<h3>软硬件栈</h3>
+
+<table>
+<thead><tr><th>层次</th><th>选择</th><th>作用</th></tr></thead>
+<tbody>
+<tr><td>硬件</td><td>单节点 4 × NVIDIA A100（108 SM / 40 GB HBM 每卡），节点内 NVLink</td><td>每 NVLink lane 25 GB/s 单向，每对 GPU 4 lane → <strong>单向约 100 GB/s 上限</strong></td></tr>
+<tr><td>框架</td><td><a href="https://arxiv.org/abs/2607.19539" target="_blank">PyTorch 2.6.0</a> + 自研 CUDA runtime</td><td>对外暴露为 PyTorch 可调用的 runtime</td></tr>
+<tr><td>编译</td><td>CUDA 12.1</td><td>—</td></tr>
+<tr><td>GEMM</td><td><a href="https://github.com/NVIDIA/cutlass" target="_blank">CUTLASS 3.9</a></td><td>常驻 GEMM 基于 CUTLASS 模板；按 GEMM 形状从 CUTLASS profiler 导出的查找表选最优配置</td></tr>
+<tr><td>信令</td><td>CUTLASS Epilogue（沿用 EVT / Epilogue Visitor Tree 思路）</td><td>信令融进 epilogue，<strong>不扰动主循环</strong>的乘累加</td></tr>
+<tr><td>通信</td><td><a href="https://developer.nvidia.com/nvshmem" target="_blank">NVSHMEM 3.6.5</a></td><td>设备端发起的单边 put，写入对端对称堆</td></tr>
+<tr><td>对照通信</td><td>NCCL 2.29.3</td><td>承载第一次 all-to-all（dispatch）以及框架基线的通信路径</td></tr>
+</tbody>
+</table>
+<p class="src">来源：§3.4 Implementation 与 §4.1.1，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></p>
+
+<div class="card info">
+<h3>一个容易被忽略的细节：A100 而非 Hopper</h3>
+<p>实验平台是 A100（sm_80），这意味着论文里的 tile 级信令必须<strong>用软件手工搭建</strong>：CTA 写完 tile → 执行 thread-fence 确保全局可见 → 再置 ready 标志 → 消费者轮询。这套"store → fence → flag → poll"模式，正是 NVIDIA 在 Hopper 上用硬件收掉的东西（合并 store+arrive 指令与 mbarrier 事务计数）。这一对照很有意思，我在 TAB ⑨ 展开。</p>
+<p class="src">依据：§3.3.1 原文"performs a thread-fence to ensure that the data is globally visible, then publishes a readiness flag"，<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></p>
+</div>
+
+</div>
+<div class="tab" id="t-bg">
+<h2>② 问题与背景：为什么第二次 all-to-all 这么难藏</h2>
+<p class="lead">这一节把论文的问题设定完整摊开：MoE 前向的五个阶段各自在做什么、为什么偏偏是第二次 all-to-all 卡在关键路径上、为什么"等它做完再算"这件事随着硬件代际推进反而越来越亏，以及 GEMM 的 tile 结构为什么天然是插入信令的最佳位置。</p>
+
+<h3>MoE 前向的五个阶段</h3>
+<p>论文 §2.1 把一个专家并行（Expert Parallelism）下的 MoE 层拆成五个阶段。理解这五步的边界，是理解后面所有设计的前提。</p>
+
+<table>
+<thead><tr><th style="width:52px">阶段</th><th>名称</th><th>做什么</th><th>本文是否优化</th></tr></thead>
+<tbody>
+<tr><td><b>①</b></td><td><b>Routing</b><br>路由</td><td>门控网络为每个 token 打分，选出 top-k 个专家。产出的是"哪个 token 去哪个专家"的映射表，以及后续加权求和用的权重。</td><td><span class="tag">不改</span></td></tr>
+<tr><td><b>②</b></td><td><b>All-to-All #1</b><br>Dispatch 分发</td><td>把 token 的隐藏向量按路由结果送到持有对应专家的 rank 上。这是一次全局的数据重排。</td><td><span class="tag a">仍走 NCCL</span></td></tr>
+<tr><td><b>③</b></td><td><b>Expert Compute</b><br>专家计算</td><td>每个 rank 上的本地专家对收到的 token 做前馈计算（本质是一批 GEMM）。</td><td><span class="tag g">重写为持久化 GEMM</span></td></tr>
+<tr><td><b>④</b></td><td><b>All-to-All #2</b><br>Combine 回传</td><td>把专家输出<b>送回</b>最初持有该 token 的 rank。方向与 ② 相反。</td><td><span class="tag g">核心优化对象</span></td></tr>
+<tr><td><b>⑤</b></td><td><b>Weighted Reduction</b><br>加权归约 / scale</td><td>每个 token 把它的 top-k 个专家输出按门控权重加权求和，得到该层最终输出。</td><td><span class="tag">不改</span></td></tr>
+</tbody>
+</table>
+
+<div class="card highlight">
+<h4>请务必记住这个范围限定</h4>
+<p>论文<b>只优化第 ④ 阶段</b>（Combine）。第 ② 阶段（Dispatch）在他们的实现里<b>依然由 NCCL 承担</b>——原文 §4.1.1 明确写道 "NCCL carries the first all-to-all (dispatch) and the framework baseline's communication path."。</p>
+<p>这个取舍是有道理的：Dispatch 的输入是路由后的 token，此时上游没有一个正在逐 tile 产出数据的 GEMM 可以拿来重叠；而 Combine 的输入正是专家 GEMM 的输出，天然存在"边算边传"的空间。但这也意味着，论文的加速上限从一开始就被砍掉了一半通信量。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §2.1 / §4.1.1</a></p>
+</div>
+
+<h3>第一层原因：通信占比已经接近一半</h3>
+<p>论文引用 COMET（Zhang et al., MLSys 2025）的测量结论：在分布式 MoE 中，all-to-all 通信可以占到<b>总执行时间的近一半</b>（"nearly half of total execution time"）。这是一个足以决定系统设计走向的数字——如果通信只占 10%，把它完美隐藏最多也就换来 11% 的加速，做多层工程的性价比很低；但如果占到 50%，完美隐藏理论上能带来接近 2× 的收益。</p>
+
+<div class="lat">
+  <div class="row"><div class="lbl">专家计算（GEMM）</div><div class="bar b-green" style="width:48%">≈ 50% 时间</div></div>
+  <div class="row"><div class="lbl">all-to-all 通信</div><div class="bar b-red" style="width:46%">≈ 50% 时间（近一半）</div></div>
+</div>
+<p class="src">示意图，比例依据论文 §1 引用的 COMET 测量："all-to-all communication can account for nearly half of total execution time"，见 <a href="https://arxiv.org/abs/2502.19811" target="_blank">COMET, MLSys 2025 (arXiv:2502.19811)</a></p>
+
+<h3>第二层原因：算力与互连带宽的增速正在分岔</h3>
+<p>论文 §1 的另一句判断更关键，因为它说明这个问题<b>会随时间恶化</b>而不是缓解：</p>
+
+<div class="quote">
+"GPU compute throughput has scaled much faster than interconnect bandwidth across recent generations."
+<span class="src">—— arXiv:2607.19539v1, §1</span>
+</div>
+
+<p>换句话说，同样一层 MoE，在新一代 GPU 上计算部分被压缩得更多、通信部分被压缩得更少，于是通信在总时间里的<b>占比反而上升</b>。这决定了"重叠"不是一个可有可无的优化，而是一条必须走通的路：单纯等更快的网卡/NVLink，等不来。</p>
+
+<h3>第三层原因，也是真正的技术难点：回传映射是运行时才确定的</h3>
+<p>这是全文最该被划线的一句话。为什么 Combine 这一步不能像普通的 GEMM + AllReduce 那样简单切块流水？因为它的目的地不是静态的。</p>
+
+<div class="card danger">
+<h4>论文原文（§1）</h4>
+<div class="quote">
+"The difficulty arises because each expert output row must return to the rank that originally held its input token, and <b>this row-to-rank mapping is determined at runtime</b>."
+<span class="src">—— arXiv:2607.19539v1, §1</span>
+</div>
+<p>拆解一下这句话为什么致命：</p>
+<ul>
+<li>专家输出矩阵的<b>每一行</b>对应一个 token，而这一行必须回到"当初持有这个 token 的那个 rank"。</li>
+<li>哪个 token 来自哪个 rank，取决于门控网络对这一批输入的打分结果——<b>每一次前向都不一样</b>，编译期无从得知。</li>
+<li>于是专家输出矩阵在行方向上是"目的地混杂"的：第 0 行可能要回 rank 2，第 1 行要回 rank 0，第 2 行留本地。</li>
+</ul>
+</div>
+
+<h3>混杂的直接后果：tile 的"单一目的地"性质被破坏</h3>
+<p>GEMM 内核以 tile 为单位产出结果。一个 tile 是输出矩阵上一块 <code>tb_M × tb_N</code> 的矩形。如果不做任何处理，这块矩形在行方向上会横跨多个不同目的地的行：</p>
+
+<pre><code>专家输出矩阵（未重排，rank 1 视角）
+                 &lt;----------- N 列 -----------&gt;
+  row 0   来自 rank 2  ┐
+  row 1   来自 rank 0  │  ← 一个 tb_M 高的 tile
+  row 2   来自 rank 2  │     里面混了 3 个不同目的地
+  row 3   来自 rank 3  ┘     → 无法作为一次远程写发出
+
+论文原话：
+"a single output tile may contain rows assigned to different ranks,
+ breaking the single-destination property required for fine-grained overlap."</code></pre>
+
+<p>"单一目的地性质"（single-destination property）是细粒度重叠的<b>前置条件</b>：只有当一个已完成的数据单元整体属于同一个远端 rank，才能在它一完成就立刻发出去。否则每个 tile 都要先做一次逐行的目的地分类，通信退化成大量零碎的小拷贝。</p>
+
+<div class="card info">
+<h4>所以论文的第一项贡献，本质上是把"运行时未知"变成"静态可查"</h4>
+<p>既然 row-to-rank 映射运行时才知道，那就在<b>拿到路由结果之后、GEMM 启动之前</b>，按这个映射把行重新排一遍，让同一目的地的行连续、并且在 tile 边界上对齐。这样 GEMM 一旦产出某个 tile，它的目的地就是一个可以用查表得到的确定值。</p>
+<p>这就是 §3.2.1 的 <b>remote-owner-aligned row layout</b>。它没有降低任何通信量，也没有加速 GEMM，它做的唯一一件事是<b>让细粒度重叠成为可能</b>。详见 TAB ④。</p>
+</div>
+
+<h3>为什么信令要放在 GEMM 的 epilogue</h3>
+<p>要做到"一个 tile 算完就发"，就必须有人在 tile 完成的那一刻通知通信侧。CUTLASS 风格的 GEMM 内核有一个天然的挂载点：<b>epilogue</b>（尾声段），即主循环累加完成、把累加器写回全局内存的那段代码。</p>
+
+<table>
+<thead><tr><th>挂载位置</th><th>可行性</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>Host 端（每块之后同步）</td><td><span class="tag r">代价高</span></td><td>论文批评 decomposition 路线时点名的问题："incur non-trivial host-side synchronization costs between chunks"。</td></tr>
+<tr><td>单独的探测内核</td><td><span class="tag a">粒度粗</span></td><td>需要额外内核和额外的全局内存往返，且无法精确对齐 tile 完成时刻。</td></tr>
+<tr><td><b>GEMM epilogue 内</b></td><td><span class="tag g">最自然</span></td><td>数据刚写回全局内存，CTA 上下文里已经知道自己算的是哪个 tile。只需追加 fence + 置标志位两步。论文称其代价是 "a small, fixed number of additional instructions per tile and does not perturb the main loop."</td></tr>
+</tbody>
+</table>
+
+<p>实现上论文遵循 CUTLASS 的 <b>EVT（Epilogue Visitor Tree）</b> 机制把信令织入 epilogue，而不是去魔改 GEMM 主循环——这也是它自称"非侵入"的技术基础。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">§3.3.1 / §3.4</a>，<a href="https://github.com/NVIDIA/cutlass" target="_blank">NVIDIA CUTLASS</a></p>
+
+<h3>通信侧的两块基础设施</h3>
+<div class="grid g2">
+  <div class="card">
+    <h4>NVSHMEM：设备端发起的单边通信</h4>
+    <p>要让 GPU 自己在内核里把数据推给对端，不能依赖 host 调用集合通信。论文使用 <b>NVSHMEM 3.6.5</b>，在对称堆（symmetric heap）上做<b>单边 put</b>：发送方直接写入远端预留的接收缓冲区，接收方无需参与。这正是"知道目的 rank + 偏移 + 行数就能立刻发出"的前提。</p>
+    <p class="src"><a href="https://developer.nvidia.com/nvshmem" target="_blank">NVIDIA NVSHMEM</a></p>
+  </div>
+  <div class="card">
+    <h4>持久化内核 + SM 划分</h4>
+    <p>生产者（GEMM）和消费者（通信）要真正并发，就不能让二者抢占同一批 SM。论文用<b>持久化内核</b>（固定 CTA 数量、每 SM 一个 CTA、CTA 常驻到内核退出）配合<b>流优先级</b>，把两者的 SM 占用划开：消费者优先级更高，其 SM 相当于被"预留"给通信。可调参数 <code>cCTA</code> 就是消费者的 SM 预算。</p>
+    <p class="src">§3.3.3，详见 TAB ⑦</p>
+  </div>
+</div>
+
+<div class="card warning">
+<h4>一个诚实的观察：这套机制的复杂度都被推给了"调参"</h4>
+<p>把生产者和消费者塞进同一块 GPU、靠 SM 预算切分资源，好处是不必融合内核；代价是引入了一个必须被正确设置的旋钮。论文 §4.3.4 自己测出：<code>cCTA=2</code> 时性能<b>比不重叠的基线还慢，最坏达到 1.91×</b>，而且他们没有提供自动选择机制（明确列为 future work）。这一点我在 TAB ⑨ 详细展开。</p>
+</div>
+
+</div>
+
+<div class="tab" id="t-routes">
+<h2>③ 三条既有技术路线，以及本文站在哪</h2>
+<p class="lead">论文 §1 与 §5 把已有工作归为三类，并逐类给出了相当具体的批评。理清这三条路线的边界，就能看清本文的定位：它既不是拆块流水，也不是内核融合，而是"保持内核分离、但把同步粒度做到 tile 级"的中间路线。</p>
+
+<h3>路线一：Decomposition（拆分 + 流水）</h3>
+<p><b>代表工作：</b>CoCoNet（Jangda et al., ASPLOS'22）、Wang et al.（ASPLOS'23）、Centauri（ASPLOS'24）、Domino、MegaScale、PyTorch async TP。</p>
+<p><b>做法：</b>把集合通信和 GEMM 都切成若干 chunk，放到不同的 CUDA stream 上流水起来，让第 i 块的通信与第 i+1 块的计算并行。</p>
+
+<div class="card danger">
+<h4>论文的两条批评（均为原文）</h4>
+<ul>
+<li>"often do not fully exploit tensor-core efficiency at small chunk sizes and <b>incur non-trivial host-side synchronization costs between chunks</b>" —— 块切小了，Tensor Core 吃不饱，而且每块之间要回 host 同步。</li>
+<li>NCCL 之类的集合通信原语 "usually require contiguous-buffer, so the decomposition is often limited to a single tensor dimension and <b>the resulting chunks tend to be misaligned with the GEMM tile structure</b>. As a result, <b>tile-level overlap is hard to achieve through decomposition alone</b>."</li>
+</ul>
+<p>第二条是要害：NCCL 要求连续缓冲区，于是只能沿单一张量维度切；这样切出来的 chunk 边界和 GEMM 内部的 tile 边界<b>对不齐</b>。对不齐就意味着"某个 chunk 可以发了"这个判断无法由"某个 tile 算完了"直接推出，tile 级重叠在这条路上原理性地走不通。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">§1 / §5</a>；<a href="https://arxiv.org/abs/2105.05720" target="_blank">CoCoNet (arXiv:2105.05720)</a>、<a href="https://arxiv.org/abs/2409.15241" target="_blank">Domino (arXiv:2409.15241)</a>、<a href="https://arxiv.org/abs/2402.15627" target="_blank">MegaScale (arXiv:2402.15627)</a></p>
+</div>
+
+<h3>路线二：MoE 专用的粗粒度流水</h3>
+<p>这一类不动通信原语，而是沿 <b>token 维度</b>切块，做 MoE 层内部的流水。区别主要在"流水级数怎么定"。</p>
+
+<table>
+<thead><tr><th>系统</th><th>会场/来源</th><th>流水策略</th></tr></thead>
+<tbody>
+<tr><td><b>FasterMoE</b></td><td>He et al., PPoPP 2022</td><td>定制 all-to-all 原语并对其做流水；<b>流水级数固定为 2</b>。也是论文实验中的归一化基线。</td></tr>
+<tr><td><b>Tutel</b></td><td>Hwang et al., MLSys 2023</td><td>自适应运行时，对流水级数做<b>启发式搜索</b>；另有分层的 2D all-to-all。<span class="tag b"><a href="https://arxiv.org/abs/2206.03382" target="_blank">arXiv:2206.03382</a></span></td></tr>
+<tr><td><b>PipeMoE</b></td><td>Shi et al., INFOCOM 2023</td><td>建模并自适应决定流水级数。</td></tr>
+<tr><td><b>ScheMoE</b></td><td>Shi et al., EuroSys 2024</td><td>自适应级数，并进一步<b>针对节点内/跨节点带宽差异</b>做任务调度。</td></tr>
+<tr><td><b>MPipeMoE</b></td><td>Zhang et al., IPDPS 2023</td><td>目标偏向<b>显存效率</b>而非纯延迟。</td></tr>
+</tbody>
+</table>
+
+<div class="card warning">
+<h4>共同的天花板</h4>
+<p>无论级数怎么调，切块单位始终是"一批 token"，粒度远粗于 GEMM 的 tile。级数少 → 重叠窗口小；级数多 → 每块 GEMM 变瘦、Tensor Core 效率下滑，且同步开销线性增长。这是一个内在的两难，本文选择用"tile 级信令"绕过它，而不是继续在级数上做优化。</p>
+</div>
+
+<h3>路线三：Kernel Fusion（内核融合）</h3>
+<p>最激进的一条：直接把通信写进计算内核里，或者反过来。</p>
+
+<table>
+<thead><tr><th>系统</th><th>会场</th><th>做法</th></tr></thead>
+<tbody>
+<tr><td><b>Punniyamurthy et al.</b></td><td>SC 2024</td><td>在 AMD GPU 上实现三种融合范式：embedding + all-to-all、GEMV + all-reduce、<b>GEMM + all-to-all</b>。</td></tr>
+<tr><td><b>COMET</b></td><td>MLSys 2025</td><td>线程块特化（thread-block specialization）的融合内核，配合自适应块划分。也是"通信占近一半时间"这一数据的来源。<span class="tag b"><a href="https://arxiv.org/abs/2502.19811" target="_blank">arXiv:2502.19811</a></span></td></tr>
+<tr><td><b>CCFuser</b></td><td>PPoPP 2025</td><td>用 NVSHMEM 的单边读写<b>替换掉</b> all-to-all，走 GPU 间共享内存语义。</td></tr>
+<tr><td><b>FlashMoE</b></td><td>NeurIPS 2025</td><td>把<b>整个 MoE 层</b>塞进单个 CUDA 内核。<span class="tag b"><a href="https://arxiv.org/abs/2506.04667" target="_blank">arXiv:2506.04667</a></span></td></tr>
+</tbody>
+</table>
+
+<div class="card danger">
+<h4>论文的批评（原文）</h4>
+<div class="quote">
+"typically require intrusive engineering, including <b>custom barriers</b>, <b>inter-rank atomic protocols</b>, and <b>per-target kernel specialization</b>."
+<span class="src">—— arXiv:2607.19539v1, §1</span>
+</div>
+<p>三个词都很具体：自定义屏障意味着你要自己保证正确性；跨 rank 原子协议意味着调试地狱；"per-target kernel specialization"意味着换一个形状、换一代硬件就得重写一遍。融合能拿到最好的粒度，但工程可维护性代价极高。</p>
+</div>
+
+<h3>最接近的前作：tile 级信令本身不是本文首创</h3>
+<div class="card highlight">
+<p>论文非常诚实地指出，"用 tile 级信令来暴露细粒度就绪状态"这个想法已有前作：</p>
+<ul>
+<li><b>Hong et al., EuroSys '26</b> —— "Efficient and adaptable overlapping for computation and communication via signaling and reordering"。名字里同时有 signaling 和 reordering，与本文的 signaling + row layout 重排思路高度重合，是最需要对照阅读的一篇。<a href="https://arxiv.org/abs/2504.19519" target="_blank">arXiv:2504.19519</a></li>
+<li><b>T3（Pati et al., ASPLOS 2024）</b> —— "Transparent Tracking &amp; Triggering for fine-grained overlap of compute &amp; collectives"，用硬件追踪机制触发通信。</li>
+</ul>
+<p>本文的自我定位是这一句：</p>
+<div class="quote">
+"Our design adopts this signaling principle while <b>keeping compute and communication kernels separate</b>."
+<span class="src">—— arXiv:2607.19539v1, §5</span>
+</div>
+<p>所以本文的新意不在"信令"，而在<b>不融合内核也能把信令用起来</b>，以及为此配套的一整套数据布局（remote-owner-aligned layout）、调度（remote-first schedule）、粒度（row band / segment）和资源划分（SM partition）机制。</p>
+</div>
+
+<h3>四条路线横向对照</h3>
+<table>
+<thead><tr><th>维度</th><th>Decomposition</th><th>粗粒度 MoE 流水</th><th>Kernel Fusion</th><th>本文</th></tr></thead>
+<tbody>
+<tr><td><b>重叠粒度</b></td><td>chunk（与 tile 不对齐）</td><td>token 块</td><td>tile / 更细</td><td><b>row band（tile 对齐）</b></td></tr>
+<tr><td><b>内核结构</b></td><td>分离</td><td>分离</td><td><span class="tag r">融合</span></td><td><span class="tag g">分离</span></td></tr>
+<tr><td><b>同步位置</b></td><td>host 端，块间</td><td>host 端，级间</td><td>内核内屏障 / 原子</td><td><b>device 端就绪标志</b></td></tr>
+<tr><td><b>通信后端</b></td><td>NCCL（要连续缓冲）</td><td>NCCL / 定制原语</td><td>NVSHMEM / 自定义</td><td>NVSHMEM 单边 put</td></tr>
+<tr><td><b>工程侵入性</b></td><td>低</td><td>低</td><td><span class="tag r">高</span></td><td><span class="tag a">中（需 SM 划分与调参）</span></td></tr>
+<tr><td><b>主要代价</b></td><td>Tensor Core 效率 + host 同步</td><td>粒度粗，两难</td><td>可维护性、需逐场景特化</td><td><b>行填充开销 + cCTA 敏感</b></td></tr>
+</tbody>
+</table>
+<p class="src">本表为我依据论文 §1 与 §5 的批评整理，非论文原表。相关工作链接见 TAB ⑨ 汇总表。</p>
+
+<div class="card info">
+<h4>顺带一提：还有一条"编译/DSL"路线论文提得较少</h4>
+<p>TileLink（MLSys 2025）走的是用 tile 中心的原语自动生成计算-通信重叠内核，本质上想把这类手工优化变成编译器产物。论文在 §4.3.4 引用了它，但没有做正面对比。如果本文的调参敏感性问题要根治，这条路可能才是答案。<a href="https://arxiv.org/abs/2503.20313" target="_blank">TileLink, arXiv:2503.20313</a></p>
+</div>
+
+</div>
+<div class="tab" id="t-layout">
+<h2>④ 核心贡献一：数据布局与 tile 调度</h2>
+<p class="lead">这是全文最实质的一节。论文 §3.2 用三个子机制把"运行时才知道的回传目标"变成"GEMM 启动前就已固定、且能用三次数组读取查到"的静态信息：远端所有者对齐的行布局、远端优先的 tile 调度、以及预计算的 combine plan。</p>
+
+<h3>4.1 Remote-owner-aligned row layout（远端所有者对齐的行布局）</h3>
+<p>问题回顾：第一次 all-to-all 之后，某个本地专家收到的 token 来自多个 peer rank，混在一起。论文原文：</p>
+<div class="quote">
+"Without explicit reordering, a single output tile may contain rows assigned to different ranks, breaking the single-destination property required for fine-grained overlap."
+<span class="src">—— arXiv:2607.19539v1, §3.2.1</span>
+</div>
+
+<h4>三条布局规则</h4>
+<table>
+<thead><tr><th style="width:56px">规则</th><th>内容</th><th>为什么这样</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>①</b></td>
+  <td><b>远端行优先</b>：所有需要回传给远端 rank 的行放在最前面，并<b>按所有者 rank 分组连续存放</b>。</td>
+  <td>远端行才有通信需求，越早算完越早能发出去，重叠窗口才够长。按 owner 分组是"单一目的地"的前提。</td>
+</tr>
+<tr>
+  <td><b>②</b></td>
+  <td><b>本地行垫后</b>：属于本 rank 自己的行放在最末尾。</td>
+  <td>本地行不需要任何通信，算完直接留在原地。放最后等于把"不产生通信"的工作推到 GEMM 尾部，此时通信管道已被充分喂饱。</td>
+</tr>
+<tr>
+  <td><b>③</b></td>
+  <td><b>边界补零对齐</b>：在每个 owner-rank 分组边界处，若该组行数不是 <code>tb_M</code> 的整数倍，就<b>填充零行</b>，让下一组从 tile 边界开始。</td>
+  <td>这是让 tile 边界与 owner 边界重合的唯一办法。原文：<i>"These padded rows participate in the GEMM computation for correctness but are <b>excluded from the transfer</b>."</i></td>
+</tr>
+</tbody>
+</table>
+
+<h4>布局前后对照（示意，4 ranks / 每 rank 2 experts，rank 1 视角）</h4>
+<pre><code>【重排前】某本地专家收到的行，目的地混杂
+  idx  owner        tile 归属
+   0   rank 2   \
+   1   rank 0    |  tile 0  ← 混了 3 个目的地，不可整体发送
+   2   rank 2    |
+   3   rank 3   /
+   4   rank 1   \
+   5   rank 0    |  tile 1  ← 同样混杂
+   ...          /
+
+【重排后】remote-owner-aligned layout
+  ┌──────────────────┐
+  │ G0 : owner rank 0│ ← 远端组，连续
+  ├──────────────────┤
+  │ G2 : owner rank 2│ ← 远端组，连续
+  │ (pad zero rows)  │ ← 规则③：补到 tb_M 整数倍
+  ├──────────────────┤
+  │ G3 : owner rank 3│ ← 远端组，连续
+  │ (pad zero rows)  │
+  ├──────────────────┤
+  │ G1 : owner rank 1│ ← 本地组（r_self），放最后，无需补齐
+  └──────────────────┘
+  每个 tb_M 高的条带 → owner 唯一 → 可整体发往单一 rank</code></pre>
+
+<div class="card highlight">
+<h4>补齐开销比想象的小，论文给出了上界</h4>
+<p>不是每组都要补：<b>完整的 <code>tb_M</code> 高行带无需补齐</b>，只有每组末尾不足 <code>tb_M</code> 的残行需要；<b>本地行组（放在最后）也不需要补</b>，因为后面没有别的组了。所以最坏情况是每个远端组各差 <code>tb_M - 1</code> 行：</p>
+<pre><code>最大补零行数 / rank = (W - 1) × (tb_M - 1)
+
+W = rank 数，tb_M = tile 高度
+论文 4-rank 评测、tile 高度最大 256：
+  (4-1) × (256-1) = 3 × 255 = 765 行
+论文原话："a few percent of the per-rank row count"</code></pre>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §4.5</a>。为什么是 <code>W-1</code> 而不是 <code>W</code>：本地那一组不补。</p>
+</div>
+
+<div class="card warning">
+<h4>我的观察：这个公式随 rank 数线性增长，而论文只测到 4 卡</h4>
+<p><code>(W-1)(tb_M-1)</code> 里 <code>W</code> 是 rank 数。4 卡时是 765 行，看起来无害；但如果推到 8 卡单机（<code>7×255 = 1785</code>）乃至 64 卡跨节点专家并行（<code>63×255 ≈ 16065</code>），补零行数就会逼近甚至超过每 rank 的真实行数量级。论文既没有在更大规模上评测，也没有讨论这一趋势。</p>
+<p><b>这是我的外推，不是论文结论。</b>论文对此的唯一表态是把"larger machines"列入 §6 future work。若要在大规模专家并行下沿用这套布局，多半需要更小的 <code>tb_M</code>（会伤 Tensor Core 效率）或分层的补齐策略。</p>
+</div>
+
+<h3>4.2 Remote-first tile schedule（远端优先的 tile 调度）</h3>
+<p>布局解决了"一个 tile 属于谁"，调度解决"先算谁"。论文 §3.2.2 给出两条规则：</p>
+
+<div class="grid g2">
+  <div class="card">
+    <h4>规则 (i)：所有远端 tile 排在所有本地 tile 之前</h4>
+    <p>因为只有远端 tile 会产生通信。把它们全部前置，等价于让通信管道在 GEMM 刚开始时就被点火，而 GEMM 的后半段（跑本地 tile）就成了纯粹用来掩盖通信尾巴的时间。</p>
+  </div>
+  <div class="card">
+    <h4>规则 (ii)：远端行更多的专家排在前面</h4>
+    <p>原文：<i>"so that the largest transfers enter the communication stage earliest and expert transitions are minimized by completing each expert's remote tiles contiguously before moving to the next."</i> 一句话里有两个目的：大传输早入场；同时保证每个专家的远端 tile 连续跑完，减少专家切换次数。</p>
+  </div>
+</div>
+
+<pre><code>论文 Figure 2(c) 的例子（rank 1，本地有 expert 2 和 expert 3）
+
+  expert 3 远端负载更重  →  排第一
+  ┌────────────────────────────────────────────┐
+  │ expert 3 的所有远端 tile （连续）           │ ← 最大传输最早入场
+  ├────────────────────────────────────────────┤
+  │ expert 2 的所有远端 tile （连续）           │
+  ├────────────────────────────────────────────┤
+  │ expert 2 + expert 3 的所有本地 tile         │ ← 无通信，用来盖尾巴
+  └────────────────────────────────────────────┘
+   t=0 ──────────────────────────────────→ GEMM 结束
+
+论文原话：
+"This scheduling maximizes the time window between
+ the first transferable data segment and the end of the GEMM."</code></pre>
+
+<div class="card info">
+<h4>为什么"最大化第一个可传数据段到 GEMM 结束之间的时间窗"是正确的优化目标</h4>
+<p>重叠能藏掉的通信量，上限就是"第一段数据就绪时刻"到"GEMM 结束时刻"这段时间乘以有效带宽。这个窗口越宽，能塞进去的字节越多。所以调度的目标不是让 GEMM 更快（它一点没变快），而是<b>让第一个可发送的数据尽早出现</b>。这与规则 (ii) 完全一致：远端负载最重的专家先跑，其第一个 tile 也就最早完成。</p>
+</div>
+
+<h3>4.3 Algorithm 1：布局与调度的联合构造</h3>
+<p>论文把上面两件事合成一个算法，在每次前向拿到 routing 结果后在 host 侧执行一次。</p>
+
+<table>
+<thead><tr><th>项</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><b>输入</b></td><td><code>routing</code>（路由结果）；本地 rank <code>r_self</code>；rank 总数 <code>R</code>；每 rank 专家数 <code>E</code>；tile 的 M 维高度 <code>tb_M</code></td></tr>
+<tr><td><b>输出</b></td><td>每个专家的行布局 <code>{X_e}</code>；tile 调度序列 <code>S</code></td></tr>
+<tr><td><b>关键步骤 1</b></td><td>按 owner rank 把行分组为 <code>G_0, G_1, ..., G_{R-1}</code>，依次追加，但把 <code>G_{r_self}</code>（本地组）<b>放到最后</b></td></tr>
+<tr><td><b>关键步骤 2</b></td><td>在远端组边界补零，使每组起始位置 tile 对齐</td></tr>
+<tr><td><b>关键步骤 3</b></td><td>把本地各专家按<b>远端 row band 数量降序</b>排序，据此生成远端 tile 的调度顺序</td></tr>
+<tr><td><b>关键步骤 4</b></td><td>把所有本地 tile 追加到调度序列末尾</td></tr>
+</tbody>
+</table>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §3.2.2, Algorithm 1</a></p>
+
+<h3>4.4 Combine plan：把传输决策压缩成三次数组读取</h3>
+<p>消费者内核在设备端看到某个 tile 的就绪标志后，需要立刻知道三件事才能发出一次单边写：</p>
+
+<div class="grid g3">
+  <div class="card">
+    <h4>① 目的 rank</h4>
+    <p>这个 tile 的行属于哪个 peer。由 remote-owner-aligned layout 保证唯一。</p>
+  </div>
+  <div class="card">
+    <h4>② 远端写入偏移</h4>
+    <p>要写到对端接收缓冲区的哪个位置。必须全局协调，避免不同专家撞车。</p>
+  </div>
+  <div class="card">
+    <h4>③ 有效行数</h4>
+    <p>非补零行的数量。补零行"参与计算但不参与传输"，靠这个字段排除。</p>
+  </div>
+</div>
+
+<div class="card highlight">
+<h4>设计要点：扁平的、设备常驻的、按 tile id 索引的数组</h4>
+<p>论文原文：这三项被预计算成 <i>"flat, per-tile device-resident arrays... indexed by tile identifier, <b>reducing each tile's transfer resolution to three array reads</b>."</i></p>
+<p>为什么这一步重要：消费者内核是常驻轮询的，它对每个就绪 tile 的处理必须极短——如果解析目的地需要遍历路由表、做条件分支或原子操作，消费者本身就会成为瓶颈，重叠收益被自己吃掉。压成三次线性数组读取，等于把"运行时决策"彻底移出关键路径。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">§3.2.3</a></p>
+</div>
+
+<h4>偏移的全局协调</h4>
+<p>combine plan 还要给每个 tile 分配<b>全局</b>写入偏移。论文原文：<i>"coordinating placement across all local experts so that data from different experts targeting the same peer rank lands at non-overlapping offsets."</i></p>
+<p>这一点容易被忽略但很关键：同一个 rank 上有 <code>E</code> 个本地专家，它们可能同时都有行要发给同一个 peer。如果各自独立算偏移，就会互相覆盖。所以偏移必须在 rank 级别统一分配——这也是为什么论文选择"一个 rank 一个 persistent GEMM 内核"，而不是每个专家一个内核。</p>
+
+<div class="card">
+<h4>另外，combine plan 还负责一次二分类</h4>
+<p>每个 tile 被标记为 <b>remote-publishable</b>（远端可发布）或 <b>local-only</b>（仅本地）。生产者在 epilogue 里只对前者置标志位，消费者也只处理前者。这让本地 tile 完全不进入通信路径，零额外开销。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">§3.2.3</a></p>
+</div>
+
+<h3>4.5 三个机制如何咬合</h3>
+<pre><code>routing 结果（运行时）
+        │
+        ▼
+┌───────────────────────────────────────────────┐
+│ Algorithm 1  (host 侧，每次前向一次)            │
+│  ├─ remote-owner-aligned row layout  {X_e}     │
+│  ├─ remote-first tile schedule       S         │
+│  └─ combine plan（3 个扁平数组，拷到 device）    │
+└───────────────────────────────────────────────┘
+        │                          │
+        ▼                          ▼
+  生产者 persistent GEMM      消费者常驻通信内核
+  按 S 顺序算 tile            轮询标志位
+  epilogue: fence + 置标志  →  查 3 个数组 → NVSHMEM put
+        └──────── 设备端标志位，无 host 参与 ────────┘</code></pre>
+
+<div class="card info">
+<h4>整体评价</h4>
+<p>这一节的价值不在于任何单个技巧新颖，而在于它把"细粒度重叠在 MoE 上不可行"这个障碍<b>系统性地拆掉了</b>：布局解决单一目的地，调度解决时间窗，combine plan 解决决策延迟。三者缺一不可——只做布局不做调度，第一段数据可能很晚才出现；只做调度不做 combine plan，消费者会被解析开销拖死。</p>
+</div>
+
+</div>
+<div class="tab" id="t-producer">
+<h2>⑤ 生产者：rank 级持久化 GEMM 与 epilogue 信令</h2>
+<p class="lead">论文 §3.3.1。一个 rank 上可能有几个到几十个本地专家，传统做法是 grouped GEMM（把多个专家的矩阵拼接后一次算）。本文选了一条不同的路：一个持久化内核、不拼接矩阵、靠寄存器级的参数块替换在专家之间切换。</p>
+
+<h3>5.1 一个内核跑完整个调度序列</h3>
+<p>每个 rank 启动<b>一个</b> persistent GEMM 内核，按 Algorithm 1 产出的调度序列 <code>S</code> 逐项执行。调度序列里的每一项都是一个二元组：</p>
+<pre><code>schedule item = ( expert_index , tile_coordinate )
+
+每个 expert_index 对应一个 device view，里面存着：
+   • A / B / C 矩阵指针
+   • problem dims（该专家的 M / N / K）</code></pre>
+
+<div class="card highlight">
+<h4>与经典 grouped GEMM 的关键区别（论文自己强调的）</h4>
+<div class="quote">
+"This lets one kernel cover multiple experts <b>without concatenating their matrices</b>, distinguishing our approach from classical grouped GEMM."
+<span class="src">—— arXiv:2607.19539v1, §3.3.1</span>
+</div>
+<p>为什么这个区别对本文至关重要：如果把多个专家的输出拼成一个大矩阵，那么 tile 坐标与"哪个专家的哪些行"之间的对应就变得间接且与拼接布局耦合，而 combine plan 需要的正是一个<b>干净的 tile id → (目的 rank, 偏移, 行数)</b> 映射。不拼接，每个专家保持自己独立的、已按 owner 重排过的行布局，映射才能保持简单。</p>
+</div>
+
+<h3>5.2 CTA 如何领派任务</h3>
+<p>持久化内核的经典循环分配：启动多个持久 CTA，<b>每个 SM 一个</b>，然后步长等于 grid 大小地扫过整个调度序列：</p>
+<pre><code>设 grid size = g（也就是生产者占用的 SM 数）
+
+CTA 0  → tile 0, tile g,   tile 2g,   ...
+CTA 1  → tile 1, tile g+1, tile 2g+1, ...
+  ...
+CTA i  → tile i, tile i+g, tile i+2g, ...
+
+CTA 常驻到内核退出，不因专家切换而重建</code></pre>
+
+<div class="card info">
+<h4>这个分配方式与"远端优先调度"配合得很好</h4>
+<p>因为调度序列前部全是远端 tile，而 CTA 从序列头部开始均匀领取，所有 SM 在内核启动后的第一轮就都在生产需要传输的数据。通信管道因此能在极短时间内被点火，而不是等待某个特定 CTA 跑到序列的远端部分。</p>
+</div>
+
+<h3>5.3 专家切换为何几乎免费：寄存器级参数块替换</h3>
+<p>一个内核要跑多个专家，最大的担心是"切换专家时要不要重新 launch"。论文的做法是：</p>
+
+<table>
+<thead><tr><th style="width:60px">步骤</th><th>动作</th></tr></thead>
+<tbody>
+<tr><td><b>1</b></td><td>CTA 从调度项取得 <code>expert_index</code>，获取对应的 device view</td></tr>
+<tr><td><b>2</b></td><td>拷贝内核的<b>基础参数块</b>（base parameter block）</td></tr>
+<tr><td><b>3</b></td><td><b>只覆写</b>随专家变化的字段：矩阵指针、problem size</td></tr>
+<tr><td><b>4</b></td><td>共享内存的 staging buffer <b>跨 tile 复用</b>，不重分配</td></tr>
+</tbody>
+</table>
+
+<div class="quote">
+"Because the substitution is a <b>register-level copy</b> rather than a re-launch, transitioning between experts is negligible."
+<span class="src">—— arXiv:2607.19539v1, §3.3.1</span>
+</div>
+
+<p>这也反过来解释了 §3.2.2 规则 (ii) 里那句"expert transitions are minimized"为何仍然值得说：切换虽然便宜，但并非为零（至少多一次 device view 读取与参数块拷贝），所以调度仍然尽量让同一专家的 tile 连续。</p>
+
+<h3>5.4 信令：tile 完成后的两步</h3>
+<pre><code>CUTLASS epilogue 内（每个 remote-publishable tile）：
+
+  ① 把 tile 结果写入 global memory      ← 本来就要做的
+  ② thread-fence                        ← 确保全局可见
+  ③ publish readiness flag（该 tile）     ← 新增
+
+论文原文：
+"performs a thread-fence to ensure that the data is globally visible,
+ then publishes a readiness flag for the completed tile."
+
+开销评估：
+"a small, fixed number of additional instructions per tile
+ and does not perturb the main loop."</code></pre>
+
+<div class="card warning">
+<h4>fence 不可省，而它就是成本所在</h4>
+<p>顺序必须是"先 fence 后置标志"：否则消费者可能看到标志位已置、但 tile 数据尚未对其他 SM/设备可见，于是把脏数据发到对端——错误隐蔽且不可重现。但 fence 本身是一个内存屏障，它要等待本 CTA 的写回完成且可见，在 A100 上这意味着一次非平凡的延迟。</p>
+<p>这里正好能与硬件发展对上：Hopper 引入了把"store"与"arrive"合并为一条指令的机制，目的正是把这种"写完 → 同步 → 通知"的多轮往返压缩成一次。本文在 A100（sm_80）上只能用软件手搭这个模式。详见 TAB ⑨。</p>
+</div>
+
+<h3>5.5 为什么不直接融合？本文的工程取舍</h3>
+<table>
+<thead><tr><th>选项</th><th>得</th><th>失</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>融合成单内核</b><br>（COMET / FlashMoE / CCFuser）</td>
+  <td>同步开销最低，不需要跳出内核，数据可以停在共享内存/寄存器</td>
+  <td>论文批评的三宗罪：custom barriers、inter-rank atomic protocols、per-target kernel specialization。换形状/换代就要重写</td>
+</tr>
+<tr>
+  <td><b>保持内核分离 + tile 信令</b><br>（本文）</td>
+  <td>GEMM 侧只动 epilogue，可以继续用 CUTLASS profiler 的最优配置查表；通信侧也能独立演进</td>
+  <td>必须把 SM 手动划分给两个内核，引入 <code>cCTA</code> 这样一个高敏感旋钮；且仍需一次全局内存往返（tile 必须落到 global 才能被另一个内核读到）</td>
+</tr>
+</tbody>
+</table>
+
+<div class="card">
+<h4>实现上的一个巧妙之处：保留了 CUTLASS profiler 的调优成果</h4>
+<p>论文 §3.4 提到他们为每个目标 GEMM 形状"selecting the optimal configuration... from a lookup table derived from CUTLASS profiler"。这是保持内核分离的一个实在好处：一旦你把通信缝进 GEMM 主循环，官方 profiler 选出的最优 tile shape / stage 数 / warp 布局就不一定再成立，得重新调一遍。本文只在 epilogue 追加指令，主循环未变，因此能直接沿用。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">§3.4</a>；<a href="https://github.com/NVIDIA/cutlass" target="_blank">CUTLASS</a></p>
+</div>
+
+</div>
+
+<div class="tab" id="t-gran">
+<h2>⑥ 通信粒度：为何传输单位不是 tile 而是 row band</h2>
+<p class="lead">论文 §3.3.2。这一节是全文最具工程实感的部分：信令是 tile 级的，但<b>传输单位不能也是 tile 级</b>。原因有两个，一个关于带宽饱和，一个关于内存连续性。</p>
+
+<h3>6.1 第一个理由：tile 太小，远未饱和带宽</h3>
+<p>论文先测了一条带宽曲线（Figure 3(a)），看不同传输尺寸下 NVSHMEM 单边写能跑到多少带宽：</p>
+
+<div class="lat">
+  <div class="row"><div class="lbl">硬件上限（单向/peer）</div><div class="bar b-blue" style="width:88%">≈ 100 GB/s（4 条 NVLink × 25 GB/s）</div></div>
+  <div class="row"><div class="lbl">8 SMs @ ≈ 1 MiB</div><div class="bar b-green" style="width:77%">87 GB/s（峰值）</div></div>
+  <div class="row"><div class="lbl">4 SMs @ ≈ 3 MiB</div><div class="bar b-amber" style="width:59%">67 GB/s</div></div>
+  <div class="row"><div class="lbl">单个 tile（32–64 KiB）</div><div class="bar b-red" style="width:11%">远未饱和</div></div>
+</div>
+<p class="src">数据来自论文 §3.3.2 与 Figure 3(a)；硬件上限来自 §4.1.1。最后一条的长度为示意，论文只说 "lies far from saturation" 而未给出具体带宽值。<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1</a></p>
+
+<div class="quote">
+"A single-tile transfer (usually <b>32 KiB or 64 KiB</b> depending on the tile configuration used) <b>lies far from saturation</b>."
+<span class="src">—— arXiv:2607.19539v1, §3.3.2</span>
+</div>
+
+<p>论文把逐 tile 传输的后果叫作 <b>communication fragmentation</b>（通信碎片化）：大量极小的远端写，每一次都付固定开销，但都拿不到应有带宽。即使信令本身是完美的，通信侧也会因为粒度太细而自毁。</p>
+
+<h3>6.2 第二个理由：tile 在内存里是断的，row band 是连的</h3>
+<p>这是更根本的结构性原因。输出矩阵宽为 <code>N</code>，而一个 tile 只覆盖 <code>tb_N</code> 列：</p>
+
+<pre><code>            ←─────────────  N 列  ────────────→
+           ┌──────┬──────┬──────┬──────┬──────┐
+  tb_M 行  │ TILE │      │      │      │      │   ← 一个 tile
+           └──────┴──────┴──────┴──────┴──────┘
+
+tile 的内存布局（行主序）：
+  row 0: [████][      ][      ]...   ← 只取前 tb_N 个元素
+  row 1: [████][      ][      ]...   ← 跳过 N-tb_N 个元素再取
+  ...
+  → strided, non-contiguous → 需多次拷贝
+
+
+ROW BAND（行带）= tb_M 高 × 完整 N 宽：
+           ┌───────────────────────────────┐
+  tb_M 行  │████████  ROW BAND  ████████│
+           └───────────────────────────────┘
+  → owner-uniform（布局规则保证）
+  → contiguous  （行主序下天然连续）
+  → 可以用一次远端写搬运</code></pre>
+
+<div class="card highlight">
+<h4>row band 是本文真正的传输原子单位</h4>
+<p>论文原文：row band <i>"spans the entire width N and is <b>both owner-uniform and contiguous</b> in memory, so it can be moved with a <b>single remote write</b>."</i></p>
+<p>这一句把两个条件并列得很漂亮：<b>owner-uniform</b> 是 §3.2.1 行布局换来的（结果），<b>contiguous</b> 是行主序存储天然具备的（前提）。两者同时成立，才使得"一次单边写"成为可能。而 tile 两个条件只满足第一个。</p>
+</div>
+
+<h3>6.3 Segment：把 row band 再聚合一层</h3>
+<p>即便是一个 row band，尺寸也可能仍在饱和点之下。所以论文再加一层抽象：<b>segment = 一个或多个连续 row band</b>，并且首、中、尾三段采取<b>不同</b>的策略：</p>
+
+<pre><code>一个专家对某个 peer 的全部远端 row band：
+
+ 时间 →
+ ┌────┐  ┌──────────┐  ┌──────────┐  ┌────┐
+ │ 1  │  │   x bands  │  │   x bands  │  │ 1  │
+ │band│  │  (聚合)    │  │  (聚合)    │  │band│
+ └────┘  └──────────┘  └──────────┘  └────┘
+  ↑                                    ↑
+ 首段：尽早发                        尾段：避免长尾巴
+ 尽可能早点火通信管道                最后一段不等很多 band
+
+                中间段：聚合 x 个 band，把尺寸顶到带宽曲线饱和区
+                x 即可调参数 mgb（middle-segment row bands）</code></pre>
+
+<table>
+<thead><tr><th>段位</th><th>策略</th><th>论文给的理由</th></tr></thead>
+<tbody>
+<tr><td><b>首段</b></td><td>只 1 个 row band</td><td>尽可能早地发出第一笔数据，让通信管道立即开始工作。等凑成大包反而浪费了重叠窗口的开头。</td></tr>
+<tr><td><b>中间段</b></td><td>聚合 <code>x</code> 个连续 row band</td><td>此时 GEMM 还在稳定产出，不急；要的是尺寸落在带宽曲线的饱和段上。<code>x</code> 可调。</td></tr>
+<tr><td><b>尾段</b></td><td>只 1 个 row band</td><td>避免 <b>long communication tail</b>：如果最后一段也要凑 <code>x</code> 个 band，就得等 GEMM 完全算完才能发，这一段通信将完全裸露在关键路径上。</td></tr>
+</tbody>
+</table>
+
+<div class="card warning">
+<h4>论文坐实了一件事：<code>x</code> 没有最优值</h4>
+<div class="quote">
+"neither <b>x=1</b> (~1–2 MiB) nor <b>x=2</b> (~2–4 MiB) is <b>uniformly best</b>."
+<span class="src">—— arXiv:2607.19539v1, §3.3.2</span>
+</div>
+<p>这是一句非常诚实的自我披露，但也是一个警告信号：<code>mgb</code> 成了第二个必须按形状调的旋钮（第一个是 <code>cCTA</code>）。论文在实验里把 <code>mgb ∈ {1,2}</code> 全量扫了一遍，正是因为无法预先定下来。</p>
+</div>
+
+<h3>6.4 三个粒度层次的关系</h3>
+<table>
+<thead><tr><th>层次</th><th>尺寸</th><th>用途</th><th>为何不直接用它做传输</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>Tile</b></td>
+  <td><code>tb_M × tb_N</code><br>32–64 KiB</td>
+  <td><b>信令单位</b>。GEMM 天然以此为完成粒度，epilogue 置标志位。</td>
+  <td>太小（远未饱和）+ 内存不连续（需多次拷贝）</td>
+</tr>
+<tr>
+  <td><b>Row band</b></td>
+  <td><code>tb_M × N</code></td>
+  <td><b>传输原子单位</b>。owner-uniform + contiguous，一次远端写。</td>
+  <td>可以用，但尺寸可能仍在饱和点之下</td>
+</tr>
+<tr>
+  <td><b>Segment</b></td>
+  <td>1 或 <code>x</code> 个 row band<br>≈ 1–4 MiB</td>
+  <td><b>实际发出的单位</b>。首/尾段为 1 band，中间段聚合。</td>
+  <td>——</td>
+</tr>
+</tbody>
+</table>
+
+<div class="card info">
+<h4>一个值得注意的推论：信令粒度与传输粒度必须解耦</h4>
+<p>很多细粒度重叠工作隐含假设"粒度越细越好"。本文的结果说明它们并不同一：<b>信令应尽可能细</b>（越细越早知道数据就绪），但 <b>传输必须足够粗</b>（否则带宽跑不起来）。论文的三层粒度本质上就是在这两个相反需求之间插入了一个聚合层。这个经验对任何做计算-通信重叠的系统都适用。</p>
+</div>
+
+</div>
+
+<div class="tab" id="t-sched">
+<h2>⑦ 生产者-消费者协同与资源划分</h2>
+<p class="lead">论文 §3.3.3。两个内核同时跑在一张 GPU 上，就不可避免地互相争 SM。论文用三个手段处理：流优先级、SM 划分、设备内存协调。这也是全文最脆弱的一环。</p>
+
+<h3>7.1 三个协同手段</h3>
+<div class="grid g3">
+  <div class="card">
+    <h4>① 流级优先级</h4>
+    <p>生产者与消费者各走一条 <b>non-blocking stream</b>，且<b>消费者流优先级更高</b>。</p>
+  </div>
+  <div class="card">
+    <h4>② SM 级划分</h4>
+    <p>消费者固定启动 <code>cCTA</code> 个 CTA（每 SM 一个），剩下的 SM 给生产者。A100 共 108 个 SM。</p>
+  </div>
+  <div class="card">
+    <h4>③ 设备内存协调</h4>
+    <p>就绪标志位 + combine plan 都在设备内存里，两个内核无需任何 host 介入即可协同。</p>
+  </div>
+</div>
+
+<h3>7.2 为什么是消费者优先级更高（而不是生产者）</h3>
+<p>直觉上 GEMM 才是"真正在算东西的"，应该优先。论文给了一个很具说服力的反向论证：</p>
+<div class="quote">
+"since <b>delaying a producer tile affects performance only at the GEMM tail</b>, whereas <b>delaying a consumer transfer pushes directly onto the communication critical path and compounds across subsequent segments</b>."
+<span class="src">—— arXiv:2607.19539v1, §3.3.3</span>
+</div>
+
+<pre><code>延迟一个生产者 tile：
+  GEMM ─────────────────────────┐ ← 尾部往后挪一点
+  COMM ───────────────────┐          ← 不受影响（还有别的 tile 可发）
+  影响 = 局部、一次性
+
+延迟一个消费者 segment：
+  GEMM ───────────────────┐
+  COMM ────────────────────────────┐ ← 往后挪，且后续段逐个累积
+  影响 = 直接上关键路径、且"compounds"</code></pre>
+
+<div class="card highlight">
+<h4>优先级的真正作用：把 SM “预留”给通信</h4>
+<p>论文指出，正因为消费者优先级更高，它的 SM 就被 <i>"effectively reserved for communication"</i>。换句话说，这里的优先级不是为了"抢时间片"，而是为了实现一种<b>软硬件划分</b>——CUDA 没有提供直接的 SM 绑定接口，持久化内核（固定 CTA 数）+ 高优先级流是得到稳定 SM 分配的实用手段。</p>
+</div>
+
+<h3>7.3 <code>cCTA</code> 设小了会怎样，设大了又会怎样</h3>
+<table>
+<thead><tr><th>情形</th><th>论文描述（原文）</th><th>机制解读</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>cCTA 太小</b><br><span class="tag r">灾难性</span></td>
+  <td>"transfer pipeline <b>falls behind producer progress</b> and communication <b>spills past the GEMM tail</b>"</td>
+  <td>消费者排不走就绪 tile，就绪队列背压（back-pressure），重叠崩塌，大量通信裸露在 GEMM 结束之后</td>
+</tr>
+<tr>
+  <td><b>cCTA 太大</b><br><span class="tag a">温和退化</span></td>
+  <td>"the producer <b>loses too much compute capacity</b>"</td>
+  <td>GEMM 可用 SM 变少，产出变慢，整体时间变长；但至少重叠本身仍在工作</td>
+</tr>
+</tbody>
+</table>
+
+<div class="card danger">
+<h4>这不是纯理论担心：论文自己测到了 1.91× 的退步</h4>
+<p>§4.3.4 把 <code>cCTA</code> 从 2 扫到 24（步长 2），结果：</p>
+<ul>
+<li><code>cCTA=2</code> 在<b>所有</b>形状、<b>所有</b> router 分布下都比不重叠的基线<b>更慢</b>；最坏在 stress_skew + M=32768 + E=4 时达到基线的 <b>1.91×</b>（即慢了近一倍）。</li>
+<li><code>cCTA=4</code> 在 M=32768 且 E=4/E=8 时仍偶尔超过 1.00（仍比基线慢）。</li>
+<li>最优区间："The lowest latency is usually achieved when the consumer gets a <b>moderate share</b> of the SMs, with <b>cCTA in the range [10, 20]</b>."</li>
+<li>默认值取 <code>cCTA=14</code>，落在这个区间中心。</li>
+</ul>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §4.3.4 / Table 2</a></p>
+</div>
+
+<h3>7.4 router 倾斜会放大这个惩罚</h3>
+<p>论文观察到：<code>cCTA</code> 设小带来的惩罚在 balanced 下最小、在 stress_skew 下最大。给出的解释是倾斜会把输出产生<b>集中</b>到持有热门专家的 rank 上。</p>
+
+<pre><code>balanced：各 rank 产出速率接近
+  rank0 ████   rank1 ████   rank2 ████   rank3 ████
+  → 每个 rank 的消费者面对的就绪速率适中，小 cCTA 也勉强能跟
+
+stress_skew：热门专家集中
+  rank0 ████████████   rank1 ██   rank2 ██   rank3 ██
+  → rank0 的消费者瞬时面对海量就绪 tile
+  → cCTA 不够 → 背压 → 重叠崩塌 → 全局同步点被拖死</code></pre>
+
+<div class="card warning">
+<h4>这里有一个结构性的不匹配（我的分析）</h4>
+<p><code>cCTA</code> 是一个<b>内核启动时就固定下来的静态值</b>，而 router 倾斜是<b>逐 step 变化的动态属性</b>。即使你为平均情况调到了最优的 <code>cCTA</code>，遇到突发的专家失衡仍可能瞬时进入负收益区。论文也意识到了，在 §4.3.4 末尾写道："Production systems could benefit from an runtime-adaptive SM partition selector, <b>which we leave to future work</b>."</p>
+<p>在那之前，这套方法在生产环境里就具有一定风险：一个设错的旋钮不是"少赚一点"，而是"相比完全不优化反而慢近一倍"。</p>
+</div>
+
+<h3>7.5 完整的执行时序</h3>
+<pre><code>Stream A（低优先，108-cCTA 个 SM）：生产者 persistent GEMM
+Stream B（高优先，cCTA 个 SM）  ：消费者常驻通信内核
+
+  A: [tile0][tile1][tile2][tile3][tile4] ... [本地 tiles] → end
+         │      │      │      │
+       flag   flag   flag   flag        （epilogue: fence + set）
+         │      │      │      │
+  B: poll →──┘      │      │      │
+     首段 1 band → put ───────→ peer
+            中间段聚合 x bands → put ───→ peer
+                        ...
+                        尾段 1 band → put ─→ peer
+
+  目标：B 的最后一次 put 尽量不要超出 A 的结束时刻
+  → overlap ratio，论文测得 71.9% – 99.9%</code></pre>
+
+<div class="card info">
+<h4>overlap ratio 这个指标要与加速比分开看</h4>
+<p>overlap ratio 高（接近 99.9%）意味着通信几乎完全被藏在 GEMM 背后，但它<b>不等于</b>端到端加速就很高——如果这个模型本来通信就少，完全隐藏也换不来多少时间。这正是为什么 M-Trans-xl（Dim=512）上本方法反而输给了三个基线。详见 TAB ⑧。</p>
+</div>
+
+</div>
+<div class="tab" id="t-eval">
+<h2>⑧ 实验结果：数字要连着分母一起看</h2>
+<p class="lead">论文 §4 是全文篇幅最大的部分，包含端到端、MoE 层、算子级、专家数扫描、资源争用、正确性、开销七组实验。这一节把所有数字原样列出，同时把每个数字的<b>基线</b>和<b>配置</b>标清楚——因为本文的结论对这两者极为敏感。</p>
+
+<h3>8.1 实验平台</h3>
+<table>
+<thead><tr><th>项</th><th>配置</th></tr></thead>
+<tbody>
+<tr><td><b>GPU</b></td><td>单节点 <b>4 × NVIDIA A100</b>，每卡 <b>108 SMs / 40 GB HBM</b>，一个 rank 一张卡</td></tr>
+<tr><td><b>互连</b></td><td>节点内 NVLink。论文原文：每条 lane 单向 25 GB/s，一对 GPU 之间 4 条 lane，故<b>单向峰值约 100 GB/s per peer</b></td></tr>
+<tr><td><b>软件栈</b></td><td>CUDA 12.1、CUTLASS 3.9、NVSHMEM 3.6.5、NCCL 2.29.3、PyTorch 2.6.0</td></tr>
+<tr><td><b>NCCL 的角色</b></td><td>承担<b>第一次 all-to-all（dispatch）</b>以及框架基线的整条通信路径</td></tr>
+<tr><td><b>精度</b></td><td>FP16（正确性一节提到"two different FP16 GEMM implementations"）</td></tr>
+</tbody>
+</table>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §4.1.1 / §4.4</a></p>
+
+<div class="card warning">
+<h4>规模是这套实验最大的软肋</h4>
+<p><b>4 张卡、单节点、全程 NVLink，没有任何跨节点 / RDMA 场景。</b>真实的大规模 MoE 部署普遍是几十到上千卡、专家并行跨节点，此时通信路径是 NVLink 域 → InfiniBand/RoCE 的阶梯式带宽，延迟高一到两个数量级，且 NVSHMEM 单边写的语义与性能特征都不同。论文把 "larger machines" 明确列为 §6 future work，态度是诚实的，但这也意味着结论的外推性有限。</p>
+</div>
+
+<h3>8.2 四个基线分别是什么</h3>
+<table>
+<thead><tr><th>基线</th><th>出处</th><th>本质</th><th>强度</th></tr></thead>
+<tbody>
+<tr><td><b>FasterMoE</b></td><td>He et al., PPoPP 2022</td><td>定制 all-to-all 原语并对其做流水，<b>流水级数固定为 2</b></td><td><span class="tag r">最弱</span>（且是全部数字的归一化基准）</td></tr>
+<tr><td><b>Tutel</b></td><td>Hwang et al., MLSys 2023</td><td>自适应运行时，流水级数启发式搜索 + 分层 2D all-to-all</td><td><span class="tag a">中</span></td></tr>
+<tr><td><b>Megatron-CUTLASS</b></td><td>Megatron-LM + CUTLASS GroupGEMM</td><td>不做重叠，但 GEMM 侧极致优化</td><td><span class="tag g">强</span></td></tr>
+<tr><td><b>Megatron-TE</b></td><td>Megatron-LM + NVIDIA Transformer Engine</td><td>同上，用 TE 的融合算子</td><td><span class="tag g">强</span></td></tr>
+</tbody>
+</table>
+<p class="src">链接：<a href="https://arxiv.org/abs/2206.03382" target="_blank">Tutel</a>、<a href="https://arxiv.org/abs/1909.08053" target="_blank">Megatron-LM</a>、<a href="https://github.com/NVIDIA/cutlass" target="_blank">CUTLASS</a>、<a href="https://github.com/NVIDIA/TransformerEngine" target="_blank">Transformer Engine</a>、<a href="https://github.com/fanshiqing/grouped_gemm" target="_blank">Grouped GEMM for MoE</a></p>
+
+<h3>8.3 Table 1：三个测试模型</h3>
+<p>三个模型都是 12 个 transformer block、<code>topk=2</code>、总专家数 <code>E_total=64</code>（每 GPU 16 个），差别在 batch/seq/hidden 维度和"哪些 block 被换成 MoE"。</p>
+
+<table>
+<thead><tr><th>模型</th><th>Batch</th><th>Seq</th><th>Tokens</th><th>Dim</th><th>MoE Block</th></tr></thead>
+<tbody>
+<tr><td><b>M-GPT</b></td><td>8</td><td>1024</td><td>8192</td><td>768</td><td><code>{11}</code>（只换最后一层，稀疏）</td></tr>
+<tr><td><b>M-BERT</b></td><td>32</td><td>512</td><td>16384</td><td><b>1024</b></td><td><code>{2,5,8,11}</code>（均匀间隔）</td></tr>
+<tr><td><b>M-Trans-xl</b></td><td>16</td><td>512</td><td>8192</td><td><b>512</b></td><td><code>{all}</code>（全部换成 MoE，最密）</td></tr>
+</tbody>
+</table>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 Table 1</a>。相关模型架构原始出处：<a href="https://arxiv.org/abs/1901.02860" target="_blank">Transformer-XL</a>、<a href="https://arxiv.org/abs/2101.03961" target="_blank">Switch Transformers</a>、<a href="https://arxiv.org/abs/2006.16668" target="_blank">GShard</a></p>
+
+<h3>8.4 §4.2.1 端到端与 MoE 层加速（全部归一化到 FasterMoE）</h3>
+
+<h4>端到端（E2E）</h4>
+<table>
+<thead><tr><th>模型</th><th>vs FasterMoE</th><th>vs Tutel</th><th>vs Megatron-CUTLASS</th><th>vs Megatron-TE</th></tr></thead>
+<tbody>
+<tr><td><b>M-GPT</b></td><td><b>1.57×</b></td><td>1.35×</td><td>1.15×</td><td>1.25×</td></tr>
+<tr><td><b>M-BERT</b></td><td><b>1.66×</b></td><td>1.15×</td><td>1.04×</td><td>1.09×</td></tr>
+<tr><td><b>M-Trans-xl</b></td><td><b>2.64×</b></td><td colspan="3"><span class="tag r">论文原文："slightly trails Tutel, Megatron-CUTLASS, and Megatron-TE"</span></td></tr>
+</tbody>
+</table>
+
+<h4>MoE 层</h4>
+<table>
+<thead><tr><th>模型</th><th>vs FasterMoE</th><th>vs Tutel</th><th>vs Megatron-CUTLASS / TE</th></tr></thead>
+<tbody>
+<tr><td><b>M-GPT</b></td><td><b>2.65×</b></td><td>1.77×</td><td>论文未逐一列出</td></tr>
+<tr><td><b>M-BERT</b></td><td><b>1.78×</b></td><td>1.15×</td><td>论文未逐一列出</td></tr>
+<tr><td><b>M-Trans-xl</b></td><td><b>2.74×</b></td><td colspan="2"><span class="tag r">"remaining comparable, but does not surpass"</span></td></tr>
+</tbody>
+</table>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §4.2.1</a></p>
+
+<div class="card danger">
+<h4>这张表里藏着本文最需要被指出的一点</h4>
+<p>摘要和引言里最亮眼的 <b>2.64× / 2.74×</b> 都来自 <b>M-Trans-xl</b>，而 M-Trans-xl 恰恰是<b>本方法唯一输给三个较强基线</b>的模型。也就是说，最大的数字出现在方法表现最差的那个配置上——因为该配置下 FasterMoE 这个基线本身崩得最厉害（12 层全是 MoE，固定级数 2 的流水完全撑不住）。</p>
+<p>如果换一个更公平的分母（Megatron-CUTLASS），端到端优势只剩 <b>1.04× ~ 1.15×</b>。这不是造假，论文正文写得很清楚，但摘要的呈现方式确实容易让人形成过高预期。</p>
+</div>
+
+<h4>论文自己给出的失利解释（原文）</h4>
+<div class="quote">
+M-Trans-xl 的 Dim 最小（512）。"<b>Per-token all-to-all volume scales linearly with Dim.</b>, so a smaller Dim. leaves <b>less communication to hide</b>."
+<span class="src">—— arXiv:2607.19539v1, §4.2.1</span>
+</div>
+<p>再加上单 tile 的有用工作量变少，固定的重叠开销（fence、置标志、轮询、combine plan 查表）在总时间里占比反而上升。这个解释是自洽的，并且能被 §4.2.2 的对照实验支持——见下。</p>
+
+<div class="card info">
+<h4>为什么 E2E 加速总是小于 MoE 层加速：Amdahl</h4>
+<p>论文明确用 Amdahl's law 解释。MoE 层只是模型的一部分，attention、LayerNorm、embedding 都不受影响。M-GPT 只有 1 层是 MoE，所以层级 2.65× 只换来端到端 1.57×；M-Trans-xl 全部 12 层都是 MoE，层级 2.74× 换来 2.64×，两者非常接近——这正是 Amdahl 的直接体现，也反过来印证数据的自洽性。</p>
+</div>
+
+<h3>8.5 §4.2.2 专家数扫描：这里表现明显更好</h3>
+<p>配置：单个 MoE block，B=16、S=512、<code>topk=2</code>，<b>Dim=1024</b>（注意比 M-Trans-xl 大一倍）。专家数 <code>E ∈ {4,8,16,32,64}</code>。</p>
+
+<div class="stats">
+  <div class="stat"><div class="v">1.30–5.33×</div><div class="k">vs FasterMoE</div></div>
+  <div class="stat"><div class="v">1.77–2.16×</div><div class="k">vs Tutel</div></div>
+  <div class="stat"><div class="v">1.23–1.45×</div><div class="k">vs Megatron-CUTLASS</div></div>
+  <div class="stat"><div class="v">1.35–1.76×</div><div class="k">vs Megatron-TE</div></div>
+  <div class="stat"><div class="v">71.9–99.9%</div><div class="k">overlap ratio</div></div>
+</div>
+
+<div class="card highlight">
+<h4>关键对照：Dim 从 512 变成 1024，结论就反转了</h4>
+<p>在 §4.2.1 的 M-Trans-xl（Dim=512）上本方法输给 Megatron-CUTLASS/TE；在 §4.2.2（Dim=1024）上则<b>全程领先</b>，覆盖 E=4 到 E=64 的整个范围。论文给的解释是 <i>"potentially because the larger hidden dimension (Dim.=1024) provides enough per-tile useful work to amortize the fixed overhead."</i></p>
+<p>这一对照实验的价值高于任何单个加速比数字：它给出了本方法的<b>适用边界</b>——隐藏维度足够大、单 tile 有用工作量足够多时收益明确，否则固定开销吃掉收益。注意 "potentially" 一词，论文自己也只是推测，没有做开销分解来证明。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">§4.2.1 / §4.2.2</a></p>
+</div>
+
+<h3>8.6 §4.3 算子级 / 层级 / 吞吐（vs 顺序执行基线）</h3>
+<p>这一组把范围收窄到只有"专家 GEMM + 第二次 all-to-all"，基线是同样代码但<b>顺序执行不重叠</b>。这是最能反映重叠机制本身效果的一组数字。</p>
+
+<table>
+<thead><tr><th>层级</th><th>balanced</th><th>moderate_skew</th><th>stress_skew</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><b>§4.3.1 算子级</b><br>（GEMM + a2a #2）</td><td><b>2.97×</b></td><td><b>2.94×</b></td><td><b>3.01×</b></td><td>峰值。论文称 "speedup generally grows with E"</td></tr>
+<tr><td><b>§4.3.2 MoE 层</b></td><td>1.78×</td><td>1.73×</td><td>1.77×</td><td>加上 routing、a2a #1、加权归约后被稀释</td></tr>
+<tr><td><b>§4.3.3 吞吐</b><br>（MTokens/sec）</td><td>1.78×</td><td>1.73×</td><td>1.77×</td><td>与层级一致（吞吐是延迟的倒数换算）</td></tr>
+</tbody>
+</table>
+
+<div class="card">
+<h4>一个有意思的现象：stress_skew 下算子级加速最高</h4>
+<p>3.01× 出现在最严重的路由倾斜下，而不是均衡下。合理的解释是：倾斜时热门专家的远程行数暴增，可隐藏的通信量更大，remote-first 调度的时间窗口也更长。但这只在 <code>cCTA</code> 设置正确的前提下成立——§4.3.4 显示同一个 stress_skew 在 <code>cCTA=2</code> 时反而是最惨的（1.91× 退步）。同一个特征既是收益来源也是风险来源。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">§4.3.1 – §4.3.4</a>。此处的因果解释为我的分析，论文只报告了数值趋势。</p>
+</div>
+
+<h3>8.7 Table 2：完整的参数扫描空间</h3>
+<table>
+<thead><tr><th>参数</th><th>取值</th><th>含义</th></tr></thead>
+<tbody>
+<tr><td><code>tpr</code></td><td>8192 / 16384</td><td>tokens per rank</td></tr>
+<tr><td><code>M</code></td><td>16384 / 32768</td><td>GEMM 的 M 维 = 2 × tpr（因为 topk=2）</td></tr>
+<tr><td><code>K</code></td><td>2048</td><td>hidden</td></tr>
+<tr><td><code>N</code></td><td>4096 / <b>8192</b></td><td>out hidden（<b>加粗为论文正文报告的配置</b>）</td></tr>
+<tr><td>router mode</td><td>balanced / moderate_skew / stress_skew</td><td>三档路由倾斜程度</td></tr>
+<tr><td><code>E</code></td><td>4 / 8 / 16 / 32 / 64</td><td>每 rank 专家数</td></tr>
+<tr><td><code>cCTA</code></td><td>2,4,6,8,10,12,<b>14（默认）</b>,16,18,20,22,24</td><td>消费者 CTA 数 = 分给通信的 SM 数</td></tr>
+<tr><td><code>mgb</code></td><td>1 / 2</td><td>中间段聚合的 row band 数</td></tr>
+</tbody>
+</table>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 Table 2</a></p>
+
+<h3>8.8 §4.4 正确性：1440 次独立校验</h3>
+<p>这是论文做得相当扎实的一部分。校验设计：<b>3 种路由分布 × 12 种生产者/消费者 SM 划分 × 2 种 <code>mgb</code> 粒度</b>，覆盖整个形状网格，双方使用<b>相同的随机种子、权重与路由结果</b>，容差为相对距离 <b>τ = 8×10⁻³</b>。</p>
+
+<table>
+<thead><tr><th>路由分布</th><th>配置数</th><th>最大相对距离</th><th>通过数</th></tr></thead>
+<tbody>
+<tr><td>balanced</td><td>480</td><td>1.875×10⁻³</td><td>480 / 480</td></tr>
+<tr><td>moderate_skew</td><td>480</td><td>1.884×10⁻³</td><td>480 / 480</td></tr>
+<tr><td>stress_skew</td><td>480</td><td><b>1.913×10⁻³</b></td><td><b>(480)</b> / 480 ← 括号标记异常</td></tr>
+<tr><td><b>合计</b></td><td><b>1440</b></td><td><b>1.913×10⁻³</b></td><td><b>1440 / 1440</b></td></tr>
+</tbody>
+</table>
+
+<div class="card warning">
+<h4>那个被括号标记的异常，论文的处理方式值得注意</h4>
+<p>在 stress_skew 下，<b>某个 rank 上的某一次迭代</b>最初超出了容差；重跑之后全部通过。论文的表述是：<i>"we conservatively treat it as a <b>transient nondeterministic anomaly</b>."</i></p>
+<p>差异本身被归因于 <i>"rounding noise inherent to using two different FP16 GEMM implementations"</i>——参考实现和本文实现用的是不同的 FP16 GEMM，舍入不同是预期的。最大观测值 1.913×10⁻³ 距离容差 8×10⁻³ 还有 4 倍余量，所以整体是可信的。</p>
+<p>但"重跑就好了"这个处理需要保留一点保守态度：一个只在最高倾斜度下偶发、且涉及跨 rank 数据可见性的偏差，理论上也可能是 fence / 标志位可见性的竞态在极端压力下暴露。论文没有给出根因分析，也没有说明重跑了多少次。<b>这是我的谨慎意见，不是论文的结论。</b></p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §4.4 / Table 3</a></p>
+</div>
+
+<h3>8.9 §4.5 补零开销</h3>
+<pre><code>最大补零行数 / rank = (W - 1) × (tb_M - 1)
+
+论文的 4-rank 配置、tile 高度最大 256：
+    (4 - 1) × (256 - 1) = 765 行
+
+论文评价："a few percent of the per-rank row count"
+分布规律：balanced 下最小，stress_skew 下最大</code></pre>
+<p>为什么倾斜时更大：倾斜使各 owner 分组的行数更不规则，末尾残行更容易不满 <code>tb_M</code>，触发补齐的概率更高。</p>
+<p class="src">来源：<a href="https://arxiv.org/html/2607.19539v1" target="_blank">arXiv:2607.19539v1 §4.5</a></p>
+
+<h3>8.10 §6 论文自列的四项 future work</h3>
+<table>
+<thead><tr><th>方向</th><th>为什么它重要</th></tr></thead>
+<tbody>
+<tr><td><b>反向传播 / 训练支持</b></td><td>当前只做前向推理。训练场景的通信量更大、更值得优化，但梯度 all-to-all 的行归属关系与前向不同，能否复用同一套布局是开放问题</td></tr>
+<tr><td><b>运行时自适应 SM 划分</b></td><td><code>cCTA</code> 设错会导致 1.91× 的退步，这是当前最影响可用性的缺口</td></tr>
+<tr><td><b>更多并行模式</b></td><td>当前只有纯专家并行（1 rank = 1 GPU = E 个专家）。与 TP/PP/DP 组合时布局约束会复杂得多</td></tr>
+<tr><td><b>更大规模机器</b></td><td>4 卡单节点是本文全部结论的实验边界；跨节点带宽阶梯与补零开销的线性增长都尚未验证</td></tr>
+</tbody>
+</table>
+
+</div>
+
+<div class="tab" id="t-crit">
+<h2>⑨ 批判性评估、Hopper 对照与参考文献</h2>
+<p class="lead">这一节把我在通读全文后的判断集中列出，并明确区分「论文陈述」与「我的推论」。最后给出完整的参考链接汇总表。</p>
+
+<h3>9.1 我认为成立的贡献</h3>
+<div class="grid g2">
+  <div class="card highlight">
+    <h4>① 把"MoE 无法做 tile 级重叠"这个障碍系统性拆掉了</h4>
+    <p>这是本文最实在的价值。障碍的根源被准确定位为"single-destination property 被破坏"，解法是数据布局而非更快的通信内核。定位准确、解法对症，这个思路本身有普适性——任何"输出去向由运行时决定"的通信模式都可以套用。</p>
+  </div>
+  <div class="card highlight">
+    <h4>② row band 这个抽象选得很准</h4>
+    <p>把传输原子单位定为 row band（<code>tb_M × N</code>）而不是 tile，同时满足 owner-uniform（布局换来的）和 contiguous（行主序天然的），一次远程写即可。这是把"信令要细、传输要粗"两个矛盾需求解耦的干净做法。</p>
+  </div>
+  <div class="card highlight">
+    <h4>③ 非侵入式的工程定位是清醒的</h4>
+    <p>"adopts this signaling principle while keeping compute and communication kernels separate" 是一个务实取舍：保留 CUTLASS profiler 的调优成果，避免融合路线的 per-target specialization 维护地狱。对工业落地而言，这个取舍往往比多 5% 性能更重要。</p>
+  </div>
+  <div class="card highlight">
+    <h4>④ 正确性验证的规模超出同类论文平均水平</h4>
+    <p>1440 次独立校验、覆盖 3 × 12 × 2 的配置网格、公开最大相对距离、并且诚实标注了那一次异常。做通信重叠这类涉及内存可见性的优化，很多论文只给几个点的正确性说明，本文这一点值得肯定。</p>
+  </div>
+</div>
+
+<h3>9.2 我认为需要打折的部分</h3>
+
+<div class="card danger">
+<h4>① 头条数字与最弱基线绑定，且出现在方法表现最差的配置上</h4>
+<p>2.64×（E2E）和 2.74×（层级）都是相对 FasterMoE。FasterMoE 是 2022 年 PPoPP 的工作、流水级数固定为 2，在 12 层全 MoE 的 M-Trans-xl 上崩得最厉害。同一配置下本方法<b>输给</b> Tutel、Megatron-CUTLASS、Megatron-TE 三个基线。换 Megatron-CUTLASS 作分母，E2E 优势只有 1.04×–1.15×。</p>
+<p>论文正文如实披露了这一点（"slightly trails..."），所以这不是学术不诚实，但摘要的呈现方式确实容易造成误读。<b>依据：§4.2.1 原文。</b></p>
+</div>
+
+<div class="card danger">
+<h4>② 调参脆弱性是当前最严重的可用性缺口</h4>
+<p><code>cCTA=2</code> 在<b>所有</b>形状和路由下都慢于不重叠的基线，最坏达 <b>1.91×</b>。这意味着旋钮设错时，这个"优化"会变成一个近 2 倍的性能回退。而 <code>cCTA</code> 是静态的、路由倾斜是动态的，两者存在结构性不匹配。自适应选择器被明确列为 future work。</p>
+<p>再叠加 <code>mgb</code> 这第二个旋钮（论文自陈 "neither x=1 nor x=2 is uniformly best"），实际部署需要按形状做二维调参表。<b>依据：§4.3.4 / §3.3.2 原文。</b></p>
+</div>
+
+<div class="card danger">
+<h4>③ 补零开销随 rank 数线性增长，而实验只到 4 卡</h4>
+<p><code>(W−1)(tb_M−1)</code> 中 <code>W</code> 是 rank 数。4 卡是 765 行（"a few percent"），但外推：8 卡 <code>7×255 = 1785</code>、16 卡 <code>15×255 = 3825</code>、64 卡 <code>63×255 ≈ 16065</code>。在 <code>tpr=8192 / M=16384</code> 的量级下，64 卡的最坏补零已经接近每 rank 真实行数的相当比例，且这些补零行"participate in the GEMM computation for correctness"——也就是要真实消耗算力。</p>
+<p><b>这是我的外推，不是论文结论。</b>论文对此的唯一表态是把 "larger machines" 列入 future work，既没有测也没有讨论这一趋势。缓解手段（更小的 <code>tb_M</code>、分层补齐）都各有代价。</p>
+</div>
+
+<div class="card warning">
+<h4>④ 只优化了一半通信，且只做前向</h4>
+<p>第一次 all-to-all（dispatch）仍走 NCCL，完全没有优化——所以即使 combine 被 100% 隐藏，MoE 层的通信开销也只减半。训练场景（反向传播）完全未覆盖。这两点论文都明确声明了，属于诚实的范围限定，但读者需要据此调整对"MoE 通信优化"这个标题的预期。</p>
+</div>
+
+<div class="card warning">
+<h4>⑤ 没有跨节点评测，NVLink 域内的结论未必外推</h4>
+<p>全部实验在单节点 4 卡 NVLink 上完成。跨节点时通信走 RDMA，延迟高一到两个数量级，NVSHMEM 单边 put 的开销结构不同，且"segment 尺寸落在带宽饱和区"这个调优结论需要基于全新的带宽曲线重做。§4.1.1 给出的 87 GB/s @ 1 MiB 等数字都是 NVLink 特性。</p>
+</div>
+
+<h3>9.3 一个跨域对照：A100 用软件搭的东西，Hopper 用硬件收掉了</h3>
+<p>这是我阅读时最感兴趣的一点，需要先说清楚：<b>以下是我的分析与推论，不是论文的论述。</b>论文本身完全没有提及 Hopper 或任何硬件同步原语。我的依据只有 §3.3.1 那一句原文。</p>
+
+<div class="quote">
+"performs a <b>thread-fence</b> to ensure that the data is globally visible, then <b>publishes a readiness flag</b> for the completed tile."
+<span class="src">—— arXiv:2607.19539v1, §3.3.1（论文的实际做法）</span>
+</div>
+
+<pre><code>本文在 A100（sm_80）上的信令，展开成四步：
+
+   ① store   : tile 结果写回 global memory
+   ② fence   : 内存屏障，等待写回全局可见
+   ③ flag    : 置就绪标志位
+   ④ poll    : 消费者常驻内核轮询该标志位
+
+   ①②③ 由生产者 CTA 串行执行，④ 由另一个内核自旋
+
+
+Hopper（sm_90）把 ①②③ 收敛为一条指令 + 硬件事务计数：
+
+   store + arrive 合并指令  →  PTX 层面即
+       st.async.shared::cluster.mbarrier::complete_tx::bytes
+   配合 mbarrier 的 transaction count，
+   由硬件负责"写入完成 → 计数递减 → 屏障满足"</code></pre>
+
+<div class="card purple">
+<h4>为什么这个对照有意义</h4>
+<p>NVIDIA 的专利申请 <b>US20230315655A1</b>（快速数据同步 / 合并 store+arrive 指令）所描述的问题，恰好就是本文在 A100 上必须手工承担的成本：分离的 store 与 arrive 需要多次往返来保证"数据可见先于同步信号"，而合并指令加上硬件事务计数可以把这一开销大幅压缩。</p>
+<p>换个角度看，本文的 §3.3.1 可以被读作对这类硬件机制的<b>需求证明</b>：一个在 sm_80 上必须小心手写 fence + flag + poll 的软件模式，在 sm_90 上有了直接的硬件对应物。这也提示了一个明确的后续方向：把本文的信令层移植到 Hopper 的 mbarrier / TMA 机制上，固定开销应当下降，而固定开销正是论文解释 Dim=512 时失利的主要原因。</p>
+<p class="src">专利原文：<a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">US20230315655A1（Google Patents）</a>；PTX 指令语义：<a href="https://docs.nvidia.com/cuda/parallel-thread-execution/" target="_blank">NVIDIA PTX ISA 文档</a>。<b>此对照为我的分析，论文未涉及。</b></p>
+</div>
+
+<h3>9.4 三个值得追问的开放问题</h3>
+<table>
+<thead><tr><th>问题</th><th>为什么值得问</th></tr></thead>
+<tbody>
+<tr><td><b>与 Hong et al. (EuroSys '26) 的边界到底在哪</b></td><td>那篇的标题就是 "signaling and reordering"，与本文的 signaling + row layout reordering 高度重合。论文只用一句"我们也用信令原则但保持内核分离"来区分，缺少定量对比。这是最需要读者自行对照阅读的一篇。<a href="https://arxiv.org/abs/2504.19519" target="_blank">arXiv:2504.19519</a></td></tr>
+<tr><td><b>固定开销究竟有多大</b></td><td>论文用"固定开销占比上升"解释 Dim=512 时的失利，但从未给出这个开销的绝对量（每 tile 多少 ns / 多少条指令）。有了这个数，适用边界就能从"potentially"变成一个可计算的判据。</td></tr>
+<tr><td><b>能否交给编译器</b></td><td>两个必须手调的旋钮（<code>cCTA</code>、<code>mgb</code>）本质上是搜索问题。TileLink 那条 tile 中心原语 + 代码生成的路线，可能才是根治调参脆弱性的方向。<a href="https://arxiv.org/abs/2503.20313" target="_blank">arXiv:2503.20313</a></td></tr>
+</tbody>
+</table>
+
+<h3>9.5 趋势展望</h3>
+<div class="grid g2">
+  <div class="card">
+    <h4>方向一：信令原语从软件走向硬件</h4>
+    <p>本文、T3（ASPLOS'24）、Hong et al.（EuroSys'26）都在做同一件事——让"计算完成"这个事件以尽可能低的成本传递给通信侧。Hopper 的 mbarrier 事务计数与合并 store+arrive 指令、以及 T3 的硬件追踪触发，都指向同一个终点：这层信令最终会下沉到硬件。软件方案的价值会逐渐转向"在没有该硬件的代际上提供等价能力"。</p>
+  </div>
+  <div class="card">
+    <h4>方向二：数据布局成为通信优化的一等公民</h4>
+    <p>本文最有迁移价值的洞察是：通信优化的瓶颈常常不在通信代码，而在数据布局是否满足"单一目的地 + 内存连续"。这个判据可以直接用于评估其它动态路由场景（稀疏注意力、动态图、推荐系统的 embedding 聚合）。预期会有更多工作把"为通信而设计的布局"作为显式设计维度。</p>
+  </div>
+  <div class="card">
+    <h4>方向三：融合 vs 分离之争尚未收敛</h4>
+    <p>FlashMoE 把整层塞进一个内核，本文坚持内核分离。两条路的分野在于"能否承受 per-target specialization 的维护成本"。短期内学术界会继续出融合工作刷数字，工业界更可能采用分离方案；长期看，如果 TileLink 这类代码生成路线成熟，"融合"的维护成本会被工具链吸收，天平可能倾斜。</p>
+  </div>
+  <div class="card">
+    <h4>方向四：静态旋钮必须被自适应机制取代</h4>
+    <p><code>cCTA</code> 设错就是 1.91× 退步，这个特性在生产环境是不可接受的。MoE 的路由倾斜本质上是数据相关且逐 step 变化的，因此资源划分必须能在运行时调整。这既是本文自陈的 future work，也是这一整类"手工划分 SM"方案的共同短板。</p>
+  </div>
+</div>
+
+<h3>9.6 三句话带走</h3>
+<div class="card highlight">
+<ol>
+<li>本文的真正贡献不是更快的通信内核，而是一套<b>数据布局 + tile 调度 + 预计算传输计划</b>，把"MoE 的回传目标运行时才确定"这个障碍消除掉，从而让 tile 级细粒度重叠在 MoE 上第一次变得可行；核心抽象是 <b>row band</b>（owner-uniform 且内存连续，可一次远程写）。</li>
+<li>数字要连着分母看：<b>2.64×</b> 是对最弱基线 FasterMoE 且出现在本方法唯一失利的模型上；对强基线 Megatron-CUTLASS 的端到端优势只有 <b>1.04×–1.15×</b>；而当隐藏维度提升到 1024、单 tile 有用工作量足够时，优势稳定在 <b>1.23×–1.45×</b>，重叠率可达 <b>99.9%</b>。</li>
+<li>最大的可用性风险是<b>静态旋钮</b>：<code>cCTA=2</code> 会比完全不优化还慢 <b>1.91×</b>，而自适应选择器尚未实现；此外只优化了第二次 all-to-all、只做前向、只在 4 卡 NVLink 上验证，补零开销 <code>(W−1)(tb_M−1)</code> 随规模线性增长——这些边界在引用本文结论时都需要一并说明。</li>
+</ol>
+</div>
+
+<h3>9.7 完整参考链接汇总</h3>
+<table>
+<thead><tr><th>类别</th><th>条目</th><th>链接</th></tr></thead>
+<tbody>
+<tr><td rowspan="3"><b>本文</b></td><td>论文摘要页（arXiv:2607.19539v1，2026-07-21，CC BY 4.0）</td><td><a href="https://arxiv.org/abs/2607.19539" target="_blank">arxiv.org/abs/2607.19539</a></td></tr>
+<tr><td>全文 HTML（本页所有引文的来源）</td><td><a href="https://arxiv.org/html/2607.19539v1" target="_blank">arxiv.org/html/2607.19539v1</a></td></tr>
+<tr><td>arXiv DOI</td><td><a href="https://doi.org/10.48550/arXiv.2607.19539" target="_blank">10.48550/arXiv.2607.19539</a></td></tr>
+<tr><td><b>会议</b></td><td>ICPP '26（第 55 届国际并行处理会议），2026-09-28 至 10-01，新加坡。ACM DOI <code>10.1145/3832810.3832907</code>，ISBN 979-8-4007-2657-6/2026/09</td><td><span class="tag a">DOI 尚未注册，故不设链接</span></td></tr>
+<tr><td rowspan="2"><b>最接近的前作</b></td><td>Hong et al., EuroSys '26 — 通过信令与重排实现计算通信重叠</td><td><a href="https://arxiv.org/abs/2504.19519" target="_blank">arXiv:2504.19519</a></td></tr>
+<tr><td>T3, Pati et al., ASPLOS 2024 — 硬件追踪触发的细粒度重叠</td><td><span class="tag a">仅 ACM DOI，403 不可达，纯文本引用</span></td></tr>
+<tr><td rowspan="4"><b>融合路线</b></td><td>COMET, MLSys 2025 — 线程块特化的 MoE 融合内核（"通信占近一半时间"的出处）</td><td><a href="https://arxiv.org/abs/2502.19811" target="_blank">arXiv:2502.19811</a></td></tr>
+<tr><td>FlashMoE, NeurIPS 2025 — 整个 MoE 层单内核</td><td><a href="https://arxiv.org/abs/2506.04667" target="_blank">arXiv:2506.04667</a></td></tr>
+<tr><td>TileLink, MLSys 2025 — tile 中心原语生成重叠内核</td><td><a href="https://arxiv.org/abs/2503.20313" target="_blank">arXiv:2503.20313</a></td></tr>
+<tr><td>Lancet, MLSys 2024 — MoE 训练的通信重叠</td><td><a href="https://arxiv.org/abs/2404.19429" target="_blank">arXiv:2404.19429</a></td></tr>
+<tr><td rowspan="3"><b>分解路线</b></td><td>CoCoNet, Jangda et al., ASPLOS 2022 — 打破计算通信抽象壁垒</td><td><a href="https://arxiv.org/abs/2105.05720" target="_blank">arXiv:2105.05720</a></td></tr>
+<tr><td>Domino — 通过张量切分与重叠消除通信</td><td><a href="https://arxiv.org/abs/2409.15241" target="_blank">arXiv:2409.15241</a></td></tr>
+<tr><td>MegaScale — 万卡级 LLM 训练</td><td><a href="https://arxiv.org/abs/2402.15627" target="_blank">arXiv:2402.15627</a></td></tr>
+<tr><td rowspan="2"><b>基线系统</b></td><td>Tutel, MLSys 2023 — 自适应 MoE 运行时（基线之一）</td><td><a href="https://arxiv.org/abs/2206.03382" target="_blank">arXiv:2206.03382</a></td></tr>
+<tr><td>Megatron-LM — 模型并行训练框架（Megatron-CUTLASS / Megatron-TE 的基座）</td><td><a href="https://arxiv.org/abs/1909.08053" target="_blank">arXiv:1909.08053</a></td></tr>
+<tr><td rowspan="3"><b>MoE 架构基础</b></td><td>Switch Transformers — 万亿参数稀疏化</td><td><a href="https://arxiv.org/abs/2101.03961" target="_blank">arXiv:2101.03961</a></td></tr>
+<tr><td>GShard — 条件计算与自动切分</td><td><a href="https://arxiv.org/abs/2006.16668" target="_blank">arXiv:2006.16668</a></td></tr>
+<tr><td>Transformer-XL — M-Trans-xl 的架构来源</td><td><a href="https://arxiv.org/abs/1901.02860" target="_blank">arXiv:1901.02860</a></td></tr>
+<tr><td rowspan="4"><b>实现依赖</b></td><td>CUTLASS 3.9 — 持久化 GEMM 与 EVT epilogue</td><td><a href="https://github.com/NVIDIA/cutlass" target="_blank">github.com/NVIDIA/cutlass</a></td></tr>
+<tr><td>NVSHMEM 3.6.5 — 设备端发起的单边通信</td><td><a href="https://developer.nvidia.com/nvshmem" target="_blank">developer.nvidia.com/nvshmem</a></td></tr>
+<tr><td>Transformer Engine — Megatron-TE 基线</td><td><a href="https://github.com/NVIDIA/TransformerEngine" target="_blank">github.com/NVIDIA/TransformerEngine</a></td></tr>
+<tr><td>Grouped GEMM for MoE — 对照的经典分组 GEMM 实现</td><td><a href="https://github.com/fanshiqing/grouped_gemm" target="_blank">github.com/fanshiqing/grouped_gemm</a></td></tr>
+<tr><td rowspan="2"><b>Hopper 对照<br>（我补充的）</b></td><td>NVIDIA US20230315655A1 — 快速数据同步 / 合并 store+arrive 指令</td><td><a href="https://patents.google.com/patent/US20230315655A1/en" target="_blank">Google Patents</a></td></tr>
+<tr><td>PTX ISA — <code>st.async</code> 与 mbarrier 事务计数语义</td><td><a href="https://docs.nvidia.com/cuda/parallel-thread-execution/" target="_blank">NVIDIA PTX 文档</a></td></tr>
+<tr><td><b>混合精度</b></td><td>Mixed Precision Training, ICLR 2018 — FP16 训练基础</td><td><a href="https://arxiv.org/abs/1710.03740" target="_blank">arXiv:1710.03740</a></td></tr>
+</tbody>
+</table>
+
+<div class="card info">
+<h4>关于两个未设链接的 DOI</h4>
+<p>ACM DOI <code>10.1145/3832810.3832907</code>（本文的 ICPP '26 正式版）在 doi.org 返回 404——会议尚未召开，DOI 未注册；T3 的 ACM DOI 返回 403（Cloudflare 拦截）。为保证本页所有链接均可点击可达，这两项以纯文本形式引用。</p>
+</div>
+
+</div>
+
+</div>
+
+<div class="footer">
+<p>本页基于 <a href="https://arxiv.org/abs/2607.19539" target="_blank">arXiv:2607.19539v1</a> 全文整理，所有引文均标注章节出处。<b>凡属我的分析、推论或外推之处均已明确标注</b>，未标注的技术描述与数值一律来自论文原文。</p>
+<p>论文作者：Minyu Cui、Anna Wingkvist、Morgan Ericsson（Linnaeus University, Växjö, Sweden）· 许可 CC BY 4.0 · 待发表于 ICPP '26</p>
+<p>整理日期：2026-08-27</p>
+</div>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('.nav button');
+  var tabs = document.querySelectorAll('.tab');
+  function show(id) {
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.remove('active');
+      if (tabs[i].id === id) { tabs[i].classList.add('active'); }
+    }
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].classList.remove('active');
+      if (buttons[j].getAttribute('data-tab') === id) { buttons[j].classList.add('active'); }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  for (var k = 0; k < buttons.length; k++) {
+    buttons[k].addEventListener('click', function () {
+      show(this.getAttribute('data-tab'));
+    });
+  }
+})();
+</script>
+</body>
+</html>

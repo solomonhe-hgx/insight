@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DE102024121954A1 深度解读 · 多芯粒 GPU 统一内存本地化模式（NVIDIA Unified Memory GPU with Localized Mode）</title>
+<style>
+  :root {
+    --nvidia-green: #76b900;
+    --nvidia-dark: #1a1a2e;
+    --nvidia-darker: #0f0f1a;
+    --card-bg: #16213e;
+    --card-bg2: #131c33;
+    --card-border: #1f3460;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0b0;
+    --accent-blue: #4fc3f7;
+    --accent-orange: #ffb74d;
+    --accent-red: #ef5350;
+    --accent-purple: #b39ddb;
+    --accent-cyan: #4dd0e1;
+    --code-bg: #0d1117;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, sans-serif;
+    background: var(--nvidia-darker);
+    color: var(--text-primary);
+    line-height: 1.8;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--nvidia-dark) 0%, #0a2a0a 45%, #10203a 100%);
+    border-bottom: 3px solid var(--nvidia-green);
+    padding: 54px 40px 40px;
+    text-align: center;
+  }
+  .hero .eyebrow {
+    font-size: 0.82em; letter-spacing: 3px; color: var(--accent-cyan);
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .hero h1 {
+    color: var(--nvidia-green);
+    font-size: 2.05em;
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+    line-height: 1.35;
+  }
+  .hero h2.en {
+    font-size: 1.02em; color: var(--text-secondary); font-weight: 400;
+    margin-bottom: 18px; border: none; padding: 0;
+  }
+  .hero .subtitle {
+    font-size: 1em; color: var(--text-secondary);
+    max-width: 900px; margin: 0 auto;
+  }
+  .badges { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .badge {
+    display: inline-block;
+    background: rgba(118,185,0,0.12);
+    border: 1px solid var(--nvidia-green);
+    color: var(--nvidia-green);
+    padding: 4px 14px; border-radius: 20px; font-size: 0.82em;
+  }
+  .badge.blue { background: rgba(79,195,247,0.1); border-color: var(--accent-blue); color: var(--accent-blue); }
+  .badge.orange { background: rgba(255,183,77,0.1); border-color: var(--accent-orange); color: var(--accent-orange); }
+  .badge.purple { background: rgba(179,157,219,0.1); border-color: var(--accent-purple); color: var(--accent-purple); }
+
+  /* ===== 导航标签 ===== */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,15,26,0.96);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--card-border);
+    padding: 10px 16px;
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  }
+  .nav button {
+    background: var(--card-bg); color: var(--text-secondary);
+    border: 1px solid var(--card-border); border-radius: 22px;
+    padding: 8px 18px; font-size: 0.9em; cursor: pointer;
+    font-family: inherit; transition: all .18s ease;
+  }
+  .nav button:hover { color: var(--text-primary); border-color: var(--nvidia-green); }
+  .nav button.active {
+    background: var(--nvidia-green); color: #0b1400;
+    border-color: var(--nvidia-green); font-weight: 600;
+  }
+  .container { max-width: 1240px; margin: 0 auto; padding: 36px 24px 20px; }
+  .tab { display: none; animation: fade .25s ease; }
+  .tab.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+
+  section { margin-bottom: 44px; }
+  h2 {
+    color: var(--nvidia-green); font-size: 1.55em;
+    margin-bottom: 16px; padding-bottom: 8px;
+    border-bottom: 2px solid var(--card-border);
+  }
+  h3 { color: var(--accent-blue); font-size: 1.18em; margin: 26px 0 12px; }
+  h4 { color: var(--accent-orange); font-size: 1.03em; margin: 18px 0 8px; }
+  p { margin-bottom: 14px; }
+
+  .card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 22px 24px; margin: 16px 0;
+  }
+  .card.highlight { border-left: 4px solid var(--nvidia-green); }
+  .card.warning { border-left: 4px solid var(--accent-orange); background: rgba(255,183,77,0.05); }
+  .card.danger { border-left: 4px solid var(--accent-red); background: rgba(239,83,80,0.05); }
+  .card.info { border-left: 4px solid var(--accent-blue); background: rgba(79,195,247,0.05); }
+  .card.analysis { border-left: 4px solid var(--accent-purple); background: rgba(179,157,219,0.06); }
+  .card h4:first-child, .card h3:first-child { margin-top: 0; }
+
+  .tag {
+    display: inline-block; font-size: 0.72em; padding: 2px 8px; border-radius: 4px;
+    margin-right: 8px; vertical-align: middle; letter-spacing: .5px;
+  }
+  .tag.fact { background: rgba(118,185,0,0.18); color: var(--nvidia-green); border: 1px solid rgba(118,185,0,0.4); }
+  .tag.infer { background: rgba(179,157,219,0.18); color: var(--accent-purple); border: 1px solid rgba(179,157,219,0.4); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; margin: 18px 0; }
+  .kpi {
+    background: var(--card-bg2); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 18px; text-align: center;
+  }
+  .kpi .num { font-size: 1.7em; color: var(--nvidia-green); font-weight: 700; line-height: 1.2; }
+  .kpi .num.blue { color: var(--accent-blue); }
+  .kpi .num.orange { color: var(--accent-orange); }
+  .kpi .num.red { color: var(--accent-red); }
+  .kpi .lbl { font-size: 0.85em; color: var(--text-secondary); margin-top: 6px; }
+
+  pre {
+    background: var(--code-bg); border: 1px solid #30363d; border-radius: 8px;
+    padding: 16px 20px; overflow-x: auto;
+    font-family: 'SF Mono','Fira Code','Cascadia Code',Menlo,monospace;
+    font-size: 0.86em; line-height: 1.6; margin: 12px 0; color: #c9d1d9;
+  }
+  code {
+    font-family: 'SF Mono','Fira Code','Cascadia Code',Menlo,monospace;
+    font-size: 0.9em; background: rgba(110,118,129,0.16);
+    padding: 2px 6px; border-radius: 4px; color: #e6edf3;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9em; }
+  th {
+    background: rgba(118,185,0,0.14); color: var(--nvidia-green);
+    padding: 10px 12px; text-align: left; border-bottom: 2px solid var(--nvidia-green);
+    vertical-align: top;
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .tbl-wrap { overflow-x: auto; }
+
+  .diagram {
+    background: var(--code-bg); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 20px; margin: 18px 0;
+    font-family: 'SF Mono',Menlo,monospace; font-size: 0.8em; line-height: 1.45;
+    overflow-x: auto; white-space: pre; color: #9fb4c7;
+  }
+  .diagram .cap { color: var(--accent-orange); }
+
+  ul, ol { margin: 12px 0; padding-left: 26px; }
+  li { margin-bottom: 7px; }
+
+  blockquote {
+    border-left: 4px solid var(--accent-purple);
+    background: rgba(179,157,219,0.08);
+    padding: 12px 20px; margin: 16px 0; border-radius: 0 8px 8px 0;
+    color: var(--text-secondary);
+  }
+  strong { color: var(--nvidia-green); }
+  em { color: var(--accent-orange); font-style: normal; }
+  a { color: var(--accent-blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .ref { font-size: 0.8em; color: var(--accent-cyan); }
+
+  details {
+    background: var(--card-bg2); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 12px 18px; margin: 10px 0;
+  }
+  details summary {
+    cursor: pointer; color: var(--accent-blue); font-weight: 600; outline: none;
+  }
+  details[open] summary { color: var(--nvidia-green); margin-bottom: 10px; }
+
+  .claim {
+    background: var(--card-bg2); border: 1px solid var(--card-border);
+    border-left: 4px solid var(--accent-cyan);
+    border-radius: 8px; padding: 16px 20px; margin: 14px 0;
+  }
+  .claim .cnum {
+    display: inline-block; background: var(--accent-cyan); color: #06212a;
+    font-weight: 700; padding: 1px 10px; border-radius: 4px; font-size: 0.85em; margin-bottom: 8px;
+  }
+  .claim.dep { border-left-color: var(--card-border); }
+  .claim.dep .cnum { background: var(--card-border); color: var(--text-primary); }
+
+  .footer {
+    text-align: center; padding: 40px 24px; color: var(--text-secondary);
+    font-size: 0.85em; border-top: 1px solid var(--card-border); margin-top: 50px;
+  }
+  .toc {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 22px 28px; margin-bottom: 30px;
+  }
+  .toc h3 { margin-top: 0; color: var(--nvidia-green); }
+  .toc ol { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">Competitor Patent Deep Dive</div>
+  <h1>DE102024121954A1 · 多芯粒 GPU 统一内存"本地化模式"</h1>
+  <h2 class="en">UNIFIED MEMORY GPU WITH LOCALIZED MODE / UNIFIED MEMORY GPU MIT LOKALISIERTEM MODUS</h2>
+  <div class="subtitle">
+    NVIDIA 在多 die / 多 uGPU GPU 上引入"第二套地址映射视图"：用 MMU 页表项里的一个
+    <em>localization bit</em> 把 64MB 对齐区间从"全局细粒度交织"切换为"32MB 半区绑定本地 DRAM"，
+    再配合 GPC affinity mask 让 CWD 只把 CTA 发到同一 uGPU —— 把统一内存 GPU 变成软件可控的 NUMA 域。
+  </div>
+  <div class="badges">
+    <span class="badge">NVIDIA Corporation</span>
+    <span class="badge blue">DE102024121954A1</span>
+    <span class="badge blue">US20250078199A1</span>
+    <span class="badge orange">优先权 2023-08-29</span>
+    <span class="badge orange">公开 2025-03-06</span>
+    <span class="badge purple">状态：审查中 Pending</span>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="active" data-tab="t-overview">① 速览与书目</button>
+  <button data-tab="t-bg">② 架构背景与痛点</button>
+  <button data-tab="t-core">③ 核心机制：AMAP 双视图</button>
+  <button data-tab="t-flow">④ 软硬件协同流程</button>
+  <button data-tab="t-coh">⑤ 一致性与 Peer 访问</button>
+  <button data-tab="t-claims">⑥ 权利要求逐条解析</button>
+  <button data-tab="t-cmp">⑦ 技术对比与影响</button>
+  <button data-tab="t-out">⑧ 启示 · 规避 · 展望</button>
+  <button data-tab="t-ref">⑨ 参考文献</button>
+</div>
+
+<div class="container">
+
+<!-- ==================== TAB 1 ==================== -->
+<div class="tab active" id="t-overview">
+
+<section>
+<h2>一、30 秒读懂这篇专利</h2>
+
+<div class="card highlight">
+<h4>一句话</h4>
+<p>
+在"统一内存寻址（unified memory addressing）"的大 GPU 里，NVIDIA 增加了一个由页表项里单个比特控制的
+<strong>本地化地址映射视图</strong>：打开后，一段 64MB 对齐的显存不再被细粒度地交织（stride/interleave）到
+全部 uGPU 的 DRAM 上，而是"前 32MB 全在 uGPU0、后 32MB 全在 uGPU1"；同时用早已存在的
+<strong>GPC affinity mask</strong> 把 kernel 的 CTA 限制在同一个 uGPU 的 GPC 上执行。
+结果是<em>计算和它的数据被钉在同一个 die / 同一个 crossbar 域内</em>，跨 uGPU 的延迟、半带宽损失与
+LTC（末级缓存）重复缓存全部被消除；而当应用确实需要更大算力/容量时，又可以把该属性关掉退回全交织模式。
+</p>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="num red">~1/2</div><div class="lbl">跨 uGPU 访问只能拿到<br>约一半带宽（专利原文表述）</div></div>
+  <div class="kpi"><div class="num orange">2×</div><div class="lbl">远端数据在两侧 LTC 各存<br>一份，缓存容量被浪费</div></div>
+  <div class="kpi"><div class="num blue">64 MB</div><div class="lbl">本地化重映射的对齐<br>与切换粒度</div></div>
+  <div class="kpi"><div class="num">1 bit</div><div class="lbl">PTE 地址域里的<br>localization 属性位</div></div>
+  <div class="kpi"><div class="num blue">32 MB</div><div class="lbl">每个 uGPU 分到的<br>半区（偶/奇半区）</div></div>
+  <div class="kpi"><div class="num purple" style="color:var(--accent-purple)">20</div><div class="lbl">权利要求（独立项 3 条：<br>1 / 8 / 15）</div></div>
+</div>
+
+<div class="card info">
+<h4>为什么值得重点关注</h4>
+<ul>
+<li><strong>它是"多 die 单逻辑 GPU"路线的必然补丁。</strong>NVIDIA 一直对外强调多 die 封装在软件视角是"一颗 GPU"，但这篇专利在背景部分把代价写得非常直白：跨 uGPU 只有约一半带宽、C2C 路径延迟更差、末级缓存出现双份副本。这等于官方承认<em>单逻辑 GPU 内部已经是 NUMA</em>。</li>
+<li><strong>它把 NUMA 亲和性从"驱动内部黑盒"提升为"应用可声明的分配属性"。</strong>权利要求 3/10/20 明确写了"localization attribute 来自应用"，说明 NVIDIA 打算把这条路径通过新的 CUDA API 暴露给用户。</li>
+<li><strong>实现代价极低，因此专利价值高。</strong>不改 crossbar、不改 HBM、不改物理拓扑，只在 MMU 的 AMAP 单元里加一套映射视图 + PTE 借用一个空闲高位 + XAL 接口加宽 1 bit。这种"低成本高收益"的点子最容易成为对手的必经之路。</li>
+<li><strong>独立权利要求 1 写得极宽</strong>——"GPU 地址映射硬件，被配置为选择性地把应用的内存访问范围限制到该核本地连接的内存"，几乎覆盖了所有"硬件层面做 GPU 内部内存亲和"的实现。<span class="tag infer">分析</span>这也是它目前还在审查（美国同族 2026-03-30 刚答复非最终审查意见）的原因之一。</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>二、专利书目信息</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:170px">项目</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><strong>公开号</strong></td><td>DE 10 2024 121 954 A1（德国公开件）<br><span class="ref">同族美国申请公开：US 2025/0078199 A1</span></td></tr>
+<tr><td><strong>标题</strong></td><td>德文：UNIFIED MEMORY GPU MIT LOKALISIERTEM MODUS<br>英文：Unified Memory GPU with Localized Mode<br>中译：具有本地化模式的统一内存 GPU</td></tr>
+<tr><td><strong>申请号</strong></td><td>DE 10 2024 121 954.8A</td></tr>
+<tr><td><strong>申请人 / 权利人</strong></td><td>NVIDIA Corporation（原始申请人与当前权利人一致；美国同族于 2023-09-08 记录转让）</td></tr>
+<tr><td><strong>发明人</strong></td><td>Wish Gandhi、Ze Long、Kun Fang</td></tr>
+<tr><td><strong>优先权日</strong></td><td>2023-08-29（源自美国申请 US 18/239,733）</td></tr>
+<tr><td><strong>德国申请日</strong></td><td>2024-08-01</td></tr>
+<tr><td><strong>公开日</strong></td><td>2025-03-06（德国与美国同族同日公开）</td></tr>
+<tr><td><strong>法律状态</strong></td><td>审查中（Pending）。美国同族最新事件：2026-03-30 对非最终审查意见（non-final OA）的答复已转交审查员</td></tr>
+<tr><td><strong>分类号</strong></td><td>G06T 1/00（通用图像数据处理）、G06T 1/60（存储器管理）<br><span class="ref">Google Patents 归类领域：Memory System of a Hierarchy Structure / Theoretical Computer Science</span></td></tr>
+<tr><td><strong>权利要求</strong></td><td>共 20 条，独立项 3 条：claim 1（装置）、claim 8（方法）、claim 15（GPU 器件）</td></tr>
+<tr><td><strong>关键词（检索标签）</strong></td><td>memory、GPU、access、cluster、DRAM</td></tr>
+<tr><td><strong>来源</strong></td><td><a href="https://patents.google.com/patent/DE102024121954A1/en" target="_blank">Google Patents · DE102024121954A1</a> ｜ <a href="https://patents.google.com/patent/US20250078199A1/en" target="_blank">Google Patents · US20250078199A1</a></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card warning">
+<p style="margin:0"><span class="tag fact">说明</span>
+本报告中所有标注 <span class="tag fact">专利原文</span> 的内容均来自上述两份公开文本（德文件的英文机器翻译 + 美国同族说明书）；
+标注 <span class="tag infer">分析</span> 的内容为笔者基于公开资料的推断与解读，<strong>不构成对专利保护范围、有效性或侵权与否的法律意见</strong>。
+</p>
+</div>
+</section>
+
+<section>
+<h2>三、附图清单（帮助定位说明书内容）</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:110px">附图</th><th>内容</th><th style="width:150px">性质</th></tr></thead>
+<tbody>
+<tr><td>FIG. 1 / 1A</td><td>已知的多 GPU 系统架构</td><td>现有技术</td></tr>
+<tr><td>FIG. 2</td><td>已知 GPU 内部结构：GPC 群、uGPU、MMU、crossbar、HBM 堆栈</td><td>现有技术</td></tr>
+<tr><td>FIG. 3</td><td>跨 GPU 的统一虚拟寻址（unified virtual addressing）</td><td>现有技术</td></tr>
+<tr><td>FIG. 4</td><td>P2P 直接访问：GPU0 直接 load/store 到 GPU1 的显存</td><td>现有技术</td></tr>
+<tr><td>FIG. 5</td><td><strong>多 die GPU</strong>：两个 uGPU，各自中央 crossbar，通过 LTC slice 对经 C2C 互联</td><td>本发明语境</td></tr>
+<tr><td>FIG. 6A</td><td>应用与数据"摊开"分布在两个 uGPU 上（传统交织模式）</td><td>对照</td></tr>
+<tr><td>FIG. 6B</td><td><strong>应用被拆成两部分，各自钉在一个 uGPU 及其本地 DRAM 上</strong>，中间有一道"围栏（fence）"隔开</td><td>核心效果图</td></tr>
+<tr><td>FIG. 7</td><td>产生 FIG. 6B 场景的流程图（对应 1002 / 1004 / 1006 / 1008 步骤）</td><td>核心流程</td></tr>
+<tr><td>FIG. 8</td><td>软硬件控制栈：应用 102 → CUDA 驱动 104 → Resource Manager 106 → 硬件 108</td><td>核心栈</td></tr>
+<tr><td>FIG. 9A</td><td>localization mode = 0 的分配与地址布局</td><td>模式对比</td></tr>
+<tr><td>FIG. 9B</td><td>localization mode = 1 的分配与地址布局</td><td>模式对比</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+</div>
+
+<!-- ==================== TAB 2 ==================== -->
+<div class="tab" id="t-bg">
+
+<section>
+<h2>一、专利认定的硬件前提：GPC → uGPU → 多 die GPU</h2>
+
+<p><span class="tag fact">专利原文</span>
+说明书用相当篇幅重述了 NVIDIA GPU 的层级结构，这部分是理解发明动机的关键：</p>
+
+<ul>
+<li><strong>SM</strong>：包含 CUDA core、Tensor Core、寄存器堆、纹理单元、一个 RT Core，以及 L1 / shared memory。</li>
+<li><strong>GPC（Graphics Processing Cluster）</strong>：包含多个 SM、光栅引擎（raster engine）、ROP 分区、PolyMorph 引擎。说明书给出的示例量级是<em>每 uGPU 约 4 个 GPC、每 GPC 约 8 个 SM</em>。</li>
+<li><strong>uGPU（micro-GPU，微 GPU）</strong>：说明书明确指出，在大 die 上做"每个 GPC 到整个存储子系统的全连接 crossbar"<em>造价过高、不可能建（too costly to build）</em>。因此 NVIDIA 把若干 GPC 连同一组 L2 / LTC slice 挂到<strong>自己的一个 crossbar</strong> 上，构成一个 uGPU。</li>
+<li><strong>uGPU 之间</strong>：通过 <strong>L2 NOC（片上网络）</strong> 或 <strong>C2C（chip-to-chip）链路</strong>缝合成一颗对软件呈现为单一实体的大 GPU。</li>
+<li><strong>封装</strong>：多个 uGPU 可以位于<em>不同的 die</em>，与 HBM（3D 堆叠 SDRAM）一起放在 <strong>interposer</strong> 上，再封装到基板并焊在 PCB。</li>
+</ul>
+
+<div class="diagram"><span class="cap">图 A · 专利 FIG.5 语境下的双 uGPU / 多 die GPU（示意）</span>
+
+      ┌──────────────────────────── GPU Package ────────────────────────────┐
+      │   ┌──────────── Die 0 ────────────┐    ┌──────────── Die 1 ────────────┐
+ HBM  │   │  GPC0  GPC1  GPC2  GPC3       │    │  GPC4  GPC5  GPC6  GPC7       │  HBM
+Stack │   │    └─────┴──┬──┴─────┘        │    │    └─────┴──┬──┴─────┘        │ Stack
+  ├───┼───┤        ┌────▼────┐            │    │        ┌────▼────┐            ├───┤
+  │   │   │        │ uGPU0   │            │    │        │ uGPU1   │            │   │
+  │   │   │        │ Xbar    │            │    │        │ Xbar    │            │   │
+  │   │   │        └────┬────┘            │    │        └────┬────┘            │   │
+  │   │   │      ┌──────▼──────┐   C2C /  │    │      ┌──────▼──────┐          │   │
+  │   │   │      │ L2/LTC 切片 │◄─ L2 NOC ┼────┼─────►│ L2/LTC 切片 │          │   │
+  │   │   │      └──────┬──────┘  (成对   │    │      └──────┬──────┘          │   │
+  │   │   │             │        LTC slice)    │             │                 │   │
+  │   │   │        ┌────▼────┐            │    │        ┌────▼────┐            │   │
+  └───┼───┤        │ FB/HBM0 │            │    │        │ FB/HBM1 │            ├───┘
+      │   └────────┴─────────┴────────────┘    └────────┴─────────┴────────────┘
+      └──────────────────── Interposer / Substrate / PCB ─────────────────────┘
+
+  软件视角：一颗 GPU、一套统一虚拟地址空间（UVA）
+  硬件事实：两个 crossbar 域、两套 LTC、两组 HBM —— 一个隐藏的 NUMA 系统
+</div>
+
+<div class="card info">
+<p style="margin:0"><span class="tag fact">专利原文</span>
+说明书同时交代了两项已有能力作为发明的"地基"：一是 <strong>统一虚拟寻址</strong>，让每个处理器看到同一份一致的内存映像；
+二是 <strong>P2P 直接访问</strong>，GPU0 可以直接 load/store 到 GPU1 的显存，CPU 也可以寻址任意 GPU 的显存。
+本发明要解决的正是"统一寻址很方便，但物理上的远近差异被抹平后带来的性能陷阱"。</p>
+</div>
+</section>
+
+<section>
+<h2>二、跨 uGPU 访问的三笔账（发明动机）</h2>
+
+<p><span class="tag fact">专利原文</span>说明书把远端访问的代价拆成三条，非常适合直接引用：</p>
+
+<div class="card danger">
+<h4>① 带宽腰斩</h4>
+<p>跨 uGPU 的流量相比本地访问"只能得到<em>降低了的（例如一半）</em>带宽"。原因是数据必须穿过 uGPU 边界，
+受限于 L2 NOC / C2C 的横截带宽，而不是本地 crossbar 到 HBM 的全带宽。</p>
+</div>
+
+<div class="card danger">
+<h4>② 延迟抬升（C2C 更糟）</h4>
+<p>访问必须走"间接路径"——L2 NOC 或 NVLINK，而<strong>经由 C2C（跨 die）时更差</strong>。
+这条对多 die 产品尤其关键：die 内 NOC 的额外跳数还能忍，跨 die 的 SerDes / 封装级链路在延迟上是另一个量级。</p>
+</div>
+
+<div class="card danger">
+<h4>③ LTC 双份副本（最容易被忽略的一条）</h4>
+<p>远端数据会在<strong>末级缓存（LTC）里被复制两次</strong>：远端 uGPU 的 LTC 缓存一份（因为它是该 DRAM 的 home），
+请求方 uGPU 的 LTC 又缓存一份。结果是<em>有效缓存容量被浪费、功耗被无谓抬高</em>。</p>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>为什么第三条才是这篇专利的"隐藏主线"</h4>
+<p>
+带宽与延迟问题，业界的常规解法是"加粗互联"（更宽的 C2C、更多 NOC 通道），本质是花面积和功耗买回来。
+但<strong>LTC 重复缓存是拓扑无关的结构性浪费</strong>：无论互联做多宽，只要一条 line 同时被两侧 LTC 持有，
+片上缓存的有效容量就是打折的。对于 LLM / MoE 这类<em>权重复用率高、缓存命中率决定 roofline 位置</em>的负载，
+消除双份副本相当于凭空扩大了末级缓存。这也解释了为什么专利在"有益效果"里把
+"高效利用缓存容量（efficient use of cache capacity）"与延迟、带宽并列。
+</p>
+</div>
+</section>
+
+<section>
+<h2>三、现有手段为什么不够用</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:210px">已有机制</th><th>能做什么</th><th>为什么解决不了本问题</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>GPC affinity mask</strong><br><span class="ref">见引证 <a href="https://patents.google.com/patent/US8253749B1/en" target="_blank">US8253749</a>、<a href="https://github.com/KhronosGroup/OpenGL-Registry/blob/main/extensions/NV/WGL_NV_gpu_affinity.txt" target="_blank">WGL_NV_gpu_affinity</a></span></td>
+<td>把执行限制到指定的 GPC / GPU 节点上</td>
+<td>只管<em>算在哪</em>，不管<em>数据落在哪</em>。地址仍然被细粒度交织到所有 uGPU 的 DRAM，所以计算被钉住之后反而<strong>更容易频繁跨域取数</strong></td>
+</tr>
+<tr>
+<td><strong>Stride / interleave 地址映射</strong>（传统默认视图）</td>
+<td>把线性地址均匀铺到全部 DRAM 通道，最大化聚合带宽、避免热点</td>
+<td>它的设计目标就是"打散"，与"局部性"天然对立；且为避免 L2 slice camping 还要做 <em>swizzle</em>，软件根本无法推算某个地址归属哪个 uGPU</td>
+</tr>
+<tr>
+<td><strong>MIG / 多实例分区</strong><br><span class="ref">见引证 <a href="https://patents.google.com/patent/US11663036B2/en" target="_blank">US11663036</a>、<a href="https://patents.google.com/patent/US11249905B2/en" target="_blank">US11249905</a></span></td>
+<td>把一颗 GPU 切成多个互相隔离的"独立处理器"</td>
+<td>是<em>硬隔离</em>：切开之后就不是一颗大 GPU 了，失去了"需要时可以把资源合起来用"的弹性。本专利要的是<strong>按分配、按 64MB 块、可混用的软隔离</strong></td>
+</tr>
+<tr>
+<td><strong>软件侧页迁移 / first-touch NUMA 策略</strong></td>
+<td>操作系统式的按需搬页</td>
+<td>搬运本身消耗带宽与功耗，且对 GPU 上百万级并发线程的访问模式反应太慢；<span class="tag infer">分析</span>本专利选择了"<strong>不搬数据，改地址视图</strong>"这条零拷贝路线</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 3 ==================== -->
+<div class="tab" id="t-core">
+
+<section>
+<h2>一、方案总纲：两个机制的合体</h2>
+
+<div class="card highlight">
+<p><span class="tag fact">专利原文</span>本发明由<strong>两个互相配合的机制</strong>构成，缺一不可：</p>
+<ol>
+<li><strong>AMAP 地址映射硬件（新增）</strong>——位于 uGPU 的 MMU 内部，为<em>同一段可寻址范围</em>额外提供一套
+<strong>本地化（localized）视图</strong>，与传统的 <strong>stride / 交织视图</strong>并存。</li>
+<li><strong>GPC affinity mask（已有）</strong>——把执行限制在属于目标 uGPU 的那些 GPC 上。</li>
+</ol>
+<p style="margin-bottom:0">
+只有"数据映射本地化"而不限制执行位置，线程仍会从别的 uGPU 发起访问；
+只限制执行位置而不改地址映射，数据仍被交织到远端。<em>两者同时打开，才形成 FIG. 6B 中那道把两半应用隔开的"围栏"。</em>
+</p>
+</div>
+
+<div class="card info">
+<h4>关键工程取舍：什么都没改</h4>
+<p style="margin-bottom:0">
+<span class="tag fact">专利原文</span>
+本方案<strong>不重新设计 crossbar、也不改动 HBM</strong>，整个可寻址空间始终是可达的（remains reachable）。
+受影响的硬件单元只有两处：<strong>MMU</strong>（新增 AMAP 视图 + FLA 中的 localization bit）与
+<strong>XAL</strong>（GPU 与 PCIe/CPU 的接口，位宽 +1 bit）。
+<span class="tag infer">分析</span>这种"最小侵入式"实现是它最具威胁的地方——代价低到几乎没有理由不做。
+</p>
+</div>
+</section>
+
+<section>
+<h2>二、两套地址映射视图的差异</h2>
+
+<h3>模式 0：传统 stride / 交织视图</h3>
+<p><span class="tag fact">专利原文</span>
+线性地址以某个 <em>uGPU stride</em> 为单位被细粒度地条带化（striping）到整个 GPU 存储系统的所有 DRAM 上，
+并且对 uGPU 的选择施加 <strong>swizzle（打散）</strong>，以避免 L2 slice "camping"（某几个切片被反复命中形成热点）。</p>
+
+<h3>模式 1：本地化视图</h3>
+<p><span class="tag fact">专利原文</span>
+在 <strong>64 MB 对齐</strong>的区域上做重映射：<strong>前 32 MB 半区映射到 uGPU0，后 32 MB 半区映射到 uGPU1</strong>
+（偶数半区 → uGPU0，奇数半区 → uGPU1）。此模式下<strong>不施加 swizzle</strong>，
+因此软件可以直接计算"地址 → uGPU 归属"，这是让应用能自己做亲和性编排的前提。</p>
+
+<div class="diagram"><span class="cap">图 B · 同一段地址范围的两种视图（示意，非按比例）</span>
+
+ 【模式 0 = stride 交织 + swizzle】  目标：最大聚合带宽
+ 线性地址  0    S    2S   3S   4S   5S   6S   7S     (S = uGPU stride)
+           │    │    │    │    │    │    │    │
+ 落点     u0 → u1 → u0 → u1 → u0 → u1 → u0 → u1      ← 再经 swizzle 打散 L2 slice
+ 结果：任何一段连续 buffer 都同时压在两个 uGPU 上；软件无法推断归属。
+
+
+ 【模式 1 = localized，无 swizzle】  目标：局部性 / 亲和性
+ ┌──────────────────────── 64 MB 对齐窗口 ────────────────────────┐
+ │      偶数半区  0 ~ 32MB      │      奇数半区  32MB ~ 64MB      │
+ │   ────────────────────────   │   ────────────────────────      │
+ │        → uGPU0 的 DRAM       │        → uGPU1 的 DRAM          │
+ └──────────────────────────────┴─────────────────────────────────┘
+ 结果：一次 32MB 粒度的连续分配 100% 落在单个 uGPU 的本地 DRAM 上。
+       软件可直接算出某地址属于哪个 uGPU（因为没有 swizzle）。
+
+
+ 【混用】granularity = 每个 64MB 块独立
+ ┌────64MB(mode=1)────┬────64MB(mode=0)────┬────64MB(mode=1)────┐
+ │  本地化：延迟敏感   │  交织：带宽敏感     │  本地化：延迟敏感   │
+ └────────────────────┴────────────────────┴────────────────────┘
+ 专利明确：重映射某个块"不应影响相邻内存区段的地址"；
+ 但同一个 64MB 对齐块内的所有页必须使用同一模式，否则会产生地址别名(aliasing)。
+</div>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:180px">维度</th><th>模式 0（stride / 交织）</th><th>模式 1（localized 本地化）</th></tr></thead>
+<tbody>
+<tr><td><strong>优化目标</strong></td><td>聚合带宽最大化、消除 DRAM 热点</td><td>访问局部性、低延迟、缓存效率</td></tr>
+<tr><td><strong>映射粒度</strong></td><td>细粒度条带（uGPU stride）</td><td>32 MB 半区（64 MB 对齐单元内二分）</td></tr>
+<tr><td><strong>Swizzle</strong></td><td>施加，避免 L2 slice camping</td><td><strong>不施加</strong>，以便软件推算归属</td></tr>
+<tr><td><strong>可达范围</strong></td><td>全部 DRAM</td><td>全部 DRAM 仍可达（只是本次分配被约束）</td></tr>
+<tr><td><strong>跨 uGPU 流量</strong></td><td>结构性存在，约一半带宽</td><td>正常路径下基本消除</td></tr>
+<tr><td><strong>LTC 副本</strong></td><td>远端行在两侧 LTC 各一份</td><td>单一 home，无重复</td></tr>
+<tr><td><strong>适用负载</strong></td><td><span class="tag infer">分析</span>大流式访问、单 kernel 需要全 GPU 带宽</td><td><span class="tag infer">分析</span>可切分为两批相近工作的负载（专利即以此为典型用法）</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section>
+<h2>三、模式开关：PTE 地址域里的 localization bit</h2>
+
+<p><span class="tag fact">专利原文</span>
+模式选择由存放在 <strong>MMU 页表项（PTE）地址字段</strong>中的一个
+<strong>localization attribute（本地化属性，1 bit / flag）</strong>决定，其位置由一个宏定义给出：
+<code>LOCALIZATION_MODE_BIT_IN_ADDRESS_OFFSET</code>。</p>
+
+<div class="diagram"><span class="cap">图 C · localization bit 在 PTE 地址域中的位置与语义</span>
+
+  PTE 地址字段（为"远端寻址"预留的位宽 &gt; 本地最大容量所需位宽 ⇒ 存在空闲高位）
+  ┌───────────────────────────────────────────────────────────────────────────┐
+  │  空闲高位  │ LOCALIZATION │        物理页帧号 (PA / GPA / FLA)        │ ... │
+  │            │   MODE BIT   │                                          │     │
+  └────────────┴──────┬───────┴──────────────────────────────────────────┴─────┘
+                      │
+        位置 = LOCALIZATION_MODE_BIT_IN_ADDRESS_OFFSET
+                      │
+          ┌───────────┴────────────┐
+       0 = stride 交织视图      1 = localized 本地化视图
+
+  ★ 关键设计：该位被当作"属性(attribute)"而非"地址位(address bit)"
+     ⇒ MMU 做地址边界检查(bounds check)时必须把它剔除，否则会误判越界
+     ⇒ RM 的查表/反查代码必须"知道"这一位的存在
+     ⇒ XAL（GPU↔PCIe/CPU 接口）位宽 +1 bit 以承载它
+</div>
+
+<div class="card highlight">
+<h4>为什么"借位"是可行的（专利给出的理由）</h4>
+<p style="margin-bottom:0"><span class="tag fact">专利原文</span>
+PTE 的地址字段位宽是按<strong>远端内存寻址</strong>的需求设计的，而<strong>本地可支持容量所需的位数更少</strong>，
+因此天然存在空闲高位可供借用。
+<span class="tag infer">分析</span>这是一个非常典型的"零成本硬件扩展"套路：不新增页表字段、不改 PTE 格式版本、
+不影响 TLB entry 尺寸，因此对现有 MMU 流水线的扰动几乎为零；代价只是<em>所有解析该地址域的软硬件都必须同步认识这一位</em>，
+这恰恰是后面"一致性与 Peer 访问"一节里所有麻烦的根源。
+</p>
+</div>
+
+<details>
+<summary>推演：localization bit 在地址翻译流水线中的处理顺序（<span class="tag infer">分析</span>，非专利原文）</summary>
+<pre><code>VA ──► GMMU/TLB 查找 ──► 命中 PTE
+                            │
+                            ├─ 取出 localization bit  (作为属性)
+                            ├─ 把该位从地址中"抠掉"再做 bounds check   ← 专利明确要求
+                            │
+                            ▼
+                   ┌─────────────────────┐
+                   │  AMAP 地址映射单元   │
+                   └─────────┬───────────┘
+                bit=0 ┌──────┴──────┐ bit=1
+                      ▼             ▼
+        stride 映射 + swizzle    64MB 内二分：
+        → 打散到所有 uGPU        addr[25] 决定 uGPU  (32MB=2^25)
+                      │             │  且不做 swizzle
+                      └──────┬──────┘
+                             ▼
+                 crossbar → L2/LTC slice → FB/HBM
+
+注：addr[25] 仅为按"32MB 半区"推算出的示意位，专利未点明具体比特编号。</code></pre>
+</details>
+</section>
+
+</div>
+
+<!-- ==================== TAB 4 ==================== -->
+<div class="tab" id="t-flow">
+
+<section>
+<h2>一、软硬件控制栈（对应 FIG. 8）</h2>
+
+<div class="diagram"><span class="cap">图 D · 从应用到硬件的四层栈</span>
+
+  ┌────────────────────────────────────────────────────────────┐
+  │  应用 (102)                                                │
+  │   · 选定目标 uGPU / GPC 节点  →  GPC affinity mask         │
+  │   · 分配时携带 localization attribute                      │
+  └───────────────────────────┬────────────────────────────────┘
+                              ▼
+  ┌────────────────────────────────────────────────────────────┐
+  │  CUDA 驱动 (104)                                           │
+  │   · 新增 CUDA API（与 cudaMalloc 式分配调用集成）          │
+  │   · 向 RM 请求"64MB 对齐倍数上的本地化映射"                │
+  │   · kernel launch 时把 affinity mask 传给硬件调度           │
+  └───────────────────────────┬────────────────────────────────┘
+                              ▼
+  ┌────────────────────────────────────────────────────────────┐
+  │  Resource Manager RM (106)                                 │
+  │   · 以 64MB 对齐为单位管理  →  子分配属于目标 uGPU 的 32MB 半区 │
+  │   · 在 PTE 中置 localization bit                            │
+  │   · 查表/反查逻辑需感知该位（含 r2p 反向映射）              │
+  └───────────────────────────┬────────────────────────────────┘
+                              ▼
+  ┌────────────────────────────────────────────────────────────┐
+  │  硬件 (108)                                                │
+  │   · MMU / AMAP：按 bit 选择 stride 或 localized 视图        │
+  │   · CWD（中央工作分发器）：只把 CTA 派发到目标 uGPU 的 GPC  │
+  └────────────────────────────────────────────────────────────┘
+</div>
+</section>
+
+<section>
+<h2>二、四步流程（对应 FIG. 7 的 1002 / 1004 / 1006 / 1008）</h2>
+
+<div class="card">
+<h4>① 1002 — 指定目标 uGPU / GPC 节点</h4>
+<p style="margin-bottom:0"><span class="tag fact">专利原文</span>
+应用通过 <strong>affinity mask</strong> 指名要绑定的 uGPU（或 GPC 节点）。
+这一步复用已有机制，不需要新硬件。</p>
+</div>
+
+<div class="card">
+<h4>② 1004 — 带本地化属性的显存分配</h4>
+<p style="margin-bottom:0"><span class="tag fact">专利原文</span>
+分配时置上 localization attribute；CUDA 驱动请求 <strong>RM / AMAP</strong> 在
+<strong>64 MB 对齐（且为其整数倍）</strong>的空间上建立本地化映射；
+随后 <strong>RM 从该 64MB 单元中子分配（sub-allocate）属于所选 uGPU 的那个 32MB 半区</strong>。</p>
+</div>
+
+<div class="card">
+<h4>③ 1006 — 用 affinity mask 约束 CTA 派发</h4>
+<p style="margin-bottom:0"><span class="tag fact">专利原文</span>
+驱动利用 affinity mask，使 <strong>CWD（Central Work Distributor，中央工作分发器）</strong>
+只把 <strong>CTA（thread block，线程块）</strong>派发给<em>该 uGPU 所属的 GPC</em>。</p>
+</div>
+
+<div class="card">
+<h4>④ 1008 — 访问被自然收敛到本地 DRAM</h4>
+<p style="margin-bottom:0"><span class="tag fact">专利原文</span>
+此时线程发出的内存访问被限制在<strong>直接连接的 DRAM</strong> 上，跨 uGPU 边界的往返被消除。</p>
+</div>
+
+<div class="card info">
+<h4>典型用法：一分为二</h4>
+<p style="margin-bottom:0"><span class="tag fact">专利原文</span>
+说明书给出的典型场景是把工作拆成<strong>两批体量相当的批次，每个 uGPU 各跑一批</strong>——
+即 FIG. 6B 相对 FIG. 6A 的差别。此外还提到"<strong>智能驱动（intelligent / smart driver）</strong>"变体：
+由驱动自行分析应用特征，<em>自动决定用本地化还是非本地化模式</em>，无需应用显式声明。</p>
+</div>
+</section>
+
+<section>
+<h2>三、编程模型层面的形态推演</h2>
+<p><span class="tag fact">专利原文</span>说明书明确提到"新增 CUDA API"，并把它描述为<em>内建于设备分配调用（cudamalloc）中的 API</em>，
+同时施加 GPC affinity mask 与逐次分配的 localization 属性。专利未给出具体函数签名，以下伪代码为<span class="tag infer">分析</span>推演，仅用于说明形态：</p>
+
+<pre><code>// ——— 推演形态（非专利原文 API）———
+// 1) 查询本 GPU 有几个 uGPU 域，以及每个域的本地 DRAM 容量
+int nUgpu; cudaDeviceGetAttribute(&amp;nUgpu, cudaDevAttrLocalityDomainCount, dev);
+
+// 2) 声明"把这块内存本地化到 uGPU k"
+void *pA;
+cudaMallocWithLocality(&amp;pA, bytes,        // 内部按 64MB 对齐向上取整
+                       /*localityDomain=*/0,
+                       /*flags=*/cudaMemLocalizedMode);   // → PTE localization bit = 1
+
+// 3) 把 kernel 的 CTA 限制在同一个 uGPU 的 GPC 上（affinity mask 语义）
+cudaStream_t s0; cudaStreamCreateWithAffinity(&amp;s0, /*ugpuMask=*/0b01);
+
+// 4) 两个域各跑一半工作 —— 对应 FIG.6B
+kernel&lt;&lt;&lt;grid/2, block, 0, s0&gt;&gt;&gt;(pA);   // uGPU0：算与数据同域
+kernel&lt;&lt;&lt;grid/2, block, 0, s1&gt;&gt;&gt;(pB);   // uGPU1：算与数据同域
+
+// 反例：本地化了内存但没约束执行域 ⇒ 一半线程变成纯远端访问，
+//       比全交织模式更慢（因为交织至少是"两边都各占一半"的均摊）</code></pre>
+
+<div class="card warning">
+<h4>三条工程约束（直接来自专利文本，实现时躲不开）</h4>
+<ul style="margin-bottom:0">
+<li><strong>对齐与粒度</strong>：本地化映射必须建立在 64 MB 对齐的整数倍空间上；单个 uGPU 实际拿到的是其中 32 MB 半区。这意味着<em>小分配用不了这条路径</em>，或者必须由分配器做二级 suballocator。</li>
+<li><strong>同块同模式</strong>：同一个 64 MB 对齐块内的所有页必须使用相同模式，否则产生地址别名（aliasing）。</li>
+<li><strong>块间可混用</strong>：不同的 64 MB 块可以各用各的模式，且重映射一个块"不应影响相邻内存区段的地址"——这是该方案能在真实驱动里增量启用的关键。</li>
+</ul>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 5 ==================== -->
+<div class="tab" id="t-coh">
+
+<section>
+<h2>一、为什么"改地址视图"必然引出一致性难题</h2>
+
+<div class="card analysis">
+<p style="margin-bottom:0"><span class="tag infer">分析</span>
+本地化模式的本质是：<strong>同一个物理页，在开启/关闭 localization bit 时对应的物理落点不同</strong>。
+换句话说，地址的语义依赖于"由谁、按哪套视图去解释"。凡是绕过 GPU MMU 直接持有/传递物理地址的路径
+（CPU 侧访问、缓存 probe、NVLink peer 报文、RM 的反查表）都会因此看到<em>不一致的地址</em>。
+专利说明书用了相当篇幅逐一处理这些路径，这部分恰恰是最能反映真实工程难度的地方。</p>
+</div>
+</section>
+
+<section>
+<h2>二、CPU 侧与一致性系统（coherent system）</h2>
+
+<p><span class="tag fact">专利原文</span>在 CPU 操作系统拥有内存分配权的一致性系统里，处理方式是：</p>
+
+<ol>
+<li><strong>RM 取走一块 64 MB</strong>；</li>
+<li><strong>向操作系统标记该块为 offline（离线）</strong>，使 OS 不再把它当作可分配内存；</li>
+<li>RM 用带 localization bit 的 PTE 格式<strong>自行建立 GMMU 映射</strong>；</li>
+<li>RM 自身的查表代码必须<strong>感知 localization bit</strong>。</li>
+</ol>
+
+<div class="card warning">
+<h4>CPU 的访问权限被明确收窄</h4>
+<p><span class="tag fact">专利原文</span>
+CPU <strong>可以对本地化内存执行 prefetch（预取）</strong>，但被描述为<strong>无法访问 / 无修改权限</strong>，
+原因就是<em>重映射之后 CPU 看到的地址视图与 GPU 不同</em>。</p>
+<p style="margin-bottom:0">为让缓存 probe 仍能正确解析，方案依赖<strong>反向映射 r2p（reverse map）总是"去本地化（de-localize）"探测地址</strong>，
+从而把 probe 还原到原始地址上，使被缓存的行能被正确定位。</p>
+</div>
+
+<div class="card info">
+<h4>替代实施例：把标志位暴露给 CPU OS</h4>
+<p style="margin-bottom:0"><span class="tag fact">专利原文</span>
+说明书同时给出另一种实施方式——<strong>把 localization 标志位对 CPU 操作系统可见</strong>，
+以支持真正的<em>共享 / 一致性内存</em>操作。<span class="tag infer">分析</span>这条替代路径在
+Grace-Hopper / Grace-Blackwell 这类 CPU-GPU 一致性平台上意义更大：一旦 CPU 页表与 GPU 页表共享同一套
+localization 语义，就可以把 GPU 内部的 uGPU 亲和性一路上升为"整机 NUMA 拓扑"的一部分。</p>
+</div>
+</section>
+
+<section>
+<h2>三、Peer 访问：GPA 与 FLA 两条路径的差别</h2>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:150px">映射类型</th><th style="width:190px">页表位于</th><th>本地化模式下能否工作（专利结论）</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>GPA</strong><br>(Guest / GPU Physical Address peer 映射)</td>
+<td><strong>源 GPU</strong>（发起方）</td>
+<td><span class="tag fact">专利原文</span><em>有条件可行</em>：需要 <strong>NVLink 报文中存在一个空闲比特</strong>来携带 localization 信息。
+<span class="tag infer">分析</span>因为翻译发生在源侧，本地化语义必须"随包传输"到目标侧才能被正确解释——这等于对链路协议提出了要求。</td>
+</tr>
+<tr>
+<td><strong>FLA</strong><br>(Fabric Linear Address)</td>
+<td><strong>目标 GPU</strong>（被访问方）</td>
+<td><span class="tag fact">专利原文</span><em>直接可行</em>：FLA 的 PTE 就住在目标 GPU 上，且其编程方式与本地显存相同，
+因此 <strong>FLA 能够支持本地化的 peer 映射</strong>。受影响单元列表里也明确提到"FLA 中的 localization bit"。</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>这条对比揭示了 NVIDIA 的架构偏好</h4>
+<p style="margin-bottom:0">
+"翻译放在目标侧（FLA）就天然兼容，翻译放在源侧（GPA）就要改链路协议"——这正是
+<strong>Fabric Attached Memory 类架构（见引证 <a href="https://patents.google.com/patent/US11182309B2/en" target="_blank">US11182309</a>）
+把地址翻译责任下推到目标/fabric 侧</strong>的价值所在。本专利相当于给出了一个新证据：
+当 GPU 内部开始出现多套地址视图时，<em>"谁负责翻译"决定了新特性能否零协议改动地扩展到 scale-up 域</em>。
+对自研 scale-up 互联的团队而言，这是一条应当提前对齐的设计决策。
+</p>
+</div>
+
+<div class="diagram"><span class="cap">图 E · 一致性/Peer 路径上 localization bit 的流向</span>
+
+  【本地路径】SM → MMU(AMAP, bit=1) → 本地 crossbar → 本地 LTC → 本地 HBM      ✅ 天然正确
+
+  【CPU probe】CPU cache probe ──► r2p 反向映射（强制 de-localize）──► 原始地址   ✅ 由 r2p 兜底
+                                    ↑ RM 查表代码必须感知 localization bit
+
+  【CPU 访问】CPU load/store ──✖──► 本地化内存（无访问/修改权限；仅允许 prefetch）
+              ⇒ 替代实施例：把标志位暴露给 CPU OS，以支持共享/一致内存
+
+  【Peer-GPA】源 GPU 翻译 ──► NVLink 报文（需空闲 bit 携带 localization）──► 目标 GPU
+              ⇒ 依赖链路协议有富余比特
+
+  【Peer-FLA】源 GPU 发 FLA ──► 目标 GPU 的 FLA PTE（含 localization bit）──► 目标 DRAM   ✅ 直接支持
+</div>
+
+<div class="card">
+<h4>受影响的硬件/软件单元清单（专利明示）</h4>
+<ul style="margin-bottom:0">
+<li><strong>MMU</strong>：新增 AMAP 本地化视图；FLA 中承载 localization bit；<strong>地址边界检查必须排除该位</strong>。</li>
+<li><strong>XAL</strong>（GPU 与 PCIe / CPU 的接口）：位宽 <strong>+1 bit</strong>。</li>
+<li><strong>RM</strong>：64MB 块管理与 32MB 半区子分配；PTE 置位；<strong>查表与 r2p 反查必须感知该位</strong>；一致性系统中向 OS 标记 offline。</li>
+<li><strong>CUDA 驱动</strong>：新 API；向 RM 请求本地化映射；把 affinity mask 传给 CWD。</li>
+<li><strong>CWD</strong>：按 affinity mask 限制 CTA 派发范围。</li>
+</ul>
+</div>
+</section>
+
+</div>
+
+<!-- ==================== TAB 6 ==================== -->
+<div class="tab" id="t-claims">
+
+<section>
+<h2>一、权利要求结构总览</h2>
+<p>共 <strong>20 条</strong>，三条独立要求分别覆盖<em>装置</em>、<em>方法</em>与<em>具体 GPU 器件结构</em>，
+从属项在三组之间高度镜像——这是典型的"同一发明点三种撰写角度全覆盖"策略。</p>
+
+<div class="diagram"><span class="cap">图 F · 权利要求树</span>
+
+  ┌─ Claim 1  【装置】GPU 地址映射硬件：选择性限制访问范围到本地内存
+  │    ├─ 2  也可选择性地"扩展"范围到本地之外
+  │    ├─ 3  响应于"来自应用的 localization attribute"而限制
+  │    ├─ 4  该属性是存放在页表项(PTE)中的 bit / flag
+  │    ├─ 5  硬件调度器把执行限制到该处理核
+  │    ├─ 6  上述限制响应于 affinity mask
+  │    └─ 7  peer 访问经由 chip-to-chip 网络链路发生
+  │
+  ├─ Claim 8  【方法】在处理核上启动应用执行，并选择性把其访问范围限制到本地内存
+  │    └─ 9 ~ 14  与 2 ~ 7 镜像（扩展到 striding 内存 / localization 属性 /
+  │               PTE 存储 / 执行限制 / affinity mask / chip-to-chip 访问）
+  │
+  └─ Claim 15 【GPU 器件】第一簇+第一DRAM+第一crossbar、第二簇+第二DRAM+第二crossbar、
+       │        两 crossbar 之间的互联，以及"第一簇内耦合到第一 crossbar 的地址映射器"
+       ├─ 16  映射器响应"指明本地化/非本地化"的属性
+       ├─ 17  两簇位于【不同芯片】，之间为 chip-to-chip 互联
+       ├─ 18  两簇即为 micro-GPU (uGPU)
+       ├─ 19  调度器按 affinity mask 把 thread block 派发到任一簇
+       └─ 20  由【应用自身】指定其访问是否被本地化到第一 DRAM
+</div>
+</section>
+
+<section>
+<h2>二、独立权利要求逐条解析</h2>
+
+<div class="claim">
+<div class="cnum">CLAIM 1 · 装置</div>
+<p><span class="tag fact">专利原文（要点转述）</span>
+在一个使用<strong>统一内存寻址</strong>的 GPU 系统中——多个处理核共享统一的内存视图，且能够访问彼此本地连接的内存——
+包含<strong>"GPU 地址映射硬件，其被配置为选择性地将运行在某处理核上的应用的内存访问范围限制到该核本地连接的内存"</strong>。</p>
+<h4>解析</h4>
+<ul style="margin-bottom:0">
+<li><strong>前序限定了适用场景</strong>：必须是"统一内存寻址 + 多核可互访彼此本地内存"的系统。纯粹的硬分区（切开后互不可见）不落入该前序。</li>
+<li><strong>技术特征只有一条</strong>：地址映射硬件 + "选择性限制访问范围到本地内存"。<span class="tag infer">分析</span>没有限定 64MB/32MB、没有限定 PTE、没有限定 swizzle，因此<em>保护范围相当宽</em>——任何"在地址映射硬件层面把访问收敛到本地内存"的做法都可能被覆盖。</li>
+<li><span class="tag infer">分析</span><strong>"选择性（selectively）"是这条要求的重心</strong>：它把本发明与"固定分区/固定映射"区分开来。也就是说，规避设计如果做成"始终本地化、不可切换"，反而可能不落入 claim 1。</li>
+</ul>
+</div>
+
+<div class="claim">
+<div class="cnum">CLAIM 8 · 方法</div>
+<p><span class="tag fact">专利原文（要点转述）</span>
+在某处理核上<strong>启动应用的执行</strong>，并<strong>选择性地把其内存访问范围限定到该核本地连接的内存</strong>。</p>
+<h4>解析</h4>
+<p style="margin-bottom:0"><span class="tag infer">分析</span>方法项把"启动执行"这一步显式写进来，实际上锁定了
+"<em>执行位置选择</em> + <em>访问范围限制</em>"这对组合动作，正对应说明书 FIG.7 的 1006 + 1008。
+对软件栈（驱动 / runtime / 编译器）实现者而言，方法项通常比装置项更值得关注。</p>
+</div>
+
+<div class="claim">
+<div class="cnum">CLAIM 15 · GPU 器件（结构最具体）</div>
+<p><span class="tag fact">专利原文（要点转述）</span>一个 GPU，包含：</p>
+<ul>
+<li><strong>第一簇</strong>（含第一处理核）、<strong>第一 DRAM</strong>、把二者相连的<strong>第一 crossbar</strong>；</li>
+<li><strong>第二簇</strong>、<strong>第二 DRAM</strong>、<strong>第二 crossbar</strong>；</li>
+<li>两个 crossbar 之间的<strong>互联</strong>，使任一簇都能访问另一簇的 DRAM；</li>
+<li>位于第一簇内、耦合到第一 crossbar 的<strong>地址映射器（address mapper）</strong>，其被<em>选择性地配置</em>为：
+使第一簇产生的地址<strong>本地化到第一 DRAM，且不访问第二 DRAM</strong>。</li>
+</ul>
+<h4>解析</h4>
+<ul style="margin-bottom:0">
+<li>这条把 FIG.5 的硬件结构完整写进了权利要求，包括"<strong>地址映射器在簇内、耦合到该簇的 crossbar</strong>"这一位置限定。<span class="tag infer">分析</span>这暗示实现上 AMAP 是<em>每 uGPU 一份、位于 MMU/crossbar 前端</em>，而不是集中式的一份。</li>
+<li>"<strong>并且不访问第二 DRAM</strong>"是一个强限定：<span class="tag infer">分析</span>它要求在该配置下形成真正的封闭访问域，而非"优先本地、必要时溢出"的软亲和策略。</li>
+<li>从属项 17（<strong>不同芯片 + chip-to-chip 互联</strong>）与 18（<strong>簇即 uGPU</strong>）合起来，把保护范围明确覆盖到 <em>chiplet / 多 die GPU</em> 形态。</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>三、从属权利要求的信息价值</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:120px">从属项</th><th style="width:250px">附加特征</th><th>它透露的实现信息（<span class="tag infer">分析</span>）</th></tr></thead>
+<tbody>
+<tr><td><strong>2 / 9</strong></td><td>也可"选择性扩展"范围到本地之外（9 中写作 striding 内存）</td><td>确认<strong>双模式共存</strong>是发明的一部分，而非只做本地化。同时把"stride 交织"作为对照模式写入权利要求，体现两套视图并列的架构</td></tr>
+<tr><td><strong>3 / 10 / 20</strong></td><td>限制动作<strong>响应于来自应用的 localization attribute</strong>；20 更直接写"由应用指定"</td><td>最具战略含义的一条：NVIDIA 打算把<strong>uGPU 亲和性作为公开的编程模型语义</strong>暴露给 CUDA 开发者，而不是仅由驱动隐式启用</td></tr>
+<tr><td><strong>4 / 11</strong></td><td>属性是<strong>存放在页表项中的 bit / flag</strong></td><td>把"借用 PTE 空闲位"这一低成本实现锁进权利要求；规避设计若改用独立寄存器/描述符表，需另作评估</td></tr>
+<tr><td><strong>5 / 12</strong></td><td><strong>硬件调度器</strong>把执行限制到该处理核</td><td>对应 CWD。说明"访问范围限制"与"执行范围限制"被视为一体的技术方案</td></tr>
+<tr><td><strong>6 / 13 / 19</strong></td><td>上述限制<strong>响应于 affinity mask</strong>；19 写为按 mask 派发 thread block</td><td>复用已有 affinity mask 机制（可追溯到 2005 年的 <code>WGL_NV_gpu_affinity</code> 与 US8253749），说明这是一条<em>老接口 + 新硬件</em>的组合创新</td></tr>
+<tr><td><strong>7 / 14 / 17</strong></td><td>peer 访问经由 <strong>chip-to-chip 网络链路</strong>；17 明确"不同芯片"</td><td>把 <strong>chiplet / 多 die 封装</strong>作为核心目标形态显式圈定，这与背景部分强调"经 C2C 时延迟更差"完全呼应</td></tr>
+<tr><td><strong>16</strong></td><td>映射器响应"指明本地化 vs 非本地化"的属性</td><td>与 claim 4/11 相比不限定属性存放位置，形成<strong>不同层级的保护梯度</strong></td></tr>
+<tr><td><strong>18</strong></td><td>簇即 <strong>micro-GPU</strong></td><td>把 NVIDIA 自家的 uGPU 术语写入权利要求，便于对照自家产品主张实施</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card warning">
+<h4><span class="tag infer">分析</span>关于审查前景的观察</h4>
+<p style="margin-bottom:0">
+claim 1 只有"地址映射硬件 + 选择性限制到本地内存"一个特征，而说明书自己引用的现有技术里就包含
+<a href="https://patents.google.com/patent/US8253749B1/en" target="_blank">US8253749（用 affinity mask 控制多 GPU 处理）</a>、
+<a href="https://patents.google.com/patent/US20130031328A1/en" target="_blank">US20130031328（平衡对不同内存类型的访问）</a>、
+<a href="https://patents.google.com/patent/US10915445B2/en" target="_blank">US10915445（高带宽扩展下的一致缓存）</a>等。
+美国同族在 2026-03-30 才刚答复非最终审查意见，说明<strong>宽项正在被挑战</strong>。
+真正稳固的护城河更可能落在 <strong>claim 15 + 17 + 18</strong>（多 die/uGPU 结构 + 簇内地址映射器 + 不访问第二 DRAM）
+以及 <strong>claim 4/11</strong>（PTE 内属性位）这几条具体特征上。跟踪审查历史（file wrapper）里的修改，比读公开件更有价值。
+</p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 7 ==================== -->
+<div class="tab" id="t-cmp">
+
+<section>
+<h2>一、与本专利引证的 NVIDIA 自家专利对照</h2>
+<p>引证列表本身就是一张"NVIDIA 内存/互联专利地图"，每一件都对应本方案的一块地基或一条被排除的替代路线：</p>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:150px">引证专利</th><th style="width:250px">主题</th><th>与本专利的关系（<span class="tag infer">分析</span>）</th></tr></thead>
+<tbody>
+<tr>
+<td><a href="https://patents.google.com/patent/US10915445B2/en" target="_blank">US10915445</a></td>
+<td>高带宽扩展下的一致性缓存（coherent caching for high bandwidth scaling）</td>
+<td>提供了"多缓存域一致性"的基础。本专利的"LTC 双份副本"痛点正是这条路线的副作用</td>
+</tr>
+<tr>
+<td><a href="https://patents.google.com/patent/US11663036B2/en" target="_blank">US11663036</a> / <a href="https://patents.google.com/patent/US11249905B2/en" target="_blank">US11249905</a></td>
+<td>把一个处理器配置为多个相互独立的处理器（MIG 类分区）</td>
+<td><strong>被对照的"硬分区"路线</strong>。本专利要的是保留单一大 GPU 语义前提下的软亲和，二者互补而非替代</td>
+</tr>
+<tr>
+<td><a href="https://patents.google.com/patent/US11182309B2/en" target="_blank">US11182309</a></td>
+<td>高效 Fabric Attached Memory</td>
+<td>FLA / fabric 侧地址翻译的来源。本专利结论"FLA 可直接支持本地化 peer 映射"直接建立在它之上</td>
+</tr>
+<tr>
+<td><a href="https://patents.google.com/patent/US11609879B2/en" target="_blank">US11609879</a></td>
+<td>面向不同应用域的并行处理器</td>
+<td>说明 GPU 内部资源按域组织的既有思路</td>
+</tr>
+<tr>
+<td><a href="https://patents.google.com/patent/US10769076B2/en" target="_blank">US10769076</a></td>
+<td>多节点互联 fabric 中的分布式地址翻译</td>
+<td>"翻译放在源侧还是目标侧"的先例，正是 GPA vs FLA 讨论的技术根源</td>
+</tr>
+<tr>
+<td><a href="https://patents.google.com/patent/US8253749B1/en" target="_blank">US8253749</a></td>
+<td>使用 affinity mask 控制多 GPU 处理</td>
+<td><strong>本专利复用的"已有机制"</strong>。发明点在于给它补上了"数据侧"的另一半</td>
+</tr>
+<tr>
+<td><a href="https://patents.google.com/patent/US20130031328A1/en" target="_blank">US20130031328</a></td>
+<td>平衡对不同内存类型的访问</td>
+<td>早期的内存放置策略先例，属于潜在的对比文件</td>
+</tr>
+<tr>
+<td><a href="https://github.com/KhronosGroup/OpenGL-Registry/blob/main/extensions/NV/WGL_NV_gpu_affinity.txt" target="_blank">WGL_NV_gpu_affinity</a>（2005–2006）</td>
+<td>OpenGL GPU 亲和性扩展</td>
+<td>非专利引证。说明 NVIDIA 的"亲和性接口"血脉可追溯到 20 年前</td>
+</tr>
+<tr>
+<td><a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html" target="_blank">CUDA Programming Guide v12.1</a>（§19 统一内存编程、§10 虚拟内存管理）</td>
+<td>统一内存与虚拟内存管理编程模型</td>
+<td>非专利引证。指明新 API 将落在统一内存 / VMM 这两章的语义框架内</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section>
+<h2>二、与其他"内存亲和/分区"技术的层次对比</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th style="width:130px">机制</th><th>隔离层次</th><th>粒度</th><th>算/数是否同时约束</th><th>能否动态混用</th><th>是否需要搬数据</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>本专利<br>localized mode</strong></td><td>地址映射（AMAP）+ 调度（CWD）</td><td>64MB 块 / 32MB 半区</td><td><strong>是</strong>（PTE 位 + affinity mask）</td><td><strong>是</strong>（逐 64MB 块）</td><td><strong>否</strong>（零拷贝改视图）</td>
+</tr>
+<tr>
+<td>MIG / 多实例分区</td><td>硬件分区（含 L2、FB 通道）</td><td>整个实例</td><td>是（但是硬隔离）</td><td>否（需重配置）</td><td>否</td>
+</tr>
+<tr>
+<td>CPU NUMA first-touch</td><td>OS 页分配策略</td><td>页（4KB/2MB）</td><td>需 CPU 亲和 API 配合</td><td>是</td><td>迁移时需要</td>
+</tr>
+<tr>
+<td>GPU affinity mask（单独使用）</td><td>只有调度</td><td>GPC / 设备</td><td><strong>否</strong>（数据仍交织）</td><td>是</td><td>否</td>
+</tr>
+<tr>
+<td>显式多设备 + P2P 拷贝</td><td>应用层</td><td>由应用决定</td><td>是</td><td>是</td><td><strong>需要</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="card highlight">
+<p style="margin:0"><span class="tag infer">分析</span>
+横向看下来，本专利占据的是一个此前空白的格子：<strong>"不搬数据、可逐块开关、同时约束算与数、且不破坏单 GPU 语义"</strong>。
+这正是多 die 时代最需要的那种"软 NUMA"能力——既不像 MIG 那样把 GPU 切死，也不像纯 affinity mask 那样只做半套。
+</p>
+</div>
+</section>
+
+<section>
+<h2>三、行业背景：竞品在同一问题上的公开做法</h2>
+
+<div class="card info">
+<h4>AMD：把分区做成产品级配置项</h4>
+<p style="margin-bottom:0">
+AMD Instinct MI300X 在产品文档层面直接暴露了<strong>计算分区（SPX / CPX 等）</strong>与
+<strong>内存分区 NPS（NUMA Per Socket，如 NPS1 / NPS4）</strong>两组正交模式，由 BIOS / 驱动配置，
+本质上是把"XCD 与 HBM stack 的亲和关系"变成用户可选的运行模式。
+<span class="tag infer">分析</span>与本专利相比，AMD 的方案是<em>粗粒度、静态、整卡级</em>（切换通常需要重置设备、且以整个分区为单位），
+而 NVIDIA 这篇专利是<em>细粒度、动态、逐分配级</em>（64MB 块，可与交织模式在同一进程内混用）。
+方向一致，颗粒度与灵活性差一个层级。
+<br><span class="ref">来源：<a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html" target="_blank">AMD Instinct MI300X GPU Partitioning Overview</a>
+｜<a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/quick-start-guide.html" target="_blank">Quick Start Guide to Partitioning MI300X GPUs</a>
+｜专利侧参考 <a href="https://patents.google.com/patent/US11841803B2/en" target="_blank">AMD US11841803B2 · GPU chiplets using high bandwidth crosslinks</a></span>
+</p>
+</div>
+
+<div class="card info">
+<h4>NVIDIA 自家产品线：这篇专利要落到哪里</h4>
+<p style="margin-bottom:0">
+NVIDIA 官方对 Blackwell / Blackwell Ultra 的描述是<strong>两颗接近光罩极限的 die 通过超高带宽 die-to-die 互联封装、对软件呈现为单一 GPU</strong>。
+<span class="tag infer">分析</span>本专利（优先权 2023-08-29）的时间点与 Blackwell 的开发周期高度吻合，说明书里的"两个 uGPU、各自 crossbar、经成对 LTC slice 走 C2C"
+几乎就是双 die 产品的抽象描述。学术界的微基准测试工作也已经开始量化这类多 die GPU 的内部非均匀性。
+<br><span class="ref">来源：<a href="https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era/" target="_blank">NVIDIA Developer Blog · Inside NVIDIA Blackwell Ultra</a>
+｜<a href="https://arxiv.org/html/2512.02189v3" target="_blank">arXiv · Microbenchmarking NVIDIA's Blackwell Architecture</a></span>
+</p>
+</div>
+</section>
+
+<section>
+<h2>四、影响分析</h2>
+
+<div class="card">
+<h4>① 对编程模型：CUDA 将出现"GPU 内 NUMA"语义</h4>
+<p style="margin-bottom:0">
+一旦 claim 3/20 所述的"由应用声明 localization"落地为公开 API，CUDA 开发者就要开始像写 CPU NUMA 代码那样思考
+<em>"这块 buffer 属于哪个 uGPU、这个 kernel 在哪个 uGPU 上跑"</em>。
+<span class="tag infer">分析</span>这会连带影响到所有把 GPU 当作均匀设备的上层框架：
+显存分配器（PyTorch caching allocator、vLLM 的 KV Cache 池）、通信库（NCCL 的 buffer 放置）、
+以及编译器的 tiling 策略，都需要引入"locality domain"这一维。
+</p>
+</div>
+
+<div class="card">
+<h4>② 对 LLM / MoE 负载：最直接的受益点</h4>
+<ul style="margin-bottom:0">
+<li><span class="tag infer">分析</span><strong>MoE 专家权重</strong>天然可按专家切分并绑定到某个 uGPU，配合 CTA 亲和，让每个 die 只读自己的专家权重——这正是专利"拆成两批相近工作"的理想实例。</li>
+<li><span class="tag infer">分析</span><strong>KV Cache</strong> 是 32MB 粒度友好的大块分配，且访问具备明确的 per-request 局部性，很适合本地化；同时它对末级缓存容量高度敏感，消除 LTC 双份副本收益明显。</li>
+<li><span class="tag infer">分析</span>反面案例：需要全 GPU 带宽的<strong>大 GEMM / 集合通信收发缓冲</strong>应当保持交织模式。这正解释了为什么专利坚持"逐 64MB 块可混用"——真实负载必然是两种模式共存。</li>
+</ul>
+</div>
+
+<div class="card">
+<h4>③ 对竞争格局：抬高了"多 die 单逻辑 GPU"的软件门槛</h4>
+<p style="margin-bottom:0">
+<span class="tag infer">分析</span>多 die 拼一颗大 GPU，硬件上是封装与互联的问题，但要真正跑出接近单 die 的效率，
+必须解决"软件看不见的 NUMA"。本专利把这条路径上最便宜的一个解法（借 PTE 一位 + 复用 affinity mask）圈了起来。
+对同样走 chiplet 路线的团队而言，这意味着<em>要么绕开，要么在地址映射之外另找抓手</em>。
+</p>
+</div>
+
+<div class="card danger">
+<h4>④ 风险提示：这套机制会把性能悬崖交到应用手里</h4>
+<p style="margin-bottom:0">
+<span class="tag infer">分析</span>本地化模式下如果 affinity mask 与内存 locality 不匹配（内存钉在 uGPU0、CTA 跑在 uGPU1），
+性能会<strong>比全交织模式更差</strong>——交织至少保证"两边各摊一半"，而错配的本地化是"100% 远端"。
+专利提到的"智能驱动自动选模式"正是为了缓解这一点。
+<em>启示：任何暴露此类语义的 API，都必须同时提供"归属查询 + 错配检测/告警"配套能力，否则用户必然踩坑。</em>
+</p>
+</div>
+</section>
+
+</div>
+
+<!-- ==================== TAB 8 ==================== -->
+<div class="tab" id="t-out">
+
+<section>
+<h2>一、可直接借鉴的五个设计要点</h2>
+
+<div class="card highlight">
+<h4>① 用"地址视图切换"代替"数据迁移"</h4>
+<p style="margin-bottom:0">这是本专利最值钱的思想：<strong>不动数据，只改解释数据落点的规则</strong>。
+在自研加速器上，若已有多套 memory partition，完全可以在 MMU / 地址交织单元里预留第二套映射函数，
+并用页表属性位选择——实现成本远低于任何形式的页迁移引擎。</p>
+</div>
+
+<div class="card highlight">
+<h4>② 用"对齐大块 + 二分"换取软件可推算性</h4>
+<p style="margin-bottom:0">本地化模式<strong>刻意不做 swizzle</strong>，就是为了让软件能自己算出地址归属。
+这提示一条通用原则：<em>凡是希望软件参与优化的硬件机制，其地址映射函数必须是软件可预测的闭式表达</em>。
+硬件里那些为了避免热点而做的哈希 / 打散，在需要暴露局部性的路径上必须可关闭。</p>
+</div>
+
+<div class="card highlight">
+<h4>③ 属性位与地址位的严格区分</h4>
+<p style="margin-bottom:0">把 localization bit 放在地址域里却当属性处理，并要求<strong>边界检查时剔除该位</strong>——
+这是一条容易被漏掉的实现细节，也是最容易产生安全隐患（越界检查被绕过）的地方。
+自研 MMU 若采用同类技巧，必须在 RTL 与驱动两侧建立"属性位掩码"的单一真源。</p>
+</div>
+
+<div class="card highlight">
+<h4>④ 把翻译责任放在目标侧，为新特性留出扩展空间</h4>
+<p style="margin-bottom:0">FLA（目标侧翻译）天然支持本地化 peer 映射，而 GPA（源侧翻译）需要链路报文有空闲比特。
+<em>结论：scale-up 互联协议设计时应预留若干"语义扩展比特"，否则未来每加一个内存语义都要改协议版本。</em></p>
+</div>
+
+<div class="card highlight">
+<h4>⑤ 双模式并存 + 逐块混用，是增量落地的唯一现实路径</h4>
+<p style="margin-bottom:0">专利反复强调"重映射某块不影响相邻区段"、"不同块可用不同模式"。
+这让特性可以从少数关键分配（如 KV Cache）开始灰度启用，而不必一次性切换整个显存布局——
+任何要在成熟软件栈上落地的内存新特性都应遵循这一约束。</p>
+</div>
+</section>
+
+<section>
+<h2>二、规避设计思路（供研发参考）</h2>
+<div class="card analysis">
+<p><span class="tag infer">分析 · 非法律意见</span>
+以下仅为基于公开权利要求文本的技术性讨论，实际方案必须结合最终授权的权利要求与专业 FTO 分析：</p>
+<ul style="margin-bottom:0">
+<li><strong>避开"选择性"这一重心</strong>：claim 1/8/15 都以"selectively（选择性地）"为核心。若采用<em>固定的、上电期确定且运行时不可切换</em>的本地化映射，与"选择性限制"的距离更远，代价是失去弹性。</li>
+<li><strong>避开"访问范围被限制到本地内存"</strong>：claim 15 要求"不访问第二 DRAM"。若实现为<strong>优先本地、容量不足时自动溢出到远端</strong>的软亲和策略（类似 CPU NUMA 的 preferred 而非 bind），则不构成封闭访问域。</li>
+<li><strong>避开属性位的存放位置</strong>：claim 4/11 限定属性位在页表项中。改由<em>独立的区间描述符表（range table / 段寄存器）</em>或<em>per-kernel 配置寄存器</em>承载模式选择，可与该从属项区分。</li>
+<li><strong>把决策上移到分配器而非地址映射硬件</strong>：<em>不改地址映射函数</em>，而是让驱动 / 固件在<strong>物理页选择阶段</strong>只从目标 uGPU 作为 home 的通道里挑页（保持单一交织函数，通过挑选物理页号实现亲和）。难点在于交织函数带 swizzle 时可选页集合稀疏。</li>
+<li><strong>把亲和性下沉到互联 / 内存侧</strong>：由 fabric 或内存控制器侧做归属重定向，而非 GPU 内的地址映射器，同时不涉及"簇内耦合到 crossbar 的映射器"这一结构限定。</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>三、趋势展望</h2>
+
+<div class="card">
+<h4>趋势一：GPU 内部 NUMA 从"隐藏"走向"公开"</h4>
+<p style="margin-bottom:0">路线非常清楚：MIG（硬分区）→ affinity mask（只管算）→ 本专利（算与数一起管、逐块可选）。
+<span class="tag infer">分析</span>下一步很可能是<strong>把 locality domain 变成一等公民</strong>：设备属性可查询、分配可指定、
+kernel launch 可绑定、profiler 可显示"跨域访问占比"。CPU 世界花了十几年走完的 NUMA 之路，GPU 会在两三代产品内压缩走完。</p>
+</div>
+
+<div class="card">
+<h4>趋势二：die 数量继续增加，"两分法"会被推广为 N 分法</h4>
+<p style="margin-bottom:0"><span class="tag infer">分析</span>本专利的映射规则是"64MB 二分给两个 uGPU"。
+一旦 die / uGPU 数量超过 2（4 die、8 die 封装），这套规则必然要扩展为
+"<em>对齐窗口大小 = N × 每域块大小</em>、按窗口内序号取模映射"。
+届时对齐单元会随 N 线性增大（例如 4 域 → 128MB 对齐），
+<strong>大页 / 大对齐带来的内碎片问题会成为新的工程矛盾</strong>——这是值得提前布局的专利空间。</p>
+</div>
+
+<div class="card">
+<h4>趋势三：末级缓存的"单一 home"语义会被显式管理</h4>
+<p style="margin-bottom:0"><span class="tag infer">分析</span>专利把"消除 LTC 双份副本"列为核心收益。
+沿着这条线往下走，自然会出现<strong>缓存归属（cache home）的显式控制</strong>：
+让软件声明某段数据"只在某个 LTC 域内缓存"，从而把片上缓存当作可分配资源来编排。
+这与 Hopper 引入的 L2 persisting / 访存策略窗口是同一趋势的不同侧面。</p>
+</div>
+
+<div class="card">
+<h4>趋势四：编译器与运行时会接管"模式选择"</h4>
+<p style="margin-bottom:0">专利已经明确提到"智能驱动"变体。<span class="tag infer">分析</span>让应用手工声明亲和性在真实工程中难以推广，
+最终形态更可能是：<strong>编译器分析访存模式 + 运行时按 profile 反馈自动切换</strong>，
+应用层只保留"提示（hint）"级别的接口。这也意味着<em>竞争的关键会从硬件机制转移到"自动决策质量"上</em>。</p>
+</div>
+
+<div class="card info">
+<h4>后续跟踪建议</h4>
+<ul style="margin-bottom:0">
+<li><strong>跟踪美国同族审查历史</strong>：US 18/239,733 于 2026-03-30 答复非最终审查意见，后续 claim 修改将决定实际保护边界，价值高于公开件本身。</li>
+<li><strong>跟踪 CUDA 新版本发布说明</strong>：留意统一内存 / VMM 章节是否出现 locality domain、localized allocation 一类 API 或设备属性。</li>
+<li><strong>跟踪 open-gpu-kernel-modules</strong>：RM 侧的 64MB 块管理、offline 标记、r2p 反查如果落地，会在开源内核模块的内存管理路径留下痕迹。</li>
+<li><strong>跟踪同族在中国/欧洲的进入情况</strong>：目前可见 DE 与 US，后续若进入 CN，将直接影响国内产品的 FTO 边界。</li>
+</ul>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 9 ==================== -->
+<div class="tab" id="t-ref">
+
+<section>
+<h2>一、本专利与同族（一手来源）</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:180px">文献</th><th style="width:230px">说明</th><th>链接</th></tr></thead>
+<tbody>
+<tr><td><strong>DE102024121954A1</strong></td><td>德国公开件（本报告主体，含说明书、附图、20 条权利要求的英文机器翻译）</td><td><a href="https://patents.google.com/patent/DE102024121954A1/en" target="_blank">patents.google.com/patent/DE102024121954A1/en</a></td></tr>
+<tr><td><strong>US20250078199A1</strong></td><td>美国同族公开（US 18/239,733，优先权基础申请；含审查状态）</td><td><a href="https://patents.google.com/patent/US20250078199A1/en" target="_blank">patents.google.com/patent/US20250078199A1/en</a></td></tr>
+<tr><td>DPMA 检索</td><td>德国专利商标局官方检索入口（可核对法律状态）</td><td><a href="https://www.dpma.de/english/patents/search/index.html" target="_blank">dpma.de · Patent Search</a></td></tr>
+<tr><td>USPTO 检索</td><td>美国专利商标局检索入口（可查 file wrapper / 审查历史）</td><td><a href="https://www.uspto.gov/patents/search" target="_blank">uspto.gov/patents/search</a></td></tr>
+<tr><td>WIPO PATENTSCOPE</td><td>国际与各国专利集合检索（可核查同族进入情况）</td><td><a href="https://patentscope.wipo.int/" target="_blank">patentscope.wipo.int</a></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section>
+<h2>二、本专利引用的专利文献</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr><th style="width:190px">专利号</th><th>主题</th><th style="width:120px">链接</th></tr></thead>
+<tbody>
+<tr><td>US10915445</td><td>Coherent caching for high bandwidth scaling</td><td><a href="https://patents.google.com/patent/US10915445B2/en" target="_blank">查看</a></td></tr>
+<tr><td>US11663036</td><td>Configuring a processor as multiple separate processors</td><td><a href="https://patents.google.com/patent/US11663036B2/en" target="_blank">查看</a></td></tr>
+<tr><td>US11249905</td><td>Configuring a processor as multiple separate processors（同族）</td><td><a href="https://patents.google.com/patent/US11249905B2/en" target="_blank">查看</a></td></tr>
+<tr><td>US11182309</td><td>Techniques for an efficient fabric attached memory</td><td><a href="https://patents.google.com/patent/US11182309B2/en" target="_blank">查看</a></td></tr>
+<tr><td>US11609879</td><td>Parallel processors for different application domains</td><td><a href="https://patents.google.com/patent/US11609879B2/en" target="_blank">查看</a></td></tr>
+<tr><td>US10769076</td><td>Distributed address translation in a multi-node interconnect fabric</td><td><a href="https://patents.google.com/patent/US10769076B2/en" target="_blank">查看</a></td></tr>
+<tr><td>US8253749</td><td>Using affinity masks to control multi-GPU processing</td><td><a href="https://patents.google.com/patent/US8253749B1/en" target="_blank">查看</a></td></tr>
+<tr><td>US20130031328</td><td>Balancing accesses to different memory types</td><td><a href="https://patents.google.com/patent/US20130031328A1/en" target="_blank">查看</a></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section>
+<h2>三、本专利引用的非专利文献</h2>
+<ul>
+<li><a href="https://github.com/KhronosGroup/OpenGL-Registry/blob/main/extensions/NV/WGL_NV_gpu_affinity.txt" target="_blank">Khronos OpenGL Extension Registry · <code>WGL_NV_gpu_affinity</code></a>（2005–2006）—— NVIDIA GPU 亲和性扩展规范。</li>
+<li><a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html" target="_blank">CUDA C++ Programming Guide</a> —— 专利引用 v12.1 的 §19（Unified Memory Programming）与 §10（Virtual Memory Management）。</li>
+</ul>
+</section>
+
+<section>
+<h2>四、用于行业对照的公开资料</h2>
+<ul>
+<li><a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html" target="_blank">AMD Instinct Docs · MI300X GPU Partitioning Overview</a> —— 计算分区与内存分区（NPS）模式说明。</li>
+<li><a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/quick-start-guide.html" target="_blank">AMD Instinct Docs · Quick Start Guide to Partitioning MI300X GPUs</a> —— 分区模式的实际配置流程。</li>
+<li><a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/docs-30.10.2/gpu-partitioning/index.html" target="_blank">AMD Instinct Docs · GPU/APU Partitioning</a> —— 分区能力总览。</li>
+<li><a href="https://patents.google.com/patent/US11841803B2/en" target="_blank">AMD US11841803B2 · GPU chiplets using high bandwidth crosslinks</a> —— AMD 多 chiplet GPU 互联专利。</li>
+<li><a href="https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era/" target="_blank">NVIDIA Developer Blog · Inside NVIDIA Blackwell Ultra</a> —— 双 die 封装、对软件呈现为单一 GPU 的官方描述。</li>
+<li><a href="https://arxiv.org/html/2512.02189v3" target="_blank">arXiv · Microbenchmarking NVIDIA's Blackwell Architecture</a> —— 对新架构内部行为的实测分析。</li>
+<li><a href="https://www.patsnap.com/resources/blog/rd-blog/gpu-architecture-memory-integration-patent-landscape/" target="_blank">PatSnap · GPU Architecture &amp; Memory Integration Patent Landscape</a> —— 该领域专利态势的第三方综述。</li>
+</ul>
+</section>
+
+<section>
+<h2>五、免责声明</h2>
+<div class="card warning">
+<p style="margin:0">
+本报告为技术情报解读，所有事实性内容均来自上方列出的公开来源；德国公开件正文为机器翻译，
+个别术语（如 LTC、AMAP、XAL、r2p）以英文原文为准。文中标注 <span class="tag infer">分析</span> 的段落为笔者推断，
+不代表专利权人立场。<strong>本报告不构成对专利保护范围、有效性、可实施性或侵权与否的法律意见</strong>；
+任何 FTO / 规避设计决策请以最终授权文本与专业法律意见为依据。
+</p>
+</div>
+</section>
+
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  <p><strong>DE102024121954A1 · 多芯粒 GPU 统一内存本地化模式</strong> 深度解读</p>
+  <p>生成日期：2026-08-27 ｜ 一手来源：Google Patents（DE102024121954A1 / US20250078199A1）</p>
+  <p>Competitor Patent Deep Dive Series · 仅供内部技术研究参考</p>
+</div>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('.nav button');
+  var tabs = document.querySelectorAll('.tab');
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = btn.getAttribute('data-tab');
+      buttons.forEach(function (b) { b.classList.remove('active'); });
+      tabs.forEach(function (t) { t.classList.remove('active'); });
+      btn.classList.add('active');
+      var el = document.getElementById(target);
+      if (el) { el.classList.add('active'); }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

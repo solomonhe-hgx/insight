@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US12326820B2 深度解读 · 多播与反射内存的内存模型一致性 | NVIDIA 专利</title>
+<style>
+:root{
+  --nvidia-green:#76b900;
+  --nvidia-green-dim:#5a8f00;
+  --bg:#0f1624;
+  --bg2:#0b111c;
+  --card-bg:#16213e;
+  --card-bg2:#1b294c;
+  --border:#2a3a5c;
+  --text:#e8eefc;
+  --text-dim:#a9b6d0;
+  --text-faint:#7f8daa;
+  --amber:#f0b429;
+  --red:#e5484d;
+  --blue:#4d9cf0;
+  --purple:#a06bf0;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#0f1624 0%,#0b111c 100%);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  line-height:1.75;
+  font-size:15px;
+}
+a{color:var(--nvidia-green);text-decoration:none;border-bottom:1px dotted rgba(118,185,0,.5);}
+a:hover{color:#9ee02a;border-bottom-style:solid;}
+code{
+  background:#0a1020;color:#9ee02a;
+  padding:1px 6px;border-radius:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.88em;border:1px solid #23314f;
+}
+pre{
+  background:#0a1020;border:1px solid #23314f;border-radius:8px;
+  padding:14px 16px;overflow-x:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px;line-height:1.6;color:#c8d6f0;
+}
+pre code{background:none;border:none;padding:0;color:inherit;}
+
+/* ---------- hero ---------- */
+.hero{
+  padding:56px 24px 40px;
+  text-align:center;
+  background:
+    radial-gradient(900px 320px at 50% -60px, rgba(118,185,0,.18), transparent 70%),
+    linear-gradient(180deg,#111b2e 0%,#0f1624 100%);
+  border-bottom:1px solid var(--border);
+}
+.hero .eyebrow{
+  display:inline-block;
+  font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--nvidia-green);
+  border:1px solid rgba(118,185,0,.4);
+  border-radius:999px;padding:4px 14px;margin-bottom:18px;
+}
+.hero h1{
+  margin:0 0 10px;font-size:31px;line-height:1.35;font-weight:700;
+}
+.hero h1 .pn{color:var(--nvidia-green);}
+.hero .sub{
+  margin:0 auto 22px;max-width:840px;
+  color:var(--text-dim);font-size:15.5px;
+}
+.hero .meta{
+  display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+  max-width:960px;margin:0 auto;
+}
+.hero .meta span{
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  border-radius:6px;padding:5px 12px;
+  font-size:12.5px;color:var(--text-dim);
+}
+.hero .meta span b{color:var(--text);font-weight:600;}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:50;
+  display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+  padding:12px 16px;
+  background:rgba(11,17,28,.94);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.nav button{
+  background:transparent;color:var(--text-dim);
+  border:1px solid var(--border);border-radius:6px;
+  padding:7px 13px;font-size:13px;cursor:pointer;
+  font-family:inherit;transition:all .15s;
+}
+.nav button:hover{color:var(--text);border-color:#3d5280;}
+.nav button.active{
+  background:var(--nvidia-green);color:#0b1400;
+  border-color:var(--nvidia-green);font-weight:600;
+}
+
+/* ---------- layout ---------- */
+.container{max-width:1120px;margin:0 auto;padding:32px 20px 60px;}
+.tab{display:none;}
+.tab.active{display:block;animation:fade .25s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+section{margin-bottom:34px;}
+h2{
+  font-size:23px;margin:0 0 6px;
+  padding-bottom:10px;border-bottom:2px solid rgba(118,185,0,.35);
+}
+h3{font-size:17.5px;margin:26px 0 10px;color:#dce6ff;}
+h4{font-size:15px;margin:18px 0 8px;color:var(--nvidia-green);}
+.lead{color:var(--text-dim);margin:12px 0 20px;font-size:15px;}
+
+.card{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-left:3px solid var(--nvidia-green);
+  border-radius:8px;padding:16px 18px;margin:14px 0;
+}
+.card.info{border-left-color:var(--blue);}
+.card.warning{border-left-color:var(--amber);}
+.card.danger{border-left-color:var(--red);}
+.card.highlight{
+  border-left-color:var(--nvidia-green);
+  background:linear-gradient(135deg,rgba(118,185,0,.09),var(--card-bg) 60%);
+}
+.card.purple{border-left-color:var(--purple);}
+.card h4{margin-top:0;}
+.card p:last-child{margin-bottom:0;}
+
+.grid{display:grid;gap:14px;}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+
+table{
+  width:100%;border-collapse:collapse;margin:14px 0;
+  font-size:13.5px;background:var(--card-bg);
+  border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+th{
+  background:#1d2b4d;color:#dce6ff;text-align:left;
+  padding:10px 12px;font-weight:600;font-size:13px;
+  border-bottom:1px solid var(--border);
+}
+td{padding:9px 12px;border-bottom:1px solid rgba(42,58,92,.6);vertical-align:top;color:var(--text-dim);}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:rgba(118,185,0,.05);}
+td b,td strong{color:var(--text);}
+
+ul,ol{padding-left:22px;margin:10px 0;}
+li{margin:6px 0;color:var(--text-dim);}
+li b,li strong{color:var(--text);}
+
+.quote{
+  background:#0a1020;border:1px solid #23314f;
+  border-left:3px solid var(--amber);
+  border-radius:6px;padding:12px 16px;margin:12px 0;
+  font-size:13.5px;color:#c8d6f0;font-style:italic;
+}
+.quote .src{
+  display:block;margin-top:8px;font-style:normal;
+  font-size:12px;color:var(--text-faint);
+}
+
+.tag{
+  display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:999px;
+  border:1px solid var(--border);color:var(--text-dim);
+  margin:2px 4px 2px 0;background:rgba(255,255,255,.03);
+}
+.tag.g{color:var(--nvidia-green);border-color:rgba(118,185,0,.45);background:rgba(118,185,0,.08);}
+.tag.a{color:var(--amber);border-color:rgba(240,180,41,.45);background:rgba(240,180,41,.08);}
+.tag.r{color:var(--red);border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.08);}
+.tag.b{color:var(--blue);border-color:rgba(77,156,240,.45);background:rgba(77,156,240,.08);}
+
+.ref{font-size:12.5px;color:var(--text-faint);margin-top:10px;}
+.ref a{border-bottom-style:solid;}
+
+.footer{
+  border-top:1px solid var(--border);
+  padding:26px 20px 40px;text-align:center;
+  color:var(--text-faint);font-size:13px;
+}
+.footer a{color:var(--text-dim);}
+
+.kbd{
+  display:inline-block;background:#0a1020;border:1px solid #2a3a5c;
+  border-bottom-width:2px;border-radius:4px;padding:0 6px;
+  font-size:12px;color:#9ee02a;font-family:ui-monospace,Menlo,monospace;
+}
+.center{text-align:center;}
+@media(max-width:640px){
+  .hero h1{font-size:23px;}
+  h2{font-size:19px;}
+  .nav button{font-size:12px;padding:6px 10px;}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">NVIDIA Patent Deep Dive · 2026-08-27</div>
+  <h1><span class="pn">US 12,326,820 B2</span><br>多播与反射内存行为的内存模型一致性</h1>
+  <p class="sub">Multicast and reflective memory behavior for memory model consistency —— 一个虚拟地址同时映射到多个物理地址，让 all-reduce 从「N 次单播」压缩为「1 次多播」，并用访问权限、访问路径与转发约束把多播伪装成单播，使既有内存模型与既有代码无需改写。这项 2022 年 1 月的申请，正是今天 PTX <code>multimem.*</code> 指令族与 CUDA Multicast Object API 的专利底座。</p>
+  <div class="meta">
+    <span><b>专利号</b> US 12,326,820 B2</span>
+    <span><b>申请号</b> US 17/578,266</span>
+    <span><b>申请/优先日</b> 2022-01-18</span>
+    <span><b>授权日</b> 2025-06-10</span>
+    <span><b>受让人</b> NVIDIA Corporation</span>
+    <span><b>权利要求</b> 20 项（独立 1 / 10 / 18）</span>
+    <span><b>法律状态</b> Active</span>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="active" data-tab="t-overview">① 专利速览</button>
+  <button data-tab="t-bg">② 背景与问题</button>
+  <button data-tab="t-core">③ 核心机制</button>
+  <button data-tab="t-inst">④ 指令矩阵</button>
+  <button data-tab="t-reflect">⑤ 反射内存与一致性</button>
+  <button data-tab="t-opt">⑥ 透明化与优化</button>
+  <button data-tab="t-claims">⑦ 权利要求解析</button>
+  <button data-tab="t-cmp">⑧ 产业对照</button>
+  <button data-tab="t-ref">⑨ 参考文献</button>
+</div>
+
+<div class="container">
+
+<!-- ============ TAB 1 ============ -->
+<div class="tab active" id="t-overview">
+
+<section>
+<h2>一句话读懂这篇专利</h2>
+<p class="lead">在传统内存模型里，一个虚拟地址（VA）只能对应一个物理地址（PA），这是保证一致性的基础。这篇专利做的事情是：<b>专门划出一类「多播 VA」，让它同时是多个 PA 的别名</b>；当一条访存指令带着这个 VA 进入内存管理单元时，硬件把它翻译成多个目标，交给交换机（switch）向多个设备扇出。于是 all-reduce 这类集合操作不再需要「每个参与者一次请求」，请求数量与参与设备数解耦。</p>
+
+<div class="card highlight">
+<h4>但专利真正精妙的部分在标题的后半句</h4>
+<p>只做多播是不够的。多播路径要穿出芯片、经过交换机；而同一个设备访问自己的本地内存有一条<b>更短的内部路径</b>。两条路径延迟不同，在弱序（weak ordering）内存系统下就会出现「后发的单播先完成、先发的多播后完成」的诡异结果。专利因此引入<b>反射内存（reflective memory）</b>：把请求刻意送出到交换机再「反射」回发起设备本身，让所有设备被<b>同等对待</b>；并配合访问权限（生产者/消费者）、访问路径、转发规则、软件无竞争提示四类约束，使多播的结果与不用多播时<b>完全一致</b>。</p>
+<p style="margin-top:10px">最终目标是一句非常有分量的话：<b>用不用多播，对编程模型是不透明的（opaque）</b>——为只支持单播的内存系统写的代码，可以直接被硬件用多播加速执行。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">Google Patents · US12326820B2 全文</a></p>
+</div>
+</section>
+
+<section>
+<h2>书目信息（Bibliographic Data）</h2>
+<table>
+<thead><tr><th style="width:22%">字段</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><b>标题</b></td><td>Multicast and reflective memory behavior for memory model consistency<br><span style="color:var(--text-faint)">（用于内存模型一致性的多播与反射内存行为）</span></td></tr>
+<tr><td><b>授权专利号</b></td><td><b>US 12,326,820 B2</b>，授权日 <b>2025-06-10</b></td></tr>
+<tr><td><b>申请号</b></td><td>US 17/578,266</td></tr>
+<tr><td><b>申请日 / 最早优先日</b></td><td><b>2022-01-18</b>（同日，无更早临时申请）</td></tr>
+<tr><td><b>公开号（授权前）</b></td><td>US 2023/0229599 A1，公开日 2023-07-20</td></tr>
+<tr><td><b>受让人</b></td><td><b>NVIDIA Corporation</b>（权利转让登记于 2022-01-21，REEL/FRAME 058730/0713）</td></tr>
+<tr><td><b>发明人</b></td><td><b>Glenn Alan Dearth</b>、<b>Daniel Joseph Lustig</b>、<b>Mark Hummel</b></td></tr>
+<tr><td><b>权利要求</b></td><td>共 <b>20 项</b>；独立项 <b>1</b>（方法 · 内存管理器视角）、<b>10</b>（方法 · 交换机视角）、<b>18</b>（装置 · one or more devices）</td></tr>
+<tr><td><b>法律状态</b></td><td>Active；<b>调整后到期日 2042-08-24</b>（含专利期调整）</td></tr>
+<tr><td><b>主要 CPC 分类</b></td><td>G06F 13/16、13/1668（存储器访问的总线控制）；G06F 12/0223、12/023、12/0238（存储分配）；G06F 12/08、12/10、<b>12/1027</b>、12/1045、12/1054、12/1063、12/1072、12/109（虚实地址转换 / TLB / 分页）</td></tr>
+<tr><td><b>引用 / 被引</b></td><td>引用前案 <b>10 篇</b>；被引 <b>1 篇</b>（NVIDIA 自家 2024 年新申请）</td></tr>
+</tbody>
+</table>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">Google Patents US12326820B2</a> · 授权前公开 <a href="https://patents.google.com/patent/US20230229599A1/en" target="_blank">US20230229599A1</a></p>
+</section>
+
+<section>
+<h2>发明人：三个名字说明了这篇专利的定位</h2>
+<div class="grid g3">
+  <div class="card info">
+    <h4>Daniel Joseph Lustig</h4>
+    <p>NVIDIA 内存模型（memory consistency model）方向的核心人物。他的署名出现在这里，直接解释了为什么专利标题里会有「memory model consistency」——这不是一篇单纯讲互连硬件的专利，而是<b>从内存一致性模型出发</b>去论证多播的合法性。</p>
+  </div>
+  <div class="card info">
+    <h4>Mark Hummel</h4>
+    <p>长期从事系统架构与一致性互连设计。多播需要跨设备的 fabric 语义、地址转换分层与权限模型，这部分正对应说明书里 switch / link TLB / 中间地址的设计。</p>
+  </div>
+  <div class="card info">
+    <h4>Glenn Alan Dearth</h4>
+    <p>第一署名发明人，负责地址转换与内存管理路径的实现细节，对应说明书中 memory manager 108、页表 / TLB、以及故障（fault）驱动的 VA 迁移机制。</p>
+  </div>
+</div>
+<p class="ref">发明人信息来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">Google Patents US12326820B2 · Inventors</a></p>
+</section>
+
+<section>
+<h2>同族与延续申请：标题的两半，被拆到了两件专利里</h2>
+<p class="lead">这是理解这个专利家族最关键的一点。授权本（US12326820B2）的权利要求最终落在<b>多播地址转换</b>上；而标题中「reflective memory（反射内存）」的保护，被放进了<b>2025 年 5 月提交的延续申请</b>，目前仍在审查中。</p>
+<table>
+<thead><tr><th style="width:24%">同族成员</th><th style="width:14%">国家/局</th><th style="width:16%">日期</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><b>US 12,326,820 B2</b><br><span class="tag g">已授权</span></td><td>美国 USPTO</td><td>申请 2022-01-18<br>授权 2025-06-10</td><td>本篇。20 项权利要求，保护范围是「应用下发映射指令配置多播 VA → 多播地址转换 → 多设备访存」。</td></tr>
+<tr><td><b>US 2025/0272248 A1</b><br>（US 19/202,282）<br><span class="tag a">审查中 Pending</span></td><td>美国 USPTO</td><td>提交 2025-05-08<br>公开 2025-08-28</td><td><b>延续申请（continuation）</b>。权利要求转向<b>反射</b>：coherent fabric 把请求「reflect 回发起设备」，且明确写入「<b>绕过设备内部更短的路径</b>」，并把生产者/消费者权限写进权利要求。</td></tr>
+<tr><td><b>CN 116501667 A</b></td><td>中国 CNIPA</td><td>申请 2022-08-23<br>（CN202211013261.8）</td><td>中国同族申请。</td></tr>
+<tr><td><b>DE 102023100421 A1</b></td><td>德国 DPMA</td><td>申请 2023-01-10<br>（DE102023100421.2）</td><td>德国同族申请。</td></tr>
+</tbody>
+</table>
+<div class="card warning">
+<h4>为什么这个拆分很重要</h4>
+<p>如果只读授权本的权利要求，你会觉得标题里的「reflective」名不副实——20 项权利要求里几乎没有正面保护反射行为。真相是：<b>反射被留给了延续申请</b>。这说明 NVIDIA 认为反射内存是一块值得单独圈地的资产，且愿意为它再走一轮审查。对竞争对手而言，评估风险时必须把 US20250272248A1 一起看。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20250272248A1/en" target="_blank">US20250272248A1（延续申请）</a> · <a href="https://patents.google.com/patent/CN116501667A/en" target="_blank">CN116501667A</a> · <a href="https://patents.google.com/patent/DE102023100421A1/en" target="_blank">DE102023100421A1</a></p>
+</div>
+</section>
+
+<section>
+<h2>阅读地图</h2>
+<div class="grid g2">
+<div class="card">
+<h4>如果你关心「这东西怎么工作」</h4>
+<p>按顺序读 ② 背景与问题 → ③ 核心机制 → ④ 指令矩阵 → ⑤ 反射内存与一致性。这四个标签完整还原了说明书 FIG. 1 / FIG. 2 / FIG. 3 的技术方案。</p>
+</div>
+<div class="card">
+<h4>如果你关心「能不能绕、风险多大」</h4>
+<p>直接读 ⑦ 权利要求解析。里面有独立项原文、逐项中文释义、依附项地图，以及<b>授权前 vs 授权后的范围收窄对比</b>与完整审查历史（含一次 FINAL REJECTION）。</p>
+</div>
+<div class="card">
+<h4>如果你关心「已经落到产品里了吗」</h4>
+<p>读 ⑧ 产业对照。FIG. 2 的三条多播指令与 PTX <code>multimem.ld_reduce</code> / <code>multimem.st</code> / <code>multimem.red</code> 一一对应，<code>CreateMulticastAlias</code> 对应 CUDA <code>cuMulticastCreate</code> 系列 API。</p>
+</div>
+<div class="card">
+<h4>如果你要引用</h4>
+<p>⑨ 参考文献列出本页所有一手来源链接（专利原文、同族、前案、PTX ISA、CUDA Driver API 文档），全部可点击直达。本页所有事实陈述均可回溯到这些来源。</p>
+</div>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 2 ============ -->
+<div class="tab" id="t-bg">
+
+<section>
+<h2>问题的起点：一个 VA 只能指向一个 PA</h2>
+<p class="lead">专利的背景部分（Background）先陈述了现状约束，再给出后果。这两段是整篇专利的动机基石。</p>
+
+<div class="card">
+<h4>约束：一致性要求「一个 VA → 一个 PA」</h4>
+<p>在协同处理环境中，多个处理元件（processing element，例如 GPU 的 SM、CPU 核心、SIMD 单元）通过虚拟地址访问内存。为了维持一致性（coherency），<b>每个虚拟地址都映射到一个特定的物理地址</b>。这条规则是内存模型可推理的前提：任何时刻你都能明确知道「写到 VA 的值落在哪块内存上」。</p>
+</div>
+
+<div class="card danger">
+<h4>后果：集合操作的请求数量随参与者线性膨胀</h4>
+<p>问题出在<b>集合通信（collective）</b>上。以 all-reduce 为例：要把所有处理元件的值聚合起来，需要<b>每个处理元件发一次请求</b>把值收集上来；聚合完成后，还要<b>再对每个处理元件发一次请求</b>把结果广播回去。于是请求总数随参与设备/处理元件的数量增长。</p>
+<div class="quote">
+"This overhead may be especially impactful in deep learning, where all-reduce has become a key operation that is performed at a high frequency."
+<span class="src">—— US12326820B2, Background（专利原文）</span>
+</div>
+<p>这句话把整篇专利的商业动机说得很直白：<b>深度学习让 all-reduce 从「偶尔用一下的集合操作」变成了高频关键路径</b>。数据并行训练每个 step 都要 all-reduce 梯度；张量并行每层都要 all-reduce 激活。请求数量的线性膨胀，直接转化成训练吞吐的损失。</p>
+</div>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · Background</a></p>
+</section>
+
+<section>
+<h2>把开销拆开看：为什么「请求数」比「数据量」更疼</h2>
+<p>集合通信的成本通常被拆成两部分：搬运的字节数（bandwidth 项）与发起的请求数（latency / issue 项）。多播优化的是<b>后者</b>。</p>
+<table>
+<thead><tr><th style="width:26%">维度</th><th style="width:37%">纯单播（现状）</th><th style="width:37%">多播（本专利）</th></tr></thead>
+<tbody>
+<tr><td><b>广播同一个值到 N 个设备</b></td><td>N 次 store 请求，每次都要独立地址转换、独立占用链路事务槽位</td><td><b>1 次</b> multicast store，交换机负责扇出到 N 个 PA</td></tr>
+<tr><td><b>从 N 个设备聚合一个值</b></td><td>N 次 load 请求 + 主机侧归约 + N 次广播回写</td><td><b>1 次</b> reducing load：多播出去、N 份响应在交换机/设备侧聚合、结果回送</td></tr>
+<tr><td><b>地址转换次数</b></td><td>每个请求各自做一遍 VA→PA</td><td>一次转换产生多个目标（或一个中间地址，由 switch/link TLB 完成后续）</td></tr>
+<tr><td><b>请求数与参与者的关系</b></td><td><span class="tag r">O(N)</span> 线性增长</td><td><span class="tag g">O(1)</span> 从发起方看是常数</td></tr>
+<tr><td><b>对编程模型的影响</b></td><td>—</td><td><b>理想情况下为零</b>：语法保留单播写法，是否多播对应用不透明</td></tr>
+</tbody>
+</table>
+<div class="card info">
+<h4>注意这里的定语</h4>
+<p>专利用词是「the number of processed requests may be <b>reduced</b>」，而不是承诺某个具体倍数。它保护的是<b>机制</b>，不是性能数字。这也是这类体系结构专利的典型写法：把加速效果写成可能性，把机制写成必要技术特征。</p>
+</div>
+</section>
+
+<section>
+<h2>专利想要的最终状态</h2>
+<div class="card highlight">
+<p>说明书在讨论约束时给出了一句可以当作全篇目标函数的话：使用多播处理请求得到的结果，必须与<b>不使用多播</b>处理这些请求的结果一致。因此——</p>
+<div class="quote">
+"whether multicasting or unicasting is used may be opaque to the programming model"
+<span class="src">—— US12326820B2, Detailed Description</span>
+</div>
+<p>以及更进一步的推论：为「只支持单播操作的内存系统」编写的代码，<b>可以使用一个或多个多播操作来执行</b>。这意味着多播不是一个需要应用改写才能吃到的新特性，而是一个可以被硬件/驱动<b>悄悄启用</b>的加速手段。</p>
+</div>
+<p>这个目标直接决定了专利后半部分的结构：既然要「对编程模型不透明」，就必须证明多播不会破坏原有的内存序语义。于是才有了 FIG. 3 的四类约束，以及反射内存这个看起来「反直觉地故意走远路」的设计。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · Detailed Description</a></p>
+</section>
+
+</div>
+
+<!-- ============ TAB 3 ============ -->
+<div class="tab" id="t-core">
+
+<section>
+<h2>系统组成：FIG. 1 的协同处理环境</h2>
+<p class="lead">说明书用一套编号贯穿全文。先把这套编号对齐，后面所有机制描述都会变得清晰。</p>
+<table>
+<thead><tr><th style="width:16%">编号</th><th style="width:20%">名称</th><th>专利中的定义与要点</th></tr></thead>
+<tbody>
+<tr><td><b>102A…102N</b></td><td>设备 devices</td><td>参与协同处理的设备。可以是 GPU、CPU、集成电路，或 FIG. 7 中的逻辑单元 720。多播组由这些设备构成。</td></tr>
+<tr><td><b>104</b></td><td>交换机 switch</td><td><b>一致性 fabric（coherent fabric）</b>。可以位于设备内部或外部；<b>可以有多个交换机，对应不同的多播组</b>。负责把请求扇出到多个设备。</td></tr>
+<tr><td><b>106A…106N</b></td><td>处理元件 processing elements</td><td>设备内部的执行单元，例如 GPU 的 SM、SIMD 单元、CPU 核心。请求的真正发起者。</td></tr>
+<tr><td><b>108A…108N</b></td><td>内存管理器 memory managers</td><td>执行地址转换。说明书列举了 MMU、GMMU（GPU MMU）、PMMU、MCC、MCU 等形态。</td></tr>
+<tr><td><b>110A…110N</b></td><td>内存 memories</td><td>每个内存有自己的内存总线；该总线可被内存管理器 108 与交换机 104 <b>延伸</b>——这是跨设备访问得以成立的物理基础。</td></tr>
+<tr><td><b>116A / 116B</b></td><td>单播 VA</td><td>普通虚拟地址，各自映射到<b>单一</b> PA。</td></tr>
+<tr><td><b>118</b></td><td><b>多播 VA</b></td><td>本专利的核心对象。同时映射到 <b>PA 120A 与 PA 120N</b>（乃至更多）。</td></tr>
+<tr><td><b>120A…120N</b></td><td>物理地址 PAs</td><td>分散在各设备本地内存中的物理地址。</td></tr>
+</tbody>
+</table>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · FIG. 1 说明</a></p>
+</section>
+
+<section>
+<h2>两个地址空间：多播 VA 空间 vs 单播 VA 空间</h2>
+<div class="grid g2">
+<div class="card">
+<h4>方案 A：分离的地址空间</h4>
+<p>把多播 VA 放进<b>独立的多播 VA 空间</b>，与单播 VA 空间分开。这样<b>地址本身就编码了语义</b>——内存管理器一看 VA 落在哪个空间，就知道该做单播转换还是多播转换，不需要新的指令编码。</p>
+<p style="margin-top:8px">这个方案的最大好处是：<b>单播语法被完整保留</b>。应用照常写 load / store，是否多播由地址决定。这正是「对编程模型不透明」的实现基础。</p>
+<p style="margin-top:8px"><span class="tag g">对应权利要求 3、14</span></p>
+</div>
+<div class="card">
+<h4>方案 B：由指令或操作数区分</h4>
+<p>另一种做法是用<b>不同的指令或操作数</b>来指示多播还是单播。专利明确指出，在这种情况下<b>分离的 VA 空间「可能不再需要（但仍然可以使用）」</b>。</p>
+<p style="margin-top:8px">这句括号里的补充是典型的专利撰写技巧：既覆盖「用指令区分」的实现，也不放弃「同时用两种机制」的组合，避免竞争对手用「我两个都用了所以不落入」来规避。</p>
+<p style="margin-top:8px"><span class="tag b">说明书 Detailed Description</span></p>
+</div>
+</div>
+<div class="card highlight">
+<h4>现实中的答案：两者都用了</h4>
+<p>看今天的 NVIDIA 实现会发现，产品同时采用了两个方案：CUDA 侧通过 <code>cuMulticastCreate</code> + <code>cuMemMap</code> 建立<b>专门的多播地址</b>（方案 A 的空间分离），PTX 侧又提供<b>专门的 <code>multimem.*</code> 指令族</b>（方案 B 的指令区分），并且规定<b>用普通 load/store 访问多播地址是未定义行为</b>。详见 ⑧ 产业对照。</p>
+</div>
+</section>
+
+<section>
+<h2>API 形态：CreateMulticastAlias</h2>
+<p>说明书给出了应用侧的接口示意，这也是后来成为权利要求 1「mapping instruction」的原型：</p>
+<pre><code>VA 116A, VA 116B = Malloc()                        // 常规分配，得到两个单播 VA
+VA 118 = CreateMulticastAlias(VA 116A, VA 116B)    // 把它们别名成一个多播 VA</code></pre>
+<div class="card">
+<p>注意 <b>alias（别名）</b>这个词——它在权利要求 6 里被正式使用：「configuring includes <b>allocating memory</b> for the first PA and the second PA and <b>creating the VA as an alias</b> for the first PA and the second PA」。也就是说，多播 VA 的法律定义就是「多个 PA 的别名」。</p>
+<p style="margin-top:8px">此外，说明书提到多播组可以由<b>运行在处理元件上的应用</b>来指派（权利要求 4、15：「one or more applications running on one or more of the plurality of PEs <b>assigned the VA to a multicast group</b>」）。这把「谁有权组建多播组」明确划给了应用层。</p>
+</div>
+</section>
+
+<section>
+<h2>三段式地址转换：VA → 中间地址 → 多个 PA</h2>
+<p class="lead">这是整篇专利在硬件层面最有信息量的部分。多播的地址转换<b>不是一步完成的</b>，而且「转换到什么」本身就承载了信号。</p>
+
+<pre><code>       处理元件 106A
+            │  访存指令，携带 VA
+            ▼
+   ┌──────────────────────┐
+   │  内存管理器 108A      │   ← 判断 VA 属于单播还是多播
+   │  (MMU / GMMU / MCC)  │
+   └──────────┬───────────┘
+              │
+     ┌────────┴─────────────────────────────┐
+     │                                      │
+  单播路径                                多播路径
+  VA 116A → PA 120A                    VA 118 → 中间地址
+  （单一 PA）                          （fabric linear address，
+     │                                  全局虚拟地址空间中的地址）
+     │                                      │
+     ▼                                      ▼
+  直接访存                          ┌────────────────────┐
+                                    │   交换机 104        │
+                                    │  (coherent fabric) │
+                                    └─────┬──────┬───────┘
+                                          │      │  扇出
+                                ┌─────────┘      └─────────┐
+                                ▼                          ▼
+                        ┌───────────────┐          ┌───────────────┐
+                        │ 设备 102A      │          │ 设备 102N      │
+                        │ link TLB      │          │ link TLB      │
+                        │ 中间地址→PA120A│          │ 中间地址→PA120N│
+                        └───────────────┘          └───────────────┘
+                                ▼                          ▼
+                            内存 110A                  内存 110N</code></pre>
+
+<div class="grid g2">
+<div class="card highlight">
+<h4>关键设计：用「地址的类型」向交换机传递语义</h4>
+<p>说明书给出了一个非常干净的信号机制：内存管理器转换后交给交换机的东西——</p>
+<ul>
+<li><b>如果是一个中间地址</b> → 交换机知道这是<b>多播</b>操作</li>
+<li><b>如果是一个物理地址</b> → 交换机知道这是<b>单播</b>操作</li>
+</ul>
+<p>不需要额外的控制位或旁路信号，<b>地址本身的种类就是 opcode</b>。这一点被写进了权利要求 5：「a <b>presence of the one or more intermediate address indicates</b> the address translation is a multicasting memory operation」。</p>
+</div>
+<div class="card info">
+<h4>中间地址是什么</h4>
+<p>说明书把它描述为<b>全局虚拟地址空间的 fabric 线性地址（fabric linear address）</b>。它不是任何设备的物理地址，而是 fabric 层面的统一编址。设备侧的 <b>link TLB</b> 负责把它落到本地 PA。</p>
+<p style="margin-top:8px">这条 FLA 技术线索有明确的前案渊源：本专利引用的前案里就包括 NVIDIA 自己的 <a href="https://patents.google.com/patent/US20200159669A1/en" target="_blank">US20200159669A1「Distributed address translation in a multi-node interconnect fabric」</a>（2018-11-21）。也就是说，多播是<b>建立在既有的分布式地址转换体系上的一层扩展</b>，而不是从零设计。</p>
+</div>
+</div>
+
+<div class="card warning">
+<h4>替代实现：交换机自己做全部转换</h4>
+<p>专利同时覆盖了另一种分工：<b>交换机直接把 VA 或中间地址翻译成多个 PA</b>，不依赖设备侧 link TLB。这对应权利要求 8（「transmitting is to a switch that <b>uses the one or more intermediate address to propagate</b> the instruction resulting in completion of the address translation to the first PA and the second PA」）与权利要求 9（「the one or more translated addresses <b>include the first PA and the second PA</b>」）。</p>
+<p style="margin-top:8px">两项权利要求一起，把「转换在设备侧完成」和「转换在交换机侧完成」两种架构都圈了进来。这是撰写上很值得注意的覆盖策略：<b>无论你把 TLB 放在哪一侧，都难以规避</b>。</p>
+</div>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · Detailed Description &amp; Claims 5/8/9</a></p>
+</section>
+
+<section>
+<h2>多播组的层级结构</h2>
+<div class="card purple">
+<p>说明书指出可以存在<b>多个交换机</b>，分别对应<b>不同的多播组</b>；更进一步，多播组可以是<b>分层的（hierarchical）</b>——<b>一个子组的聚合结果，被当作单个设备的结果来对待</b>。</p>
+<p style="margin-top:10px">这句话的工程含义很大：它天然对应<b>两级归约拓扑</b>。节点内先用 NVLink 域的交换机把 8 张卡归约成一个结果，这个结果对上层 fabric 而言就是「一个设备的值」，再参与跨节点归约。今天 NVLink SHARP（NVLS）与分层 all-reduce 的做法，正是这个结构。</p>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 4 ============ -->
+<div class="tab" id="t-inst">
+
+<section>
+<h2>FIG. 2 表 200：指令类型 × 地址类型的组合矩阵</h2>
+<p class="lead">专利的 FIG. 2 是一张组合表，穷举了「单播/多播指令」与「单播/多播 VA」相遇时的行为。这张表看似平淡，实际上定义了整套语义边界——包括什么情况下应该触发故障（fault）。</p>
+
+<table>
+<thead><tr><th style="width:20%">指令 \ 地址</th><th style="width:40%">单播 VA（116A / 116B）</th><th style="width:40%">多播 VA（118）</th></tr></thead>
+<tbody>
+<tr>
+<td><b>单播指令</b><br>202 / 204 / 206 / 208</td>
+<td>常规行为：VA → 单一 PA，直接访存。<span class="tag">基线</span></td>
+<td><b>仍可执行</b>，但只对多播组中的<b>某一个「目标 PA」（target PA）</b>生效。<span class="tag a">需要确定目标</span></td>
+</tr>
+<tr>
+<td><b>多播指令</b><br>210 / 212 / 214</td>
+<td><b>可能触发故障（fault）</b>。<span class="tag r">类型不匹配</span></td>
+<td>正常多播行为：扇出到组内所有 PA。<span class="tag g">目标场景</span></td>
+</tr>
+</tbody>
+</table>
+
+<div class="card warning">
+<h4>「单播指令 + 多播 VA」如何确定目标 PA</h4>
+<p>专利列举了多种确定方式，覆盖面很宽：</p>
+<ul>
+<li>由<b>进程指定</b>（process-specified）</li>
+<li>由 <b>MMU 选择</b></li>
+<li>使用<b>默认值</b></li>
+<li>在<b>地址空间构建时编程设定</b>（programmed at space construction）</li>
+<li>在<b>指令中直接指明</b></li>
+</ul>
+<p>如果以上都无法确定目标 PA，则<b>触发故障</b>。</p>
+</div>
+
+<div class="card danger">
+<h4>「多播指令 + 单播 VA」→ 故障</h4>
+<p>反方向的不匹配同样被处理：说明书明确「a multicast instruction with a unicast VA <b>may trigger a fault</b>」。这条规则被提升成了权利要求 7 的核心：</p>
+<div class="quote">
+"…based at least on determining, using the VA, that the instruction is to be processed as a multicast memory access, <b>evaluating whether there is a mismatch between an instruction type of the instruction and the instruction being processed as a multicast memory access</b>, wherein the performing of the one or more address translations is based at least on the evaluating."
+<span class="src">—— US12326820B2, Claim 7（原文）</span>
+</div>
+<p>换句话说，<b>类型匹配检查本身成了一项受保护的技术特征</b>——地址转换是否执行，取决于这个检查的结果。</p>
+</div>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · FIG. 2 / Claim 7</a></p>
+</section>
+
+<section>
+<h2>三条多播指令：210 / 212 / 214</h2>
+<p class="lead">这是本专利在指令集层面最具体、也最容易与真实产品对照的部分。三条指令分别覆盖「读并归约」、「写广播」、「原子归约写」。</p>
+
+<div class="grid g3">
+<div class="card highlight">
+<h4>210 · Reducing Load（归约加载）</h4>
+<p><b>行为</b>：把请求多播到 N 个节点 → 收到 N 份响应 → <b>聚合成一个值</b> → 交付给一个或多个节点。</p>
+<p style="margin-top:8px"><b>聚合运算</b>可以是：求和、平均、最小值、最大值、<b>BITAND</b>、<b>BITOR</b>、其他按位运算、<b>子集选择</b>、统计值等。</p>
+<p style="margin-top:8px"><b>聚合位置</b>：可以在<b>交换机中</b>完成、也可以在<b>设备上</b>完成，或两者结合。</p>
+<p style="margin-top:8px"><b>细节</b>：发起方自己的值可以走<b>内部路径</b>取得，再与远端返回的值合并。</p>
+<p style="margin-top:8px"><span class="tag g">对应权利要求 20</span></p>
+</div>
+<div class="card highlight">
+<h4>212 · Multicast Store（多播存储）</h4>
+<p><b>行为</b>：把一个值写到多播组内<b>所有 PA</b>。这是最直观的一条——一次请求，N 份副本。</p>
+<p style="margin-top:8px">它是「广播同一个值」这类模式的直接硬件化。在训练场景里对应参数广播、以及归约结果的回送阶段。</p>
+<p style="margin-top:8px">也正是这条指令，会与后发的单播 store 产生顺序问题——见 ⑤ 反射内存与一致性。</p>
+</div>
+<div class="card highlight">
+<h4>214 · Reduce Multicast（归约多播）</h4>
+<p><b>行为</b>：在<b>每个 PA 处执行原子操作</b>，且<b>不返回响应</b>。</p>
+<p style="margin-top:8px">它与 210 的区别在方向：210 是「读回来再归约」，214 是「把归约动作推下去，在每块内存上就地完成」。</p>
+<p style="margin-top:8px">「不返回值」是关键特征——它让这条指令可以是纯粹的 fire-and-forget，不占用返回带宽。</p>
+</div>
+</div>
+
+<div class="card info">
+<h4>208 · Reduce（单播归约）的定义值得单独记一下</h4>
+<div class="quote">
+"…similar to an atomic operation except that a value is not returned to the requester."
+<span class="src">—— US12326820B2，关于 208 的描述</span>
+</div>
+<p>这条描述精确定义了「reduce」在本专利语境下的含义：<b>它是不带返回值的原子操作</b>。理解了这一点，214（reduce multicast）就很自然——它就是把 208 扇出到多个 PA。</p>
+</div>
+</section>
+
+<section>
+<h2>三条指令 vs 今天的 PTX 指令：一一对应</h2>
+<p class="lead">这个对照关系是本专利最有说服力的落地证据。</p>
+<table>
+<thead><tr><th style="width:26%">专利 FIG. 2</th><th style="width:32%">PTX 实际指令</th><th>语义对照</th></tr></thead>
+<tbody>
+<tr>
+<td><b>210 Reducing load</b><br>多播读取 + 聚合 + 回送</td>
+<td><code>multimem.ld_reduce</code></td>
+<td>PTX 规定：从所有位置加载，然后归约，<b>结果返回到目的寄存器 d</b>。<span class="tag g">完全一致</span></td>
+</tr>
+<tr>
+<td><b>212 Multicast store</b><br>写到所有 PA</td>
+<td><code>multimem.st</code></td>
+<td>PTX 规定：把 b 存储到<b>所有位置</b>。<span class="tag g">完全一致</span></td>
+</tr>
+<tr>
+<td><b>214 Reduce multicast</b><br>每个 PA 就地原子归约、无返回</td>
+<td><code>multimem.red</code></td>
+<td>PTX 规定：在<b>所有位置</b>执行归约。无返回值。<span class="tag g">完全一致</span></td>
+</tr>
+<tr>
+<td>聚合运算：sum / min / max / BITAND / BITOR / 其他按位</td>
+<td><code>.op = {.min, .max, .add, .and, .or, .xor}</code></td>
+<td>专利列举的运算集合与 PTX 支持的 op 集合高度重合。<span class="tag g">吻合</span></td>
+</tr>
+<tr>
+<td>FIG. 2 的类型不匹配 → 故障</td>
+<td>PTX：非 <code>multimem.*</code> 指令访问多播地址 = <b>未定义行为</b></td>
+<td>专利用「fault」，ISA 用「undefined behavior」，都是<b>禁止混用</b>。<span class="tag a">同一规则的两种表述</span></td>
+</tr>
+</tbody>
+</table>
+<div class="quote">
+"A multimem address is a virtual address which points to multiple distinct memory locations across devices. <b>Only multimem.* operations are valid on multimem addresses.</b> That is, the behavior of accessing a multimem address in any other memory operation is undefined."
+<span class="src">—— NVIDIA PTX ISA, §8.2.3 Multimem Addresses（原文）</span>
+</div>
+<p class="ref">来源：<a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#multimem-addresses" target="_blank">PTX ISA · Multimem Addresses</a> · <a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#multimem-ld-reduce-multimem-st-multimem-red" target="_blank">PTX ISA · multimem.ld_reduce / multimem.st / multimem.red</a></p>
+</section>
+
+</div>
+
+<!-- ============ TAB 5 ============ -->
+<div class="tab" id="t-reflect">
+
+<section>
+<h2>问题：设备内部有一条更短的路</h2>
+<p class="lead">这是全篇最精彩的技术洞察。多播看起来只是「一变多」，但它引入了一个隐蔽的副作用：<b>同一个设备访问自己的内存，有两条延迟完全不同的路径</b>。</p>
+
+<div class="card">
+<div class="quote">
+"an internal path in a device 102 may have lower latency and bandwidth than a link leaving the device 102"
+<span class="src">—— US12326820B2, Detailed Description</span>
+</div>
+<p>因此，一个请求到达本地内存 110A，走内部路径会<b>比「送到交换机 104、再反射回设备 102A」更快</b>。这是纯粹的物理事实：片内路径短，出片链路长。</p>
+</div>
+
+<pre><code>              设备 102A
+   ┌──────────────────────────────────┐
+   │  处理元件 106A                    │
+   │      │                            │
+   │      ├──── 内部路径 ────► 内存 110A  ← 快（低延迟）
+   │      │     (internal path)        │
+   │      │                            │
+   │      └──── 出片链路 ──┐            │
+   └──────────────────────┼───────────┘
+                          ▼
+                    交换机 104
+                          │
+              ┌───────────┼───────────┐
+              │           │           │
+         反射回 102A    → 102B      → 102N   ← 慢（但所有设备被同等对待）
+              │
+              ▼
+          内存 110A</code></pre>
+</section>
+
+<section>
+<h2>一致性被打破的具体例子（专利原文场景）</h2>
+<div class="card danger">
+<h4>后发的单播 store 抢在先发的多播 store 之前完成</h4>
+<div class="quote">
+"a multicast store may be performed on the VA 118, followed by a unicast store by the processing element 106A to the VA 116A. As the internal path for the VA 116A to the PA 120A is shorter, <b>the unicast store to the VA 116A may be completed before the multicast store to the VA 118 even though the request was made later</b>."
+<span class="src">—— US12326820B2, Detailed Description（原文）</span>
+</div>
+<p>原因很直接：<b>内存系统允许弱序（weak ordering）</b>。在弱序模型下，硬件本来就不承诺两个无依赖访存的完成顺序。但问题在于——从<b>应用的视角</b>看，VA 118 与 VA 116A 是<b>同一块物理内存 PA 120A</b> 的两个名字。应用以为自己在对同一个位置做两次有序的写，硬件却因为路径长度不同把顺序倒过来了。</p>
+</div>
+
+<div class="card warning">
+<h4>这个 bug 的性质：别名（aliasing）带来的隐式竞争</h4>
+<p>它不是普通的数据竞争。普通竞争发生在<b>两个线程</b>之间，程序员知道要加同步。这里的竞争发生在<b>同一个处理元件的两条连续指令</b>之间，而且两条指令表面上访问的是<b>不同的虚拟地址</b>。任何基于「不同地址无需排序」的直觉都会出错。</p>
+<p style="margin-top:8px">这就是为什么这篇专利必须由内存模型专家参与撰写——多播 VA 一旦成为 PA 的别名，就在内存模型里引入了一类新的隐式别名关系，必须补上规则。</p>
+</div>
+</section>
+
+<section>
+<h2>解法之一：反射内存（Reflective Memory）</h2>
+<div class="card highlight">
+<h4>故意走远路，换取「所有设备被同等对待」</h4>
+<div class="quote">
+"However, for some software protocols it may be desirable to <b>reflect the request back so that all devices 102 are treated the same</b>."
+<span class="src">—— US12326820B2, Detailed Description（原文）</span>
+</div>
+<p>这是反射内存的定义与动机：<b>明知内部路径更快，也把请求送出到交换机再反射回本设备</b>。代价是延迟，收益是<b>路径对称性</b>——发起方对自己内存的访问，与它对远端内存的访问，走的是同一条逻辑路径、经历同一套排序点。</p>
+<p style="margin-top:10px">一旦所有设备被同等对待，交换机就成为<b>统一的序列化点</b>。上面那个「后发单播抢先完成」的问题，也就在结构上被消除了。</p>
+</div>
+
+<div class="card purple">
+<h4>反射被写进了延续申请的权利要求</h4>
+<p>授权本主要保护地址转换；<b>反射行为的正面保护在延续申请 US20250272248A1 中</b>，而且写得非常直白：</p>
+<ul>
+<li><b>独立项 1</b>：一致性 fabric 接收指示 VA 的请求 → 映射到多个 PA → 传播，「based at least on <b>reflecting the memory access request to the first device</b> for processing at the first PA」</li>
+<li><b>项 3 / 12 / 19</b>：「the reflecting <b>bypasses a shorter internal path</b> within the first device」——直接把「绕过更短的内部路径」写成技术特征</li>
+<li><b>项 6 / 15</b>：结果被送出到 fabric 再<b>反射回来</b></li>
+<li><b>项 7 / 16</b>：第二设备通过<b>内部路径本地取得</b></li>
+<li><b>项 8</b>：设备对<b>多播 VA 转发到 fabric</b>，对<b>单播 VA 本地处理</b></li>
+</ul>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20250272248A1/en" target="_blank">US20250272248A1 · Claims</a></p>
+</div>
+</section>
+
+<section>
+<h2>解法之二：FIG. 3 的四类一致性约束</h2>
+<p class="lead">反射解决路径对称，但还不够。FIG. 3 给出四类约束，共同保证「多播的结果 == 不用多播的结果」。这些约束可由内存管理器 108、交换机 104、内存 110、页表、TLB、驱动等<b>任意组合</b>来实施。</p>
+
+<div class="grid g2">
+<div class="card">
+<h4>① 访问权限：生产者 / 消费者角色</h4>
+<p>对某个 VA 划分角色：<b>生产者（producer）拥有写权限，消费者（consumer）只有读权限</b>。</p>
+<p style="margin-top:8px"><b>效果</b>：结构性地排除写-写竞争；并且保证读取发生时，<b>所有 PA 上保存的是同一个值</b>。这是用权限模型代替运行时同步，成本为零。</p>
+<p style="margin-top:8px"><span class="tag b">延续申请项 4/13/20 已将其权利要求化</span></p>
+</div>
+<div class="card">
+<h4>② 访问路径：谁走反射、谁走本地</h4>
+<p><b>生产者</b>把全部（或符合条件的）请求<b>转发到交换机并被反射回来</b>；<b>消费者</b>通过<b>内部路径本地读取</b>，或以其他方式走比生产者<b>更短的路径</b>。</p>
+<p style="margin-top:8px"><b>效果</b>：写走长路径统一排序，读走短路径拿到高性能。<b>非对称路径分配</b>是这里的巧思——不是所有人都反射，只有需要被排序的一方反射。</p>
+<p style="margin-top:8px"><span class="tag b">延续申请项 5/14 对应「消费者路径比生产者更短」</span></p>
+</div>
+<div class="card">
+<h4>③ 转发规则</h4>
+<p><b>只有生产者的请求 / 设备 302A 的请求</b>会经过交换机。其余请求不必进入 fabric。</p>
+<p style="margin-top:8px"><b>效果</b>：把反射的延迟代价<b>限定在必须被排序的请求上</b>，避免让所有访问都付出出片开销。这是性能与正确性之间的精确切分。</p>
+</div>
+<div class="card">
+<h4>④ 软件无竞争提示（race-free hint）</h4>
+<p>软件可以告知硬件「这段访问是无竞争的」，并且这个提示<b>可以被限定到给定的 VA 与一个时间窗口</b>。</p>
+<p style="margin-top:8px"><b>效果</b>：在软件能保证无竞争的阶段，硬件可以放开约束、走最快路径。<b>带时间窗口的作用域化提示</b>是很实用的设计——它对应真实训练循环里「计算阶段无竞争、同步点前后才需要严格排序」的模式。</p>
+<p style="margin-top:8px"><span class="tag b">延续申请项 9：race-free indication 带 defined time period，可修改多播行为</span></p>
+</div>
+</div>
+
+<div class="card highlight">
+<h4>四类约束的共同目的</h4>
+<p>专利明确：施加这些约束是为了让「使用多播处理请求的结果，与<b>不使用多播</b>处理这些请求的结果<b>一致</b>」，并且可以根据协同处理环境的配置与能力使用<b>一个或多个额外或替代的约束</b>。</p>
+<p style="margin-top:8px">这个「一个或多个额外或替代」的兜底表述，意味着专利并不把自己锁死在这四类上——<b>任何用来保证多播-单播等价性的约束机制，都可能落入其射程</b>。</p>
+</div>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · FIG. 3 说明</a></p>
+</section>
+
+</div>
+
+<!-- ============ TAB 6 ============ -->
+<div class="tab" id="t-opt">
+
+<section>
+<h2>把多播用起来的两种姿势</h2>
+<p class="lead">专利提出多播不只用于「替换已经在用的单播」，还可以<b>提前布置</b>，为将来的访问铺路。这两条路线的性能收益模型完全不同。</p>
+
+<div class="grid g2">
+<div class="card">
+<h4>姿势一：加速当前请求（替换单播）</h4>
+<p>检测到一组处理元件<b>将要把同一个值存储到多个内存</b>（用多个请求），就把这些请求<b>用一个或多个多播操作来处理</b>。收益直接：<b>处理的请求数量减少</b>。</p>
+<p style="margin-top:8px">专利用词是「multicasting may be used to <b>accelerate the processing of one or more requests which may otherwise have been processed using unicasting</b>」——注意这个「otherwise」，它强调的是<b>本来会用单播</b>，所以对应用来说是纯加速。</p>
+</div>
+<div class="card highlight">
+<h4>姿势二：加速未来请求（预先复制）</h4>
+<p>检测到一组处理元件<b>将要从多个内存加载同一个值</b>，就<b>提前用多播把该值复制到每个内存</b>。之后各设备的 load 就可以<b>从本地副本快速完成</b>，而不是从「多个进程映射到同一 PA」的慢路径上去读。</p>
+<p style="margin-top:8px">专利在 FIG. 3 的语境下指出：设备 302B、302C、302N 的 load 分别从本地副本 <b>PA 120B / 120C / 120N</b> 完成。</p>
+</div>
+</div>
+
+<div class="card warning">
+<h4>为什么「预先复制」在有同步屏障时特别值钱</h4>
+<div class="quote">
+"This may be advantageous in various scenarios, such as where <b>a synchronization barrier is enforced across the devices 302, and the devices 302 wait for the slowest load to complete</b>."
+<span class="src">—— US12326820B2, Detailed Description（原文）</span>
+</div>
+<p>这句话点出了分布式训练的真实痛点：<b>屏障下的整体耗时由最慢的那次 load 决定</b>。如果 N-1 个设备都要跨链路去同一个 PA 读同一个值，尾延迟会被链路争抢放大；把值预先复制到每张卡本地，所有 load 都变成本地读，<b>最慢的那个也快了</b>。这是从「优化平均延迟」转向「压缩尾延迟」的思路，对 barrier-heavy 的负载收益最大。</p>
+</div>
+</section>
+
+<section>
+<h2>怎么知道该多播？四类触发机制</h2>
+<p class="lead">专利说「可以使用各种方法来确定、识别、预测或以其他方式预判上述场景」，并明确这可以由内存管理器 108、交换机 104、内存 110、页表、TLB、驱动等的<b>任意组合</b>完成。具体给了以下几条。</p>
+
+<div class="grid g2">
+<div class="card info">
+<h4>① 应用/进程给出提示（hint）</h4>
+<p>通过 <b>API 调用</b>或<b>驱动层消息</b>提供提示。例如：应用分配<b>单播内存</b>时，附带一个提示，<b>指明哪些 VA 需要用多播复制</b>（以及复制到哪些设备 102）。</p>
+</div>
+<div class="card info">
+<h4>② 驱动集合操作建立多播组</h4>
+<p>当分配发生在设备 302A 上时，可以执行一次 <b>collective</b>：设备 302A 与<b>其他每个待加入多播组的设备上的驱动通信</b>。结果是设备 302A <b>为所有副本分配后备内存并创建映射</b>，然后——</p>
+<div class="quote" style="margin:8px 0 0">
+"with <b>a single pointer being returned for the VA</b> and passed to one or more of devices 302 <b>similar to a unicast pointer</b>."
+<span class="src">—— US12326820B2（原文）</span>
+</div>
+<p style="margin-top:8px">「像单播指针一样的单个指针」——这是不透明性在 API 层面的体现：<b>应用拿到的东西看起来和普通指针没区别</b>。</p>
+</div>
+<div class="card info">
+<h4>③ 计数器 / 监控 / 模式识别</h4>
+<p>递增计数器，或使用监控与<b>模式识别</b>技术来触发。例如：基于<b>统计或识别出某种模式</b>（如「若干 VA 组频繁把相同的值存到那些或其他 PA」），把对某个 VA 的 store <b>复制</b>到多个 PA。</p>
+<p style="margin-top:8px">这条被提升成了<b>权利要求 16</b>：「a multicast memory access is <b>selected for the request rather than a unicast memory access based at least on analyzing one or more patterns</b> associated with requests for memory access operations…」<span class="tag g">已权利要求化</span></p>
+</div>
+<div class="card info">
+<h4>④ 故障驱动的 VA 迁移</h4>
+<p>更节省内存的做法：分配时设备 302A <b>只为单份副本分配内存</b>（而非所有副本），同样返回单个指针。<b>当模式被识别出来后</b>，设备的驱动判定该 VA 应当被复制，于是——</p>
+<div class="quote" style="margin:8px 0 0">
+"the driver may begin <b>taking faults, handling faults</b>, and/or otherwise <b>transitioning the VA for multicasting</b>."
+<span class="src">—— US12326820B2（原文）</span>
+</div>
+<p style="margin-top:8px">用<b>缺页故障作为迁移机制</b>，把一个原本单播的 VA 在运行时<b>热转换</b>成多播 VA。这与 UVM 的按需迁移是同一套基础设施。</p>
+</div>
+</div>
+</section>
+
+<section>
+<h2>不透明性（Opacity）：这篇专利真正的野心</h2>
+<div class="card highlight">
+<p>把前面所有机制串起来，专利想达到的状态是：</p>
+<ul>
+<li>多播 VA 在应用看来<b>就是一个普通指针</b>（单个指针返回，类似单播指针）</li>
+<li>单播<b>语法被保留</b>，不必改写访存代码</li>
+<li>是否启用多播，可以由<b>驱动/硬件根据提示或模式识别自行决定</b></li>
+<li>加了一致性约束后，<b>多播结果与单播结果等价</b></li>
+<li>因此：<b>「为只支持单播的内存系统编写的代码，可以用多播操作来执行」</b></li>
+</ul>
+<p style="margin-top:10px">这是一条很强的主张：它把多播从「一个需要生态适配的新特性」变成「一个可以被硬件单方面启用的优化」。<b>专利保护的不只是多播机制，还包括让多播变得不可见的那套约束</b>。</p>
+</div>
+
+<div class="card warning">
+<h4>现实检查：产品并没有做到完全不透明</h4>
+<p>需要诚实地指出：<b>今天出货的实现是显式的，不是不透明的</b>。PTX 明确规定「只有 <code>multimem.*</code> 操作对多播地址有效，用其他内存操作访问多播地址是<b>未定义行为</b>」；CUDA 侧需要显式调用 <code>cuMulticastCreate</code> / <code>cuMulticastAddDevice</code> / <code>cuMulticastBindMem</code> / <code>cuMemMap</code> 一整套流程。</p>
+<p style="margin-top:8px">也就是说，说明书里描述的「不透明多播」目前更像是<b>为未来实现预留的权利范围</b>，而非已落地的产品形态。这一点对判断专利价值很重要：<b>它的射程明显宽于当前产品</b>，覆盖了「编译器/驱动自动把单播改写成多播」这类尚未普及的实现。</p>
+<p class="ref">来源：<a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#multimem-addresses" target="_blank">PTX ISA §8.2.3</a> · <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MULTICAST.html" target="_blank">CUDA Driver API · Multicast Object Management</a></p>
+</div>
+</section>
+
+<section>
+<h2>三个方法流程（FIG. 4 / 5 / 6）</h2>
+<p class="lead">说明书用三张流程图分别从内存管理器、交换机、以及最抽象的整体视角描述同一件事。它们直接对应三个独立权利要求。</p>
+<table>
+<thead><tr><th style="width:16%">流程图</th><th style="width:18%">视角</th><th>步骤</th><th style="width:14%">对应独立项</th></tr></thead>
+<tbody>
+<tr>
+<td><b>FIG. 4</b><br>method 400</td>
+<td>内存管理器 108A</td>
+<td><b>B402</b> 接收请求对应的数据 → <b>B404</b> 对请求指示的 VA 118 执行地址转换（至少部分地把 VA 118 转成 PA 120A 与 PA 120N）→ <b>B406</b> 向交换机 104 传输第二数据（<b>代表多个 PA 或一个中间地址</b>），导致在内存 110 上使用 PA 120A 与 PA 120N 进行访存</td>
+<td><b>权利要求 1</b></td>
+</tr>
+<tr>
+<td><b>FIG. 5</b><br>method 500</td>
+<td>交换机 104</td>
+<td><b>B502</b> 接收请求数据 → <b>B504</b> 把 VA 118 映射到多个设备 102（映射可使用来自内存管理器的中间地址或 PA；也可以由交换机自己完成 VA/中间地址→PA 的转换）→ <b>B506</b> 把请求传播到每个设备，使 102A 用 PA 120A、102N 用 PA 120N 各自访存</td>
+<td><b>权利要求 10</b></td>
+</tr>
+<tr>
+<td><b>FIG. 6</b><br>method 600</td>
+<td>系统整体（最抽象）</td>
+<td><b>B602</b> 把请求指示的 VA 118 转换为对应多个处理元件的多个 PA 120 → <b>B604</b> 响应该请求，使用这些 PA 执行访存</td>
+<td><b>权利要求 18</b></td>
+</tr>
+</tbody>
+</table>
+<div class="card info">
+<p>这种「同一机制、三个视角」的布局是防规避设计：无论侵权嫌疑方的产品是<b>MMU 厂商</b>、<b>交换机厂商</b>，还是<b>整机/SoC 集成商</b>，都能找到对应的独立项去主张。</p>
+</div>
+</section>
+
+<section>
+<h2>FIG. 7 / FIG. 8：实施环境</h2>
+<div class="grid g2">
+<div class="card">
+<h4>FIG. 7 · 计算设备 700</h4>
+<p>互连系统 702、内存 704、CPU 706、GPU 708、通信接口 710、I/O 端口 712、I/O 组件 714、电源 716、呈现组件 718、<b>逻辑单元 720</b>。</p>
+<p style="margin-top:8px"><b>逻辑单元 720 的枚举很宽</b>：DPU、Tensor Core、TPU、VPU、GPC、TPC、SM、TTU、ALU 等。这意味着「处理元件」的解释空间非常大——<b>不限于 GPU SM</b>。</p>
+<p style="margin-top:8px">说明书还指出 GPU 708 之间可通过 <b>NVLINK 或 NVSwitch</b> 连接；且设备与组件<b>可以是虚拟的</b>（VM、vGPU、vCPU、虚拟逻辑单元），或离散/虚拟组件的组合。</p>
+</div>
+<div class="card">
+<h4>FIG. 8 · 数据中心 800</h4>
+<p>标准的 NVIDIA 数据中心架构章节（基础设施层、框架层、软件层、应用层）。这类章节的作用是<b>把权利要求的适用场景从单机扩展到数据中心规模</b>，同时为「云服务实施该方法」提供说明书支撑。</p>
+</div>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 7 ============ -->
+<div class="tab" id="t-claims">
+
+<section>
+<h2>权利要求全景</h2>
+<p class="lead">共 20 项，三个独立项覆盖三种主体。所有独立项都被加入了同一个限定：<b>必须由应用下发「映射指令（mapping instruction）」来配置多播 VA</b>。这个限定不是原始申请就有的——它是审查过程中为了克服驳回而加进去的，是评估规避空间的关键。</p>
+
+<table>
+<thead><tr><th style="width:12%">项号</th><th style="width:14%">类型</th><th>主题</th></tr></thead>
+<tbody>
+<tr><td><b>1</b></td><td><span class="tag g">独立 · 方法</span></td><td>应用下发映射指令 → 配置多播 VA → 接收访存指令 → 执行地址转换（VA → 第一 PA + 第二 PA）→ 传输转换结果致使访存</td></tr>
+<tr><td>2</td><td>依附 1</td><td>地址转换与传输由 <b>MMU</b> 在收到指令后执行</td></tr>
+<tr><td>3</td><td>依附 1</td><td>该 VA 位于<b>多播 VA 空间</b>，另有 VA 位于与之<b>分离的单播 VA 空间</b></td></tr>
+<tr><td>4</td><td>依附 1</td><td>运行在处理元件上的<b>应用</b>把该 VA 指派到<b>多播组</b></td></tr>
+<tr><td>5</td><td>依附 1</td><td>先转成<b>中间地址</b>再转成 PA；<b>中间地址的存在即表示这是多播内存操作</b></td></tr>
+<tr><td>6</td><td>依附 1</td><td>配置动作包括<b>分配内存</b>并把 VA <b>创建为两个 PA 的别名（alias）</b></td></tr>
+<tr><td>7</td><td>依附 1</td><td>评估<b>指令类型与「按多播处理」之间是否存在不匹配</b>；地址转换的执行取决于该评估</td></tr>
+<tr><td>8</td><td>依附 1</td><td>转换结果含<b>中间地址</b>，传输给<b>交换机</b>，由交换机用它传播并完成到两个 PA 的转换</td></tr>
+<tr><td>9</td><td>依附 1</td><td>转换结果<b>直接就是两个 PA</b></td></tr>
+<tr><td><b>10</b></td><td><span class="tag g">独立 · 方法</span></td><td>同样的映射指令配置流程 → 把 VA <b>映射到第一设备与第二设备</b> → <b>把请求传播到多个设备</b>，各自用对应 PA 访存</td></tr>
+<tr><td>11</td><td>依附 10</td><td>映射与传播由<b>外部于所有设备</b>的交换机执行</td></tr>
+<tr><td>12</td><td>依附 10</td><td>第一设备含<b>第一 GPU</b>，第二设备含<b>第二 GPU</b></td></tr>
+<tr><td>13</td><td>依附 10</td><td>第一 PA 对应第一设备的 PE，第二 PA 对应第二设备的 PE</td></tr>
+<tr><td>14</td><td>依附 10</td><td>分离的多播 / 单播 VA 空间</td></tr>
+<tr><td>15</td><td>依附 10</td><td>基于应用<b>指派多播组</b>，把 VA 映射到多个设备</td></tr>
+<tr><td>16</td><td>依附 10</td><td>基于<b>分析请求模式</b>，为该请求选择多播而非单播</td></tr>
+<tr><td>17</td><td>依附 10</td><td>第一次访存是从第一 PA <b>加载值</b>；接收该值并回送给第一设备</td></tr>
+<tr><td><b>18</b></td><td><span class="tag g">独立 · 装置</span></td><td>「one or more devices」含<b>一个或多个硬件组件</b>，配置为执行 VA→多个 PA 的转换（基于 VA 出现在应用的访存指令中、且该 VA 已按应用的映射指令被配置为多播 VA）并执行访存</td></tr>
+<tr><td>19</td><td>依附 18</td><td>至少一次转换由 <b>MMU</b> 执行</td></tr>
+<tr><td>20</td><td>依附 18</td><td>访存操作包括<b>从多个 PA 加载值、合并成聚合值、把聚合值作为响应返回</b>（= FIG. 2 的 reducing load 210）</td></tr>
+</tbody>
+</table>
+<p class="ref">权利要求全文来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · Claims</a></p>
+</section>
+
+<section>
+<h2>独立项 1 原文与逐段释义</h2>
+<div class="quote" style="border-left-color:var(--nvidia-green)">
+<b>1.</b> A computer-implemented method comprising:<br>
+receiving, from an application, <b>a mapping instruction that specifies to configure a virtual address (VA) as a multicast VA</b> for a first physical address (PA) and a second PA;<br>
+responsive to the mapping instruction, configuring the VA as the multicast VA for the first PA and the second PA;<br>
+receiving, from the application, an instruction for a memory access operation, the instruction indicating the VA;<br>
+<b>based at least on identifying the VA in the instruction and the configuring of the VA as the multicast VA</b>, performing one or more address translations of an address translation that maps the VA to at least the first PA corresponding to a first processing element (PE) of a plurality of PEs and the second PA corresponding to a second PE of the plurality of PEs; and<br>
+transmitting one or more translated addresses resulting from the one or more address translations of the address translation, the transmitting causing memory accesses on one or more memories using the first PA and the second PA responsive to the instruction.
+<span class="src">—— US12326820B2, Claim 1（原文）</span>
+</div>
+
+<table>
+<thead><tr><th style="width:30%">要件</th><th>释义与要点</th></tr></thead>
+<tbody>
+<tr><td><b>① 从应用接收映射指令</b></td><td>必须有一个<b>来自应用</b>的、<b>明确指定「把某 VA 配置为多播 VA」</b>的指令。这是整项权利要求最强的限定：<b>纯硬件自动决定多播、无应用参与，不落入本项</b>。</td></tr>
+<tr><td><b>② 响应该指令进行配置</b></td><td>配置动作与映射指令之间必须有因果关系（responsive to）。</td></tr>
+<tr><td><b>③ 从应用接收访存指令，指令指示该 VA</b></td><td>访存指令同样来自应用，且<b>携带这个多播 VA</b>。</td></tr>
+<tr><td><b>④ 基于「在指令中识别到该 VA」+「该 VA 已被配置为多播」执行地址转换</b></td><td>双重触发条件。转换目标：<b>至少</b>第一 PA（对应第一 PE）与第二 PA（对应第二 PE）。注意用词是「one or more address translations <b>of an address translation</b>」——刻意允许<b>一次逻辑转换由多个物理转换步骤组成</b>（覆盖 MMU + link TLB 的分段实现）。</td></tr>
+<tr><td><b>⑤ 传输转换出的地址，致使访存</b></td><td>传输对象是「一个或多个转换后的地址」。结合项 8（中间地址）与项 9（就是 PA），这个上位表述同时覆盖了两种架构。</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>关键证据：授权前 vs 授权后的范围收窄</h2>
+<p class="lead">这是本页最有分析价值的一节。把 2023 年公开的申请版权利要求 1 与最终授权版并排看，收窄一目了然。</p>
+
+<div class="grid g2">
+<div class="card danger">
+<h4>授权前（US20230229599A1）Claim 1</h4>
+<p>结构极其简洁，只有三步：</p>
+<ul>
+<li>receiving <b>first data corresponding to a request</b>（接收请求对应的第一数据）</li>
+<li>performing <b>an address translation of the VA</b> … to at least a first PA … and a second PA（对 VA 执行地址转换）</li>
+<li>transmitting <b>second data</b>（传输第二数据）</li>
+</ul>
+<p style="margin-top:8px"><b>没有「application」，没有「mapping instruction」，没有「configuring」。</b></p>
+<p style="margin-top:8px">这个版本等于主张：<b>任何把一个 VA 转换成多个 PA 并致使多处访存的机制</b>。范围极宽。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20230229599A1/en" target="_blank">US20230229599A1 · Claim 1</a></p>
+</div>
+<div class="card highlight">
+<h4>授权后（US12326820B2）Claim 1</h4>
+<p>前面被插入了两个全新步骤，并给转换加上了双重触发条件：</p>
+<ul>
+<li>+ receiving, <b>from an application</b>, a <b>mapping instruction</b> that specifies to configure a VA as a multicast VA</li>
+<li>+ <b>responsive to</b> the mapping instruction, <b>configuring</b> the VA as the multicast VA</li>
+<li>+ 访存指令也必须 <b>from the application</b></li>
+<li>+ 转换须 <b>based at least on identifying the VA in the instruction and the configuring</b></li>
+</ul>
+<p style="margin-top:8px">范围从「任何 VA→多 PA 转换」收窄为「<b>应用显式建立的多播映射</b> + 基于该映射的转换」。</p>
+</div>
+</div>
+
+<div class="card warning">
+<h4>为什么会这样收窄：完整审查历史</h4>
+<table style="margin-top:6px">
+<thead><tr><th style="width:20%">日期</th><th>事件</th></tr></thead>
+<tbody>
+<tr><td>2022-01-18</td><td>提交申请（FEPP 记录）</td></tr>
+<tr><td>2022-01-21</td><td>权利转让给 NVIDIA 登记（REEL/FRAME 058730/0713）</td></tr>
+<tr><td>2022-02-24</td><td>DOCKETED NEW CASE — 进入审查队列</td></tr>
+<tr><td>2023-11-14</td><td><b>NON-FINAL 驳回</b>（第一次审查意见）</td></tr>
+<tr><td>2024-01-03</td><td>申请人答复</td></tr>
+<tr><td>2024-04-17</td><td><b>NON-FINAL 驳回</b>（第二次）</td></tr>
+<tr><td>2024-07-17</td><td>申请人答复</td></tr>
+<tr><td><b>2024-08-09</b></td><td><span class="tag r">FINAL REJECTION 最终驳回</span></td></tr>
+<tr><td>2024-12-11</td><td>DOCKETED NEW CASE — 继续审查请求（RCE）后重新入队</td></tr>
+<tr><td>2024-12-30</td><td>NON-FINAL 驳回（第三次）</td></tr>
+<tr><td><b>2025-05-28</b></td><td><span class="tag g">STCF — PATENTED CASE 授权</span></td></tr>
+<tr><td>2025-06-10</td><td>正式授权公告</td></tr>
+</tbody>
+</table>
+<p style="margin-top:10px">三轮 non-final 驳回 + 一次<b>最终驳回</b> + 一次 RCE，历时超过三年。这条时间线清楚说明：<b>「一个 VA 映射到多个 PA」这个宽泛概念被审查员认为不可专利（很可能被前案覆盖）</b>；能拿到授权，靠的是加入<b>应用层显式映射指令</b>这个限定。</p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US12326820B2/en" target="_blank">US12326820B2 · Legal Events / Concepts</a></p>
+</div>
+
+<div class="card info">
+<h4>这对竞争者意味着什么</h4>
+<ul>
+<li><b>规避空间在「谁发起映射」上</b>。授权项要求映射指令<b>来自应用</b>。如果一个实现由<b>驱动/运行时/编译器</b>自主建立多播映射，而应用完全无感（正是说明书所描述的「不透明多播」！），字面上是否落入项 1 就存在争辩空间。</li>
+<li><b>但说明书里写满了这些替代方案</b>（提示、计数器、模式识别、故障驱动迁移），且项 16 已把「基于分析模式选择多播」权利要求化。等同原则下仍有风险。</li>
+<li><b>真正需要盯的是延续申请</b> US20250272248A1：它绕开了「应用映射指令」这条路，改从<b>coherent fabric 的反射行为</b>切入，主体是 fabric 与设备，不再要求应用下发映射指令。若获授权，覆盖面与授权本形成互补夹击。</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>延续申请 US20250272248A1 的权利要求结构</h2>
+<table>
+<thead><tr><th style="width:14%">项号</th><th style="width:14%">类型</th><th>主题</th></tr></thead>
+<tbody>
+<tr><td><b>1</b></td><td><span class="tag a">独立 · 方法</span></td><td>coherent fabric 接收指示 VA 的访存请求 → 把 VA 映射到多个 PA → 传播请求，<b>基于把请求「反射」回第一设备</b>以在第一 PA 处理</td></tr>
+<tr><td>3 / 12 / 19</td><td>依附</td><td><b>该反射绕过设备内部的更短路径</b>（bypasses a shorter internal path）</td></tr>
+<tr><td>4 / 13 / 20</td><td>依附</td><td><b>生产者写权限 / 消费者只读权限</b></td></tr>
+<tr><td>5 / 14</td><td>依附</td><td>消费者的结果所走路径<b>比生产者的更短</b></td></tr>
+<tr><td>6 / 15</td><td>依附</td><td>结果被送出到 fabric 并<b>反射回来</b></td></tr>
+<tr><td>7 / 16</td><td>依附</td><td>第二设备通过<b>内部路径本地</b>取得</td></tr>
+<tr><td>8</td><td>依附</td><td>设备对<b>多播 VA 转发到 fabric</b>，对<b>单播 VA 本地处理</b></td></tr>
+<tr><td>9</td><td>依附</td><td><b>带确定时间段的无竞争提示</b>（race-free indication）修改多播行为</td></tr>
+<tr><td><b>10</b></td><td><span class="tag a">独立 · 系统</span></td><td>系统视角（coherent fabric）</td></tr>
+<tr><td><b>17</b></td><td><span class="tag a">独立 · 装置</span></td><td>第一设备，含「one or more circuits」</td></tr>
+</tbody>
+</table>
+<div class="card purple">
+<p>把两件专利放在一起看，NVIDIA 的布局意图非常清楚：<b>授权本圈「多播地址转换」，延续申请圈「反射 + 生产者消费者 + 路径非对称」</b>。前者是功能，后者是保证功能正确的一致性机制。<b>两者合起来才是标题「Multicast and reflective memory behavior for memory model consistency」的完整含义。</b></p>
+<p class="ref">来源：<a href="https://patents.google.com/patent/US20250272248A1/en" target="_blank">US20250272248A1 · Claims（Pending）</a></p>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 8 ============ -->
+<div class="tab" id="t-cmp">
+
+<section>
+<h2>从专利到产品：多播已经出货了</h2>
+<p class="lead">这篇专利申请于 2022 年 1 月 18 日——就在 Hopper 架构发布之前几个月。它描述的机制，如今在 PTX 指令集与 CUDA Driver API 中都有对应的公开实现。下面逐层对照。</p>
+
+<table>
+<thead><tr><th style="width:22%">层次</th><th style="width:26%">专利中的表述</th><th>产品中的实际形态</th></tr></thead>
+<tbody>
+<tr>
+<td><b>应用 API</b></td>
+<td><code>VA 118 = CreateMulticastAlias(VA 116A, VA 116B)</code></td>
+<td>CUDA Driver API <b>Multicast Object Management</b>：<code>cuMulticastCreate</code> → <code>cuMulticastAddDevice</code> → <code>cuMulticastBindMem</code> / <code>cuMulticastBindAddr</code> → <code>cuMemMap</code> / <code>cuMemSetAccess</code></td>
+</tr>
+<tr>
+<td><b>指令集</b></td>
+<td>FIG. 2 的 210 / 212 / 214</td>
+<td>PTX <code>multimem.ld_reduce</code> / <code>multimem.st</code> / <code>multimem.red</code>（PTX ISA <b>8.1</b> 引入，要求 <b>sm_90 或更高</b>）</td>
+</tr>
+<tr>
+<td><b>地址语义</b></td>
+<td>多播 VA 空间与单播 VA 空间分离；类型不匹配触发故障</td>
+<td>PTX §8.2.3：multimem address 是指向<b>跨设备多个不同内存位置</b>的虚拟地址；<b>只有 multimem.* 操作有效</b>，其他访问<b>未定义</b></td>
+</tr>
+<tr>
+<td><b>中间地址 / fabric</b></td>
+<td>中间地址 = 全局虚拟地址空间的 fabric 线性地址；link TLB 落地到 PA</td>
+<td>前案 <a href="https://patents.google.com/patent/US20200159669A1/en" target="_blank">US20200159669A1</a> 的分布式地址转换体系（NVLink/NVSwitch fabric 编址）</td>
+</tr>
+<tr>
+<td><b>交换机内聚合</b></td>
+<td>「聚合可以在交换机中完成」（210 reducing load）</td>
+<td><b>NVLink SHARP（NVLS）</b>：在 NVSwitch 中执行归约，NCCL 以 NVLS 算法使用</td>
+</tr>
+<tr>
+<td><b>分层多播组</b></td>
+<td>「子组的结果被当作单个设备的结果」</td>
+<td>分层 all-reduce：节点内 NVLink 域归约 → 结果参与跨节点归约</td>
+</tr>
+<tr>
+<td><b>不透明多播</b></td>
+<td>「用不用多播对编程模型不透明」</td>
+<td><span class="tag a">尚未落地</span>目前是显式 API + 专用指令，需要应用/库主动适配</td>
+</tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>PTX <code>multimem.*</code> 指令族细节</h2>
+<pre><code>multimem.ld_reduce{.ldsem}{.scope}{.ss}.op.type   d, [a];
+multimem.st{.stsem}{.scope}{.ss}.type             [a], b;
+multimem.red{.redsem}{.scope}{.ss}.op.type        [a], b;
+
+.op    = { .min, .max, .add, .and, .or, .xor }
+.scope = { .cta, .cluster, .gpu, .sys }
+.vec   = { .v2, .v4, .v8 }
+累加精度修饰： .acc::f32 / .acc::f16
+FP8 类型：    .e4m3 / .e5m2</code></pre>
+<div class="grid g2">
+<div class="card">
+<h4>语义（PTX 文档表述）</h4>
+<ul>
+<li><code>ld_reduce</code>：<b>从所有位置加载</b>，然后归约，<b>结果写入目的寄存器 d</b> → 对应专利 210</li>
+<li><code>st</code>：把 b <b>存储到所有位置</b> → 对应专利 212</li>
+<li><code>red</code>：<b>在所有位置执行归约</b> → 对应专利 214</li>
+</ul>
+</div>
+<div class="card">
+<h4>版本与硬件门槛</h4>
+<ul>
+<li>指令族<b>在 PTX ISA 8.1 引入</b></li>
+<li><code>.acc::f32</code> 于 PTX ISA <b>8.2</b> 加入</li>
+<li>FP8 类型与 <code>.acc::f16</code> 于 PTX ISA <b>8.6</b> 加入（FP8 仅在 sm_100a / 101a / 120a / 121a 等特定目标上可用）</li>
+<li><b>Target ISA Notes: Requires sm_90 or higher</b> —— 即 <b>Hopper 起</b></li>
+<li>PTX ISA 9.3 进一步加入 <code>multimem.st.async</code> / <code>multimem.red.async</code></li>
+</ul>
+</div>
+</div>
+<div class="card highlight">
+<h4>时间线吻合度</h4>
+<p>专利申请日 <b>2022-01-18</b>；<code>multimem.*</code> 要求 <b>sm_90（Hopper）</b>、随 <b>PTX ISA 8.1</b> 公开。这个「申请在前、架构在后」的顺序，是典型的<b>为下一代架构预先布局专利</b>的做法。FIG. 2 的三条指令与 PTX 三条指令一一对应，几乎可以认为 FIG. 2 就是 <code>multimem</code> 指令族的设计文档。</p>
+<p class="ref">来源：<a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#multimem-ld-reduce-multimem-st-multimem-red" target="_blank">PTX ISA · multimem 指令</a> · <a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#multimem-addresses" target="_blank">PTX ISA · §8.2.3 Multimem Addresses</a></p>
+</div>
+</section>
+
+<section>
+<h2>CUDA Multicast Object API：<code>CreateMulticastAlias</code> 的真身</h2>
+<table>
+<thead><tr><th style="width:34%">函数</th><th>作用与约束</th></tr></thead>
+<tbody>
+<tr><td><code>cuMulticastCreate(mcHandle, prop)</code></td><td>创建多播对象句柄。多播对象允许<b>某些内存操作被广播到一组（team）设备</b>。</td></tr>
+<tr><td><code>cuMulticastAddDevice(mcHandle, dev)</code></td><td>把设备加入 team。文档明确：这种关联在<b>多播对象的整个生命周期内是永久的</b>。</td></tr>
+<tr><td><code>cuMulticastBindMem</code> / <code>cuMulticastBindMem_v2</code></td><td>把由 <code>cuMemCreate</code> 或 <code>cudaMallocAsync</code> 得到的物理内存绑定到多播对象。<b>所有设备加入 team 前，绑定会阻塞</b>。</td></tr>
+<tr><td><code>cuMulticastBindAddr</code> / <code>cuMulticastBindAddr_v2</code></td><td>按地址绑定的变体。</td></tr>
+<tr><td><code>cuMulticastUnbind</code></td><td>解除绑定。</td></tr>
+<tr><td><code>cuMulticastGetGranularity</code></td><td>查询粒度。<code>CU_MULTICAST_GRANULARITY_MINIMUM</code> 为对齐<b>必需</b>；<code>CU_MULTICAST_GRANULARITY_RECOMMENDED</code> 为<b>性能推荐</b>对齐。</td></tr>
+</tbody>
+</table>
+<div class="grid g2">
+<div class="card info">
+<h4>能力查询与错误码</h4>
+<ul>
+<li>支持性通过 <code>CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED</code> 查询</li>
+<li>绑定后通过 <code>cuMemMap</code> / <code>cuMemSetAccess</code> 建立映射；<code>cuMemMap</code> 同样会阻塞直到 team 齐备</li>
+<li>可通过 <code>cuMemExportToShareableHandle</code> 跨进程共享</li>
+<li>错误码 <code>CUDA_ERROR_SYSTEM_NOT_READY</code>（需确认「all required driver daemons are running properly」）、<code>CUDA_ERROR_ILLEGAL_STATE</code></li>
+</ul>
+</div>
+<div class="card">
+<h4>与专利的对应关系</h4>
+<p>专利里 <code>Malloc()</code> + <code>CreateMulticastAlias()</code> 这两步，在产品中被拆成了更细的四步：<b>创建对象 → 加设备成组 → 绑定物理内存 → 映射到地址空间</b>。</p>
+<p style="margin-top:8px">而权利要求 6 的「allocating memory … and creating the VA as an <b>alias</b> for the first PA and the second PA」，正好覆盖了「<code>cuMemCreate</code> 分配 + <code>cuMulticastBindMem</code>/<code>cuMemMap</code> 建立别名」这个组合。</p>
+<p style="margin-top:8px">另外，说明书提到的「驱动集合操作、跨设备通信建组」也与 <code>cuMulticastAddDevice</code> 的阻塞语义（等所有设备加入才能绑定/映射）严丝合缝。</p>
+</div>
+</div>
+<div class="card warning">
+<p><b>需要注意的边界</b>：CUDA 官方文档页面<b>没有</b>写明该 API 组引入的具体 CUDA 版本，也<b>没有</b>明文要求必须有 NVLink / NVSwitch。因此本页不对「哪个 CUDA 版本开始支持」「是否强制 NVSwitch」作断言——这些需要另行查证。</p>
+<p class="ref">来源：<a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MULTICAST.html" target="_blank">CUDA Driver API · Multicast Object Management</a></p>
+</div>
+</section>
+
+<section>
+<h2>专利网络：前案、被引与同门</h2>
+
+<h3>引用的前案（10 篇）</h3>
+<table>
+<thead><tr><th style="width:24%">文献</th><th style="width:16%">权利人</th><th>主题与关联</th></tr></thead>
+<tbody>
+<tr><td><a href="https://patents.google.com/patent/US20200159669A1/en" target="_blank"><b>US20200159669A1</b></a><br>2018-11-21</td><td><b>NVIDIA</b></td><td><b>Distributed address translation in a multi-node interconnect fabric</b>。最重要的一篇前案——它是本专利「中间地址 / fabric 线性地址 / link TLB」体系的直接技术基础。<span class="tag g">自家前案</span></td></tr>
+<tr><td><a href="https://patents.google.com/patent/US5331637A/en" target="_blank">US5331637A</a><br>1993</td><td>Bellcore</td><td>使用 core based trees 的多播路由。网络多播的经典前案，说明审查员把本案放在「多播」大类下检索。</td></tr>
+<tr><td><a href="https://patents.google.com/patent/US20220114096A1/en" target="_blank">US20220114096A1</a></td><td>Intel</td><td>多 tile 内存管理。与「一个地址空间跨多个计算 tile」直接相关。</td></tr>
+<tr><td><a href="https://patents.google.com/patent/US20210075633A1/en" target="_blank">US20210075633A1</a></td><td>Intel</td><td>用于<b>内存池复制</b>的数据包多播。与本案「预先复制」思路呼应。</td></tr>
+<tr><td><a href="https://patents.google.com/patent/US20220166705A1/en" target="_blank">US20220166705A1</a></td><td>HPE</td><td>Dragonfly 拓扑相关。</td></tr>
+<tr><td><a href="https://patents.google.com/patent/US20190146825A1/en" target="_blank">US20190146825A1</a></td><td>TidalScale</td><td>分布式虚拟化 / 内存管理。</td></tr>
+<tr><td><a href="https://patents.google.com/patent/US20160259680A1/en" target="_blank">US20160259680A1</a></td><td>Arm</td><td>地址转换相关。</td></tr>
+<tr><td colspan="3">其余：<a href="https://patents.google.com/patent/US20060256793A1/en" target="_blank">US20060256793A1</a>（Freescale）、<a href="https://patents.google.com/patent/US20170192901A1/en" target="_blank">US20170192901A1</a>（Knuedge）、<a href="https://patents.google.com/patent/US20220066955A1/en" target="_blank">US20220066955A1</a>（Qualcomm）</td></tr>
+</tbody>
+</table>
+
+<h3>被引用（1 篇）与同门专利</h3>
+<div class="grid g2">
+<div class="card highlight">
+<h4>US20260113211A1 · NVIDIA</h4>
+<p><b>Symmetric multicast communication for offload operations</b>（对称多播通信用于卸载操作）。优先权 <b>2024-10-17</b>，公开 <b>2026-04-23</b>。</p>
+<p style="margin-top:8px">这是目前唯一引用本专利的文献，且同样来自 NVIDIA。说明多播路线在 2024 年之后继续向<b>「对称多播 + 卸载」</b>方向演进——把通信操作从 SM 卸载出去，同时保持多播的对称语义。</p>
+<p class="ref"><a href="https://patents.google.com/patent/US20260113211A1/en" target="_blank">查看 US20260113211A1</a></p>
+</div>
+<div class="card highlight">
+<h4>US12346752B2 · NVIDIA</h4>
+<p><b>Efficient multi-device synchronization barriers using multicasting</b>（使用多播的高效多设备同步屏障），授权 <b>2025-07-01</b>。</p>
+<p style="margin-top:8px">这是 Google Patents「Similar Documents」中最值得注意的一篇：它把多播用在<b>同步屏障</b>上。回想本专利说明书里那句「屏障下所有设备等最慢的一次 load」——这两件专利正好一个解决<b>屏障内的数据搬运</b>，一个解决<b>屏障本身的实现</b>。</p>
+<p class="ref"><a href="https://patents.google.com/patent/US12346752B2/en" target="_blank">查看 US12346752B2</a></p>
+</div>
+</div>
+</section>
+
+<section>
+<h2>技术演进时间线</h2>
+<table>
+<thead><tr><th style="width:16%">时间</th><th style="width:26%">事件</th><th>意义</th></tr></thead>
+<tbody>
+<tr><td>2018-11-21</td><td>US20200159669A1 申请（NVIDIA）</td><td>多节点互连 fabric 的<b>分布式地址转换</b>——中间地址体系的起点</td></tr>
+<tr><td><b>2022-01-18</b></td><td><b>本专利申请</b></td><td>在既有 fabric 地址转换之上，加入<b>多播 VA + 反射 + 一致性约束</b></td></tr>
+<tr><td>2022-08-23 / 2023-01-10</td><td>CN / DE 同族申请</td><td>向中国与德国布局</td></tr>
+<tr><td>2022 年内</td><td>Hopper（sm_90）架构</td><td>硬件承载体就位</td></tr>
+<tr><td>PTX ISA 8.1</td><td><code>multimem.*</code> 指令族公开</td><td>专利 FIG. 2 的三条指令<b>落到 ISA</b>，要求 sm_90+</td></tr>
+<tr><td>2023-07-20</td><td>US20230229599A1 公开</td><td>宽范围版本权利要求公开</td></tr>
+<tr><td>2023-11 ~ 2024-08</td><td>三轮 non-final + <b>一次 final rejection</b></td><td>宽范围主张被驳回</td></tr>
+<tr><td>2024-10-17</td><td>US20260113211A1 优先权（NVIDIA）</td><td>演进到<b>对称多播 + 卸载</b></td></tr>
+<tr><td>2024-12</td><td>RCE 后重新审查</td><td>加入「应用映射指令」限定</td></tr>
+<tr><td><b>2025-06-10</b></td><td><b>US12326820B2 授权</b></td><td>多播地址转换获得保护</td></tr>
+<tr><td>2025-05-08</td><td>延续申请 US 19/202,282 提交</td><td>转向<b>反射行为</b>圈地</td></tr>
+<tr><td>2025-07-01</td><td>US12346752B2 授权</td><td>多播用于<b>同步屏障</b></td></tr>
+<tr><td>2025-08-28</td><td>US20250272248A1 公开</td><td>反射相关权利要求公开，<b>目前仍在审查</b></td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>影响分析</h2>
+<div class="grid g2">
+<div class="card highlight">
+<h4>对系统软件栈</h4>
+<p>多播把「集合通信」从<b>软件编排的多次点对点</b>下沉为<b>单条访存指令 + fabric 扇出</b>。这改变了通信库的分层：NCCL 之类的库不再只是「组织消息」，而是「选择合适的硬件原语」。当 <code>multimem</code> 可用时，all-reduce / broadcast / all-gather 的实现路径与不可用时完全不同。</p>
+</div>
+<div class="card info">
+<h4>对内存模型研究</h4>
+<p>这篇专利提出了一个此前少见的问题：<b>当 VA 可以是多个 PA 的别名时，弱序内存模型需要补什么规则</b>。它给出的答案（权限角色 + 路径非对称 + 转发限定 + 作用域化无竞争提示）本质上是<b>用架构约束换取语义等价</b>，而不是引入新的同步指令。这个思路对任何做多播/近内存归约的团队都有参考价值。</p>
+</div>
+<div class="card warning">
+<h4>对竞争者的专利风险</h4>
+<p>授权项要求<b>应用下发映射指令</b>，这给「驱动自动多播」留了缝隙；但说明书对替代方案的覆盖极广（提示 / 计数器 / 模式识别 / 故障迁移），且项 16 已把模式识别写入权利要求。加上<b>反射行为的延续申请仍在审查</b>，任何计划做「交换机内归约 + 一地址多目标」的厂商，都需要把这两件一起做 FTO 分析。</p>
+</div>
+<div class="card">
+<h4>对硬件架构的启示</h4>
+<p>专利明确交换机<b>可以在设备内部也可以在外部</b>、<b>可以有多个对应不同多播组</b>、且组<b>可以分层</b>。这实际上给出了一个可扩展的设计模板：<b>把归约能力放进交换层</b>，并允许递归组合。对做 scale-up 域互连的团队，这是一份很直接的架构参考——同时也是一份需要绕开的专利地图。</p>
+</div>
+</div>
+</section>
+
+</div>
+
+<!-- ============ TAB 9 ============ -->
+<div class="tab" id="t-ref">
+
+<section>
+<h2>参考文献与一手来源</h2>
+<p class="lead">本页所有事实性陈述均可回溯到以下来源。凡是来源未明确说明的内容（如 CUDA 多播 API 的引入版本、是否强制要求 NVSwitch、具体性能数字），本页均未作断言。</p>
+
+<h3>专利本体与同族</h3>
+<ul>
+<li><a href="https://patents.google.com/patent/US12326820B2/en" target="_blank"><b>US 12,326,820 B2</b> — Multicast and reflective memory behavior for memory model consistency</a>（授权本，全文含说明书、20 项权利要求、法律事件、CPC 分类）</li>
+<li><a href="https://patents.google.com/patent/US20230229599A1/en" target="_blank"><b>US 2023/0229599 A1</b></a> — 本案授权前公开版（用于范围收窄对比）</li>
+<li><a href="https://patents.google.com/patent/US20250272248A1/en" target="_blank"><b>US 2025/0272248 A1</b></a> — 延续申请（US 19/202,282），反射内存相关权利要求，审查中</li>
+<li><a href="https://patents.google.com/patent/CN116501667A/en" target="_blank"><b>CN 116501667 A</b></a> — 中国同族（CN202211013261.8）</li>
+<li><a href="https://patents.google.com/patent/DE102023100421A1/en" target="_blank"><b>DE 102023100421 A1</b></a> — 德国同族（DE102023100421.2）</li>
+</ul>
+
+<h3>NVIDIA 相关专利</h3>
+<ul>
+<li><a href="https://patents.google.com/patent/US20200159669A1/en" target="_blank"><b>US 2020/0159669 A1</b> — Distributed address translation in a multi-node interconnect fabric</a>（本案引用前案，fabric 线性地址体系基础）</li>
+<li><a href="https://patents.google.com/patent/US12346752B2/en" target="_blank"><b>US 12,346,752 B2</b> — Efficient multi-device synchronization barriers using multicasting</a>（同门专利，多播用于同步屏障）</li>
+<li><a href="https://patents.google.com/patent/US20260113211A1/en" target="_blank"><b>US 2026/0113211 A1</b> — Symmetric multicast communication for offload operations</a>（唯一引用本案的文献，NVIDIA，优先权 2024-10-17）</li>
+</ul>
+
+<h3>引用的其他前案</h3>
+<ul>
+<li><a href="https://patents.google.com/patent/US5331637A/en" target="_blank">US 5,331,637 A</a> — Bellcore，multicast routing using core based trees</li>
+<li><a href="https://patents.google.com/patent/US20220114096A1/en" target="_blank">US 2022/0114096 A1</a> — Intel，多 tile 内存管理</li>
+<li><a href="https://patents.google.com/patent/US20210075633A1/en" target="_blank">US 2021/0075633 A1</a> — Intel，用于内存池复制的数据包多播</li>
+<li><a href="https://patents.google.com/patent/US20220166705A1/en" target="_blank">US 2022/0166705 A1</a> — HPE，Dragonfly</li>
+<li><a href="https://patents.google.com/patent/US20190146825A1/en" target="_blank">US 2019/0146825 A1</a> — TidalScale</li>
+<li><a href="https://patents.google.com/patent/US20160259680A1/en" target="_blank">US 2016/0259680 A1</a> — Arm</li>
+<li><a href="https://patents.google.com/patent/US20060256793A1/en" target="_blank">US 2006/0256793 A1</a> — Freescale</li>
+<li><a href="https://patents.google.com/patent/US20170192901A1/en" target="_blank">US 2017/0192901 A1</a> — Knuedge</li>
+<li><a href="https://patents.google.com/patent/US20220066955A1/en" target="_blank">US 2022/0066955 A1</a> — Qualcomm</li>
+</ul>
+
+<h3>NVIDIA 官方技术文档</h3>
+<ul>
+<li><a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#multimem-addresses" target="_blank"><b>PTX ISA §8.2.3 — Multimem Addresses</b></a>（多播地址定义；「只有 multimem.* 操作有效，其他访问未定义」）</li>
+<li><a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#multimem-ld-reduce-multimem-st-multimem-red" target="_blank"><b>PTX ISA — multimem.ld_reduce / multimem.st / multimem.red</b></a>（语法、.op 集合、.scope、类型、PTX ISA 8.1 引入、要求 sm_90+）</li>
+<li><a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MULTICAST.html" target="_blank"><b>CUDA Driver API — Multicast Object Management</b></a>（cuMulticastCreate / AddDevice / BindMem / BindAddr / Unbind / GetGranularity，粒度与错误码）</li>
+<li><a href="https://docs.nvidia.com/cuda/parallel-thread-execution/" target="_blank">PTX ISA 完整文档</a></li>
+<li><a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/index.html" target="_blank">NCCL 用户指南</a>（NVLS 等算法选择相关）</li>
+</ul>
+
+<h3>方法说明</h3>
+<div class="card info">
+<p>本页的专利事实来自对 Google Patents 页面的<b>全文抓取与本地解析</b>（提取 <code>itemprop="claims"</code> 与 <code>itemprop="description"</code> 段落），而非摘要式二手转述，因此权利要求与说明书引文均为<b>原文</b>。审查历史来自专利页的 Legal Events 记录。PTX 与 CUDA 的引文来自 NVIDIA 官方文档原文。</p>
+<p style="margin-top:8px"><b>本页刻意未包含的内容</b>：任何未被上述来源支持的性能数字、任何关于 CUDA 多播 API 引入版本的推断、任何关于具体芯片型号多播能力的断言。</p>
+</div>
+</section>
+
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  <p><b>US 12,326,820 B2</b> 深度解读 · NVIDIA Corporation · 发明人 Glenn Alan Dearth、Daniel Joseph Lustig、Mark Hummel</p>
+  <p>申请 2022-01-18 · 授权 2025-06-10 · 生成于 2026-08-27 · 所有事实均可回溯至 <a href="#" onclick="document.querySelector('.nav button[data-tab=t-ref]').click();return false;">参考文献</a> 中的一手来源</p>
+</div>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('.nav button');
+  var tabs = document.querySelectorAll('.tab');
+  function show(id) {
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.remove('active');
+      if (tabs[i].id === id) { tabs[i].classList.add('active'); }
+    }
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].classList.remove('active');
+      if (buttons[j].getAttribute('data-tab') === id) { buttons[j].classList.add('active'); }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  for (var k = 0; k < buttons.length; k++) {
+    buttons[k].addEventListener('click', function () {
+      show(this.getAttribute('data-tab'));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

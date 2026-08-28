@@ -1,0 +1,2479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoE 算法与系统全景对比 · 特点、区别与硬件要求（MegaMoE / MoonEP / DisagMoE 等）</title>
+<style>
+  :root {
+    --nvidia-green: #76b900;
+    --nvidia-dark: #1a1a2e;
+    --nvidia-darker: #0f0f1a;
+    --card-bg: #16213e;
+    --card-bg2: #131c33;
+    --card-border: #1f3460;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0b0;
+    --accent-blue: #4fc3f7;
+    --accent-orange: #ffb74d;
+    --accent-red: #ef5350;
+    --accent-purple: #b39ddb;
+    --accent-cyan: #4dd0e1;
+    --accent-pink: #f48fb1;
+    --code-bg: #0d1117;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, sans-serif;
+    background: var(--nvidia-darker);
+    color: var(--text-primary);
+    line-height: 1.8;
+  }
+  .hero {
+    background: linear-gradient(135deg, #10203a 0%, #0a2a2a 45%, var(--nvidia-dark) 100%);
+    border-bottom: 3px solid var(--accent-cyan);
+    padding: 52px 40px 38px;
+    text-align: center;
+  }
+  .hero .eyebrow {
+    font-size: 0.82em; letter-spacing: 3px; color: var(--accent-cyan);
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .hero h1 {
+    color: var(--accent-cyan); font-size: 2.05em; margin-bottom: 12px;
+    letter-spacing: -0.5px; line-height: 1.35;
+  }
+  .hero .subtitle {
+    font-size: 1em; color: var(--text-secondary);
+    max-width: 940px; margin: 0 auto;
+  }
+  .badges { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .badge {
+    display: inline-block; background: rgba(77,208,225,0.12);
+    border: 1px solid var(--accent-cyan); color: var(--accent-cyan);
+    padding: 4px 14px; border-radius: 20px; font-size: 0.82em;
+  }
+  .badge.green { background: rgba(118,185,0,0.12); border-color: var(--nvidia-green); color: var(--nvidia-green); }
+  .badge.orange { background: rgba(255,183,77,0.1); border-color: var(--accent-orange); color: var(--accent-orange); }
+  .badge.purple { background: rgba(179,157,219,0.1); border-color: var(--accent-purple); color: var(--accent-purple); }
+  .badge.red { background: rgba(239,83,80,0.1); border-color: var(--accent-red); color: var(--accent-red); }
+
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,15,26,0.96); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--card-border);
+    padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  }
+  .nav button {
+    background: var(--card-bg); color: var(--text-secondary);
+    border: 1px solid var(--card-border); border-radius: 22px;
+    padding: 8px 16px; font-size: 0.88em; cursor: pointer;
+    font-family: inherit; transition: all .18s ease;
+  }
+  .nav button:hover { color: var(--text-primary); border-color: var(--accent-cyan); }
+  .nav button.active {
+    background: var(--accent-cyan); color: #06212a;
+    border-color: var(--accent-cyan); font-weight: 600;
+  }
+  .container { max-width: 1280px; margin: 0 auto; padding: 36px 24px 20px; }
+  .tab { display: none; animation: fade .25s ease; }
+  .tab.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+
+  section { margin-bottom: 44px; }
+  h2 {
+    color: var(--accent-cyan); font-size: 1.55em; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--card-border);
+  }
+  h3 { color: var(--nvidia-green); font-size: 1.18em; margin: 26px 0 12px; }
+  h4 { color: var(--accent-orange); font-size: 1.03em; margin: 18px 0 8px; }
+  p { margin-bottom: 14px; }
+
+  .card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 22px 24px; margin: 16px 0;
+  }
+  .card.highlight { border-left: 4px solid var(--nvidia-green); }
+  .card.warning { border-left: 4px solid var(--accent-orange); background: rgba(255,183,77,0.05); }
+  .card.danger { border-left: 4px solid var(--accent-red); background: rgba(239,83,80,0.05); }
+  .card.info { border-left: 4px solid var(--accent-blue); background: rgba(79,195,247,0.05); }
+  .card.analysis { border-left: 4px solid var(--accent-purple); background: rgba(179,157,219,0.06); }
+  .card h4:first-child, .card h3:first-child { margin-top: 0; }
+
+  .syscard {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-left: 4px solid var(--accent-cyan);
+    border-radius: 10px; padding: 20px 24px; margin: 18px 0;
+  }
+  .syscard.train { border-left-color: var(--nvidia-green); }
+  .syscard.infer { border-left-color: var(--accent-orange); }
+  .syscard.lib { border-left-color: var(--accent-purple); }
+  .syscard .sysname {
+    font-size: 1.15em; font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px;
+  }
+  .syscard.train .sysname { color: var(--nvidia-green); }
+  .syscard.infer .sysname { color: var(--accent-orange); }
+  .syscard.lib .sysname { color: var(--accent-purple); }
+  .syscard .sysmeta { font-size: 0.85em; color: var(--text-secondary); margin-bottom: 14px; }
+  .syscard dl { margin: 0; }
+  .syscard dt {
+    color: var(--accent-blue); font-size: 0.86em; font-weight: 600;
+    margin-top: 12px; letter-spacing: .3px;
+  }
+  .syscard dd { margin: 2px 0 0 0; }
+
+  .tag {
+    display: inline-block; font-size: 0.72em; padding: 2px 8px; border-radius: 4px;
+    margin-right: 6px; vertical-align: middle; letter-spacing: .5px; white-space: nowrap;
+  }
+  .tag.fact { background: rgba(118,185,0,0.18); color: var(--nvidia-green); border: 1px solid rgba(118,185,0,0.4); }
+  .tag.infer { background: rgba(179,157,219,0.18); color: var(--accent-purple); border: 1px solid rgba(179,157,219,0.4); }
+  .tag.na { background: rgba(239,83,80,0.15); color: var(--accent-red); border: 1px solid rgba(239,83,80,0.35); }
+  .tag.tr { background: rgba(118,185,0,0.15); color: var(--nvidia-green); border: 1px solid rgba(118,185,0,0.35); }
+  .tag.inf { background: rgba(255,183,77,0.15); color: var(--accent-orange); border: 1px solid rgba(255,183,77,0.35); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 14px; margin: 18px 0; }
+  .kpi {
+    background: var(--card-bg2); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 18px; text-align: center;
+  }
+  .kpi .num { font-size: 1.6em; color: var(--accent-cyan); font-weight: 700; line-height: 1.2; }
+  .kpi .num.green { color: var(--nvidia-green); }
+  .kpi .num.orange { color: var(--accent-orange); }
+  .kpi .num.purple { color: var(--accent-purple); }
+  .kpi .lbl { font-size: 0.84em; color: var(--text-secondary); margin-top: 6px; }
+
+  pre {
+    background: var(--code-bg); border: 1px solid #30363d; border-radius: 8px;
+    padding: 16px 20px; overflow-x: auto;
+    font-family: 'SF Mono','Fira Code',Menlo,monospace;
+    font-size: 0.85em; line-height: 1.6; margin: 12px 0; color: #c9d1d9;
+  }
+  code {
+    font-family: 'SF Mono','Fira Code',Menlo,monospace; font-size: 0.9em;
+    background: rgba(110,118,129,0.16); padding: 2px 6px; border-radius: 4px; color: #e6edf3;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.87em; }
+  th {
+    background: rgba(77,208,225,0.13); color: var(--accent-cyan);
+    padding: 10px 11px; text-align: left; border-bottom: 2px solid var(--accent-cyan);
+    vertical-align: top; white-space: nowrap;
+  }
+  td { padding: 9px 11px; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .tbl-wrap { overflow-x: auto; }
+  table.compact { font-size: 0.82em; }
+  table.compact th, table.compact td { padding: 7px 9px; }
+
+  .diagram {
+    background: var(--code-bg); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 20px; margin: 18px 0;
+    font-family: 'SF Mono',Menlo,monospace; font-size: 0.78em; line-height: 1.45;
+    overflow-x: auto; white-space: pre; color: #9fb4c7;
+  }
+  .diagram .cap { color: var(--accent-orange); }
+
+  ul, ol { margin: 12px 0; padding-left: 26px; }
+  li { margin-bottom: 7px; }
+
+  blockquote {
+    border-left: 4px solid var(--accent-purple); background: rgba(179,157,219,0.08);
+    padding: 12px 20px; margin: 16px 0; border-radius: 0 8px 8px 0; color: var(--text-secondary);
+  }
+  .src {
+    display: block; font-size: 0.82em; color: var(--text-secondary);
+    opacity: 0.85; margin-top: 8px; font-style: normal;
+  }
+  strong { color: var(--nvidia-green); }
+  em { color: var(--accent-orange); font-style: normal; }
+  a { color: var(--accent-blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .ref { font-size: 0.8em; color: var(--accent-cyan); }
+
+  details {
+    background: var(--card-bg2); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 12px 18px; margin: 10px 0;
+  }
+  details summary { cursor: pointer; color: var(--accent-blue); font-weight: 600; outline: none; }
+  details[open] summary { color: var(--accent-cyan); margin-bottom: 10px; }
+
+  .footer {
+    text-align: center; padding: 40px 24px; color: var(--text-secondary);
+    font-size: 0.85em; border-top: 1px solid var(--card-border); margin-top: 50px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">MoE Algorithms &amp; Systems Landscape</div>
+  <h1>MoE 算法与系统全景对比：特点、区别与硬件要求</h1>
+  <div class="subtitle">
+    从 <strong>模型侧架构</strong>（细粒度专家 / 共享专家 / 路由与负载均衡）到
+    <strong>训练系统</strong>（MegaScale-MoE、DisagMoE、COMET、UniEP、Mixture-of-Kittens）、
+    <strong>推理服务系统</strong>（MegaScale-Infer、Janus、FinDEP）与
+    <strong>EP 通信库</strong>（DeepEP、MoonEP、MegaMoE），
+    逐个给出核心机制、并行与通信模式、以及**论文实测的硬件配置**。
+    所有数字均标注来源与基线，未公开的一律标注为未公开。
+  </div>
+  <div class="badges">
+    <span class="badge">27 个系统 / 模型</span>
+    <span class="badge green">训练侧 10 项</span>
+    <span class="badge orange">推理侧 6 项</span>
+    <span class="badge purple">通信库 4 项</span>
+    <span class="badge">模型架构 10+</span>
+    <span class="badge red">含命名考证：MegaMoE / MoonMoE / DisagMoE</span>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="active" data-tab="t-name">① 命名考证与速览</button>
+  <button data-tab="t-taxo">② 算法分类框架</button>
+  <button data-tab="t-model">③ 模型架构对比</button>
+  <button data-tab="t-train">④ 训练系统</button>
+  <button data-tab="t-infer">⑤ 推理服务系统</button>
+  <button data-tab="t-lib">⑥ EP 通信库</button>
+  <button data-tab="t-hw">⑦ 硬件要求总矩阵</button>
+  <button data-tab="t-pick">⑧ 横向对比与选型</button>
+  <button data-tab="t-ref">⑨ 参考文献</button>
+</div>
+
+<div class="container">
+
+<!-- ==================== TAB 1 ==================== -->
+<div class="tab active" id="t-name">
+
+<section>
+<h2>一、先把三个名字对上号</h2>
+
+<p>你提到的三个名字，指向的其实是<strong>三个完全不同层次</strong>的东西——这本身就说明"MoE 算法"这个词在今天已经横跨了模型架构、并行系统、通信库三层。逐个考证如下：</p>
+
+<div class="syscard lib">
+  <div class="sysname">MegaMoE ✅ 存在</div>
+  <div class="sysmeta">= DeepSeek 的<strong>融合 MoE MegaKernel</strong>，随 DeepSeek-V4 技术报告发布，作为 DeepGEMM 的组件开源</div>
+  <dl>
+  <dt>它是什么</dt>
+  <dd>把 EP 的多个阶段（Dispatch → Linear-1 → Linear-2 → Combine）融合进<strong>单个 persistent CUDA kernel</strong>，让 NVLink 通信藏在 Tensor Core 计算背后。
+  <span class="tag fact">论文原文</span>DeepSeek-V4 报告 §3.1 列的是 <strong>4 个阶段</strong>；DeepGEMM README 描述为 <strong>5 段</strong>（把 SwiGLU 单列）。</dd>
+  <dt>关键机制</dt>
+  <dd><strong>Expert Wave（专家波次）</strong>：把专家分批，某个 wave 的通信一完成就立刻开算，稳态下"当前 wave 计算 + 下一 wave token 传输 + 已完成专家结果回传"三者并发。
+  与 COMET 的"Dispatch↔Linear-1、Linear-2↔Combine 分别重叠"相比粒度更粗但覆盖更全。</dd>
+  <dt>成立前提</dt>
+  <dd><span class="tag fact">论文原文</span>每个 token-expert 对传 <code>3h</code> 字节（FP8 dispatch + BF16 combine）对应 <code>6hd</code> FLOPs，故只要
+  <strong>算力/带宽比 ⩽ 2d = 6144 FLOPs/Byte</strong>，计算就是瓶颈、通信可被完全隐藏——这是它敢用较低互联带宽的理论依据。</dd>
+  <dt>硬件要求</dt>
+  <dd>DeepGEMM 整体要求 <strong>SM90 或 SM100</strong>；Mega MoE 路径<strong>仅支持 FP8×FP4</strong>、需 PyTorch ≥ 2.9、需<strong>对称内存（symmetric memory）多进程启动</strong>。
+  <span class="tag infer">社区分析</span>PR #316 评论区指出代码 arch gate 为 <code>>= 1000</code>（即 SM100/Blackwell）且重度使用 TMEM。SM90 移植见 open PR #323（改用 FP8 权重 + FP32 scale，限制 <code>intermediate_hidden ≤ 4096</code>）。
+  <span class="tag na">未公开</span>官方 benchmark 未披露 GPU 型号；<strong>无 NVL72 硬性要求</strong>（benchmark 为节点内 EP8）。</dd>
+  <dt>性能</dt>
+  <dd>论文：通用推理 <strong>1.50–1.73×</strong>，RL rollout / 高速 agent serving 场景<strong>最高 1.96×</strong>（基线为"强非融合实现"）。
+  PR #316 实测（EP8）：V4-Pro 384 专家 top-6，batch 32768 达 <strong>2438 TFLOPS</strong>（1.54×）。已在 NVIDIA GPU 与<strong>华为昇腾 NPU</strong>两个平台验证。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/html/2606.19348v1" target="_blank">DeepSeek-V4 技术报告 arXiv:2606.19348</a> ｜
+  <a href="https://github.com/deepseek-ai/DeepGEMM" target="_blank">DeepGEMM</a> ｜
+  <a href="https://github.com/deepseek-ai/DeepGEMM/pull/304" target="_blank">PR #304 实现</a> ｜
+  <a href="https://github.com/deepseek-ai/DeepGEMM/pull/316" target="_blank">PR #316 benchmark</a></dd>
+  </dl>
+</div>
+
+<div class="syscard" style="border-left-color:var(--accent-red)">
+  <div class="sysname" style="color:var(--accent-red)">MoonMoE ❌ 不存在 → 你要找的应该是 MoonEP</div>
+  <div class="sysmeta">两轮定向检索（<code>"MoonMoE"</code>、<code>"MoonMoE" MoE LLM Moonshot</code>）只返回同名服装品牌的电商页面，<strong>无任何 AI / 系统领域命中</strong></div>
+  <dl>
+  <dt>最可能的指代对象</dt>
+  <dd><strong><a href="https://github.com/MoonshotAI/MoonEP" target="_blank">MoonEP</a></strong>（Moonshot AI 官方仓库）。判断依据：<code>Moon-</code> 前缀、MoE 专家并行领域、与 MegaMoE 的对照关系（同为 MoE kernel / 通信组件）三点全部吻合。
+  官方定位为 <em>"A Perfectly Balanced Expert Parallelism Library via Dynamic Redundant Experts"</em>。</dd>
+  <dt>MoonEP 核心创新</dt>
+  <dd><strong>动态冗余专家</strong>：不论路由多么倾斜，都保证<em>每个 rank 恰好收到 <code>S × K</code> 个 token</em>。
+  配合在线近优 GPU planning kernel、zero-copy 与<strong>静态 shape</strong>（从而消除逐层 MoE 的 host 同步）。
+  用 <em>maxvio</em> 度量不均衡；权重存放在单个连续对称内存张量 <code>[E+B, H, H']</code> 中；训练要求 <code>B = E/R</code>，推理推荐 <code>B = 3–4</code>。</dd>
+  <dt>相对 DeepEP v2 的优势</dt>
+  <dd><span class="tag fact">官方 README</span>在 H20 / EP=8 上，通信时间在<strong>所有不均衡等级下都低于 DeepEP v2</strong>，且随 maxvio 增长"几乎持平"，而 DeepEP v2 "稳步退化"；
+  端到端训练中 DeepEP 在高不均衡下会 <strong>OOM</strong>，MoonEP 不会。</dd>
+  <dt>硬件要求</dt>
+  <dd>NVIDIA GPU + NVLink + 对称内存 / VMM；README 提到 <em>"Zhenwu PPU (under review)"</em>。致谢中列出 DeepEP、Echo、UltraEP、阿里 AcclEP。</dd>
+  <dt>次可能对象</dt>
+  <dd>若你实际指的是<strong>模型侧</strong>，那应是 Moonshot 的 <strong>Kimi 系列 MoE</strong>（K2 / K2.6 / K3，见"模型架构对比"标签）。
+  相关基建仓库：<a href="https://github.com/MoonshotAI/Moonlight" target="_blank">Moonlight / Muon 优化器</a>、
+  <a href="https://github.com/MoonshotAI/MoBA" target="_blank">MoBA</a>、
+  <a href="https://github.com/MoonshotAI/FlashKDA" target="_blank">FlashKDA</a>、
+  <a href="https://github.com/MoonshotAI/checkpoint-engine" target="_blank">checkpoint-engine</a>。
+  <span class="tag infer">提示</span>Mooncake 在 kvcache-ai 组织下，<strong>不在</strong> MoonshotAI 组织下。</dd>
+  </dl>
+</div>
+
+<div class="syscard train">
+  <div class="sysname">DisagMoE ✅ 存在，但它是<strong>训练</strong>系统而非推理系统</div>
+  <div class="sysmeta">全名 <em>"DisagMoE: Computation-Communication overlapped MoE Training via Disaggregated AF-Pipe Parallelism"</em>，arXiv:2605.11005，2026-05-10 提交，13 位作者，基于 Megatron-LM 实现</div>
+  <dl>
+  <dt>核心创新</dt>
+  <dd>把 <strong>attention 层与 FFN（专家）层部署到不相交的 GPU 组</strong>上（AF-Pipe = Attention-FFN Pipeline），
+  用<strong>单向 many-to-many 多阶段流水线替代双向 All-to-All</strong>，再用
+  <strong>计算-通信 roofline 模型</strong>在两组之间切分算力与网络带宽。</dd>
+  <dt>为什么要这么做</dt>
+  <dd><span class="tag fact">论文原文</span>动机数据很有说服力：Qwen-3 在 8 节点上，序列从 4K 涨到 32K 时
+  <strong>attention 计算占比 28.38% → 50.26%</strong>，而 FFN 从 19.22% 降到 13.96%。
+  两类层的"计算/通信比"天生失衡，把它们放在同一批 GPU 上共用一套并行度，必然有一侧被拖累。</dd>
+  <dt>Roofline 如何定配比</dt>
+  <dd>两组各占一半 NIC 以平衡进出带宽，有效拐点分裂为 <code>Î^A = 2m/(m+n)·Î</code>、<code>Î^F = 2n/(m+n)·Î</code>。
+  两阶段 MILP（Gurobi）：先最小化 <code>max(𝒯a, 𝒯f)</code>，并列时最大化 MFU，再局部搜索。
+  <strong>消融结论：16K 序列下 attention:FFN = 16:10 最优</strong>（比同构 16:16 快 1.29×），而 4K 下 16:16 才最优——说明最优配比强依赖序列长度。</dd>
+  <dt>硬件</dt>
+  <dd>16 节点 × 8×<strong>H800 (80GB)</strong> = 128 卡，每节点 168 CPU + <strong>ConnectX-7 8×400 GbE</strong>，节点内 NVLink 400 GB/s。
+  <span class="tag na">注意</span>论文内部规模表述不一致（profiling 写 64 卡/8 节点，实验写 128 卡，结论写 8–16 节点）；NVLink 代数与 MFU 绝对值未公开。</dd>
+  <dt>性能</dt>
+  <dd>vs Megatron-LM 1F1B interleaved overlap <strong>最高 1.81×</strong>；vs Tutel / COMET <strong>1.2–1.5×</strong>；vs DualPipe 1.05–1.13×。
+  未重叠通信量削减：vs Tutel 88%、vs COMET 75%、vs DualPipe 45%。流水线气泡约为基线的 <strong>1/4</strong>。
+  关键背景数字：<strong>All-to-All 占比从单节点 22% 升到 8 节点近 78%</strong>。</dd>
+  <dt>测试模型</dt>
+  <dd>DeepSeek-MoE（28 层 / 64 专家 / top-4）、GPT-OSS-120B（36 层 / 128 专家 / top-4）、Qwen3-235B-A22B（94 层 / 128 专家 / top-8），序列 4K–32K。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/abs/2605.11005" target="_blank">arXiv:2605.11005</a> ｜ <a href="https://arxiv.org/html/2605.11005" target="_blank">HTML 全文</a></dd>
+  </dl>
+</div>
+</section>
+
+<section>
+<h2>二、全景速览：MoE 优化分成几层打</h2>
+
+<div class="diagram"><span class="cap">图 A · MoE 技术栈的四层与代表工作</span>
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 第 ① 层：模型架构（决定"要传多少数据"）                                      │
+│   细粒度专家 · 共享专家 · top-k 大小 · 稀疏度 · 注意力(MLA/GQA/KDA/线性)      │
+│   DeepSeek-V3(256+1,top8) · Kimi K3(896+2,top16) · Qwen3(128,top8,无shared) │
+│   Mixtral(8,top2) · Llama4 Maverick(128 routed+1 shared,top1) · GLM-4.5(160+1)│
+│   ★ 杠杆最大：稀疏度与 top-k 直接决定 All-to-All 流量的数量级                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 第 ② 层：并行策略与放置（决定"数据往哪传"）                                   │
+│   A. 同构共置：EP+TP+PP+DP+SP+CP 组合  → Megatron-Core MoE / MegaScale-MoE   │
+│   B. 异构分离：attention 与 FFN 拆到不同 GPU 组                              │
+│        训练侧 → DisagMoE(AF-Pipe)                                            │
+│        推理侧 → MegaScale-Infer · Janus · FinDEP · (vLLM AFD 已停滞)         │
+│   ★ 分歧点：把 attention/FFN 的算通比失衡"就地重叠"还是"分开部署"             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 第 ③ 层：计算-通信重叠（决定"传输能否被藏住"）                                │
+│   粗粒度(算子间重排) → 细粒度(tile 级) → MegaKernel(单 kernel 全融合)        │
+│   COMET(tile+shared tensor 分解) · UniEP(双 MegaKernel+自动搜索)             │
+│   MegaMoE(expert wave) · Mixture-of-Kittens(pull/push+CLC) · HyperParallel(昇腾)│
+│   ★ 演进方向：从"多 kernel + 多 stream"走向"单 persistent kernel + 角色特化" │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 第 ④ 层：EP 通信库与负载均衡（决定"传输本身多快、多均衡"）                    │
+│   DeepEP(normal/low-latency 双核) · MoonEP(动态冗余专家保证完美均衡)          │
+│   M2N(MegaScale-Infer 自研) · NVSHMEM / NCCL Gin / StepMesh                  │
+│   ★ 2026 年新焦点：不再只追峰值带宽，而是追"倾斜路由下的带宽稳定性"           │
+└─────────────────────────────────────────────────────────────────────────────┘
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="num orange">78%</div><div class="lbl">All-to-All 在 8 节点 EP 下<br>占执行时间比例（DisagMoE 实测）</div></div>
+  <div class="kpi"><div class="num green">1.5–2.4×</div><div class="lbl">主流重叠系统的典型<br>MoE 层加速区间</div></div>
+  <div class="kpi"><div class="num">1.08–1.41×</div><div class="lbl">但端到端加速通常大幅缩水<br>（attention/dense 部分未优化）</div></div>
+  <div class="kpi"><div class="num purple">27.89%</div><div class="lbl">MegaScale-MoE 在 1440×H800 上<br>352B 模型的 MFU（已属高水平）</div></div>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>读完全部资料后最值得记住的四条判断</h4>
+<ol style="margin-bottom:0">
+<li><strong>"MoE 算法"的竞争重心已经从模型侧转到系统侧。</strong>模型架构层面已经收敛出相当一致的配方：细粒度专家 + 1~2 个共享专家 + sigmoid gating + 无辅助损失的负载均衡。真正拉开差距的是 EP 通信怎么藏、怎么均衡。</li>
+<li><strong>端到端加速比远小于 MoE 层加速比，这是所有论文的共同真相。</strong>HyperParallel-MoE 的 MoE-FFN 模块加速 1.58×，端到端只有 1.08–1.09×，因为 attention 与 dense 部分没动。看论文时必须区分"模块级"与"端到端"。</li>
+<li><strong>2026 年的分水岭是 MegaKernel 化。</strong>COMET（tile 级重叠、多 kernel）→ UniEP / MegaMoE / Mixture-of-Kittens（单 persistent kernel、warp/threadblock 角色特化、device 侧调度）。副产物是<em>逐位确定性</em>成了新卖点（UniEP 与 Mixture-of-Kittens 都强调，并点名 COMET 不可逐位复现）。</li>
+<li><strong>硬件要求的真正门槛不是算力而是"单一 NVLink 域的大小"。</strong>MegaScale-MoE 把 SP=EP=8 严格对齐 NVLink 域；Megatron-Core 官方建议 EP×TP 必须放进单节点；Mixture-of-Kittens 直接依赖 NVL72 的 72-GPU 单域。这条约束决定了架构选择，比 TFLOPS 更关键。</li>
+</ol>
+</div>
+
+<div class="card warning">
+<p style="margin:0"><span class="tag fact">标注约定</span>
+本报告中 <span class="tag fact">论文原文</span> / <span class="tag fact">官方文档</span> 表示数字直接来自论文或官方仓库页面；
+<span class="tag infer">分析</span> 表示笔者推断；<span class="tag na">未公开</span> 表示原文未给出该数据——
+<strong>凡未公开处一律不做估算</strong>。所有加速比都标注了对比基线，因为不同论文的基线差异极大，跨论文直接比较倍数是没有意义的。
+</p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 2 ==================== -->
+<div class="tab" id="t-taxo">
+
+<section>
+<h2>三、MoE 算法的分类框架：五个正交维度</h2>
+
+<p>"各种 MoE 算法的区别"如果只列模型名字，会看成一堆无序的参数表。真正有效的读法是把 MoE 拆成<strong>五个相互正交的设计维度</strong>——任何一个模型都是这五个维度上的一次取值组合，而<em>每个维度都会以不同方式反作用于硬件需求</em>。这是本报告后面所有对比表的骨架。</p>
+
+<div class="diagram"><span class="cap">图 B · MoE 层的数据流与五个设计维度的作用位置</span>
+
+                    输入 token 隐藏态 x  (维度 h)
+                              │
+                    ┌─────────┴─────────┐
+                    │                   │
+              ┌─────▼─────┐      ┌──────▼──────┐
+              │  Router   │      │ Shared Expert│ ◄── 维度③ 是否设常开专家
+              │  (Gating) │      │  (always on) │     (DeepSeek/Llama4/GLM 有,
+              └─────┬─────┘      └──────┬──────┘      Qwen3/Mixtral 无)
+                    │                   │
+        维度① 路由机制 ──┤ softmax/sigmoid  │
+        维度② 负载均衡 ──┤ aux-loss / bias  │
+                    │                   │
+        ┌───────────┼───────────┐       │
+        ▼           ▼           ▼       │
+   ┌─────────┐ ┌─────────┐ ┌─────────┐  │
+   │Expert 1 │ │Expert 2 │ │Expert N │  │ ◄── 维度④ 专家粒度
+   │ (d_ff') │ │ (d_ff') │ │ (d_ff') │  │     N 大 & d_ff' 小 = 细粒度
+   └────┬────┘ └────┬────┘ └────┬────┘  │
+        └───────────┼───────────┘       │
+                    │  只有 top-k 个被激活 ◄── 维度⑤ 稀疏度 (k/N)
+                    ▼                   │
+              加权求和 ◄─────────────────┘
+                    │
+                    ▼  输出
+
+   ┌── 各维度对硬件的传导路径 ───────────────────────────────────────────┐
+   │ 维度① 路由机制 → 是否需要 host 同步 / 动态 shape → kernel 能否融合   │
+   │ 维度② 负载均衡 → 倾斜程度 → 单卡显存峰值与 All-to-All 尾延迟         │
+   │ 维度③ 共享专家 → 一部分计算变成纯本地 GEMM → 天然的重叠掩护对象      │
+   │ 维度④ 专家粒度 → 单个 GEMM 的 M 维变小 → Tensor Core 效率与 kernel 数 │
+   │ 维度⑤ 稀疏度   → k·h 直接决定 All-to-All 字节数 → 互联带宽下限       │
+   └────────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>维度① 路由机制：谁选谁</h3>
+
+<p>路由是 MoE 唯一的"算法核心"，其余都是工程。按<strong>选择方向</strong>与<strong>是否可微</strong>可以分成五类，它们对系统的友好程度差异极大：</p>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>路由机制</th><th>代表工作</th><th>选择方向</th><th>是否丢 token</th><th>负载是否天然均衡</th><th>对系统的影响</th></tr></thead>
+<tbody>
+<tr><td><strong>Token-Choice top-k</strong><br>（业界唯一主流）</td><td><a href="https://arxiv.org/abs/2006.16668" target="_blank">GShard</a>、<a href="https://arxiv.org/abs/2101.03961" target="_blank">Switch</a>、Mixtral、DeepSeek 系、Qwen3 系</td><td>token 选专家</td><td>会（超 capacity 即丢）</td><td>否，需额外手段</td><td>动态 shape、需要 all-to-all 前的 host 同步或 CPU-free 设计</td></tr>
+<tr><td><strong>Expert-Choice top-k</strong></td><td><a href="https://arxiv.org/abs/2202.09368" target="_blank">Expert Choice Routing</a>（Google）</td><td>专家选 token</td><td>不丢，但 token 可能 0 次被选</td><td><strong>是</strong>（每专家固定收 k 个）</td><td>shape 静态、系统极友好，但破坏自回归因果性，难用于 decoder LM</td></tr>
+<tr><td><strong>确定性哈希</strong></td><td><a href="https://arxiv.org/abs/2106.04426" target="_blank">Hash Layers</a></td><td>按 token id 查表</td><td>不丢</td><td>近似均衡</td><td>零路由开销、完全静态，但质量弱于学习式路由</td></tr>
+<tr><td><strong>最优分配 / 匈牙利-Sinkhorn</strong></td><td><a href="https://arxiv.org/abs/2103.16716" target="_blank">BASE Layers</a>、Sinkhorn 路由</td><td>全局线性分配</td><td>不丢</td><td><strong>是</strong>（严格均衡）</td><td>需全局求解，训练可用、推理不可用</td></tr>
+<tr><td><strong>Soft / 全可微</strong></td><td><a href="https://arxiv.org/abs/2308.00951" target="_blank">Soft MoE</a>、Dense-MoE</td><td>加权融合全部专家</td><td>不丢</td><td>是</td><td>无稀疏收益，FLOPs 不省，主要用于视觉与小模型</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>为什么大模型全都选了系统最不友好的那一种</h4>
+<p style="margin-bottom:0">Expert-Choice、BASE、Hash 三种在<em>系统层面</em>都比 token-choice top-k 好得多——静态 shape、无需 host 同步、天然均衡，几乎是 MegaKernel 化的理想输入。但主流 decoder-only LLM 依然全部使用 token-choice，原因是：Expert-Choice 需要看到整个 batch 内所有 token 才能挑选，<strong>违反自回归因果性</strong>，逐 token decode 阶段根本无法实现；BASE 的全局分配在推理时无从下手；Hash 牺牲了路由的语义。<br>
+这就是整个 MoE 系统领域存在的根本原因：<strong>算法层选了对质量最优、对系统最恶劣的方案，代价被完整地转移给了系统层</strong>。后面几个标签里所有的重叠、均衡、MegaKernel 技巧，本质都在偿还这一笔债。</p>
+</div>
+
+<h3>维度② 负载均衡：从辅助损失到无辅助损失</h3>
+
+<p>token-choice 会自我强化——被选得多的专家训练得更好，于是被选得更多，最终坍缩到少数专家。三代解法：</p>
+
+<h4>第一代：辅助损失（GShard / Switch，2020–2021）</h4>
+
+<p>在主损失外加一项，惩罚"路由概率"与"实际分配比例"的乘积和：</p>
+
+<pre><code>L_aux = alpha * N * sum_{i=1..N} ( f_i * P_i )
+
+  N     = 专家数
+  f_i   = 分配给专家 i 的 token 比例（实际频率，不可微）
+  P_i   = 路由器给专家 i 的平均概率（可微，梯度从这里回传）
+  alpha = 权重系数
+</code></pre>
+
+<p><span class="tag fact">论文原文</span>GShard 与 Switch Transformer 都取 <code>alpha = 0.01</code>。这个乘积形式很巧妙：<code>f_i</code> 不可微只当常数，梯度全部经 <code>P_i</code> 回传，效果是把概率质量从过热专家上推走。<span class="tag infer">代价</span>它是一项<strong>与语言建模目标直接冲突的正则</strong>——调大则均衡但掉质量，调小则质量好但严重倾斜。</p>
+
+<h4>第二代：Expert Capacity + Token Dropping</h4>
+
+<p>给每个专家设容量上限 <code>C = capacity_factor * (T * k / N)</code>，超出的 token 直接跳过该专家（走残差）。<span class="tag infer">分析</span>这是纯工程兜底：它保证了<strong>静态 shape 与显存上界</strong>，代价是训练/推理不一致且丢 token。capacity_factor 通常取 1.0–1.25，是典型的"质量换确定性"旋钮。现代大模型（DeepSeek-V3 起）在训练中已<strong>不丢 token</strong>。</p>
+
+<h4>第三代：无辅助损失（Aux-Loss-Free，2024 起成为主流）</h4>
+
+<p>思路是把"均衡"从损失函数里彻底拿掉，改成对<strong>路由打分加一个可动态调节的偏置</strong>，且该偏置<em>只参与 top-k 的选择、不参与最终加权</em>：</p>
+
+<pre><code>选择阶段:  top_k_indices = TopK( s_i + b_i )        # b_i 影响谁被选中
+加权阶段:  y = sum_{i in topk} ( s_i * Expert_i(x) )  # 权重仍用原始 s_i, 不含 b_i
+
+偏置更新:  专家 i 过载 -> b_i -= u
+          专家 i 欠载 -> b_i += u        (u = 更新速度, 无梯度)
+</code></pre>
+
+<p><span class="tag fact">论文原文</span>出自 <a href="https://arxiv.org/abs/2408.15664" target="_blank">Auxiliary-Loss-Free Load Balancing Strategy for MoE（arXiv:2408.15664）</a>，在 <a href="https://arxiv.org/abs/2412.19437" target="_blank">DeepSeek-V3</a> 中大规模落地。它的优势在于<strong>梯度完全干净</strong>——均衡不再向模型参数注入任何与语言建模冲突的梯度，只是在选择环节做了一次无梯度的"配额调度"。这一条已成为 2025–2026 年新模型的默认配方（具体采用清单见下一标签）。</p>
+
+<div class="card info">
+<h4><span class="tag fact">要点</span>负载均衡的三个层次不要混淆</h4>
+<ul style="margin-bottom:0">
+<li><strong>训练时的算法均衡</strong>：aux-loss / bias 调节，目的是让所有专家都被训练到。作用于模型质量。</li>
+<li><strong>训练时的系统均衡</strong>：capacity、drop-and-pad、以及 sequence-wise 而非 batch-wise 的均衡约束。作用于显存与吞吐。</li>
+<li><strong>推理时的部署均衡</strong>：EPLB（专家并行负载均衡器）、冗余专家复制、MoonEP 的动态冗余专家。<em>此时模型权重已固定，无法再改路由分布，只能改专家的物理摆放</em>。这是 2026 年最活跃的战场——因为它是唯一一个"不动模型就能拿到收益"的层次。</li>
+</ul>
+</div>
+
+<h3>维度③ 共享专家：一半是质量设计，一半是系统设计</h3>
+
+<p><a href="https://arxiv.org/abs/2401.06066" target="_blank">DeepSeekMoE（arXiv:2401.06066）</a>提出的两大支柱之一。设 1～2 个<strong>对所有 token 恒定激活</strong>的专家，用来承载通用知识，让路由专家专注差异化，缓解"知识冗余"。</p>
+
+<p><span class="tag infer">分析</span>但它在系统上的价值常被低估：共享专家的计算<strong>完全不需要 All-to-All</strong>（数据本来就在本地），因此它是一块天然的、时长可预测的<em>本地计算</em>，正好可以用来掩护路由专家的通信。几乎所有重叠系统都会显式利用这一点。反过来，Qwen3 系列刻意<strong>不设</strong>共享专家（明确列为与 Qwen2.5-MoE 的差异），意味着它少了这块免费的掩护物，对通信重叠的要求更高。</p>
+
+<h3>维度④ 专家粒度：细粒度化的收益与账单</h3>
+
+<p>在总参数量不变的前提下，把每个专家的中间维度 <code>d_ff'</code> 切小、专家数 <code>N</code> 等比放大、<code>k</code> 同步放大。收益是<strong>组合数爆炸式增长</strong>：</p>
+
+<pre><code>Mixtral 8x7B      : N=8,   k=2   -> C(8,2)   = 28 种专家组合
+DeepSeek-V3       : N=256, k=8   -> C(256,8) ~ 4.1e14 种组合
+</code></pre>
+
+<p>同样的激活参数量，表达能力天差地别。<span class="tag infer">但账单在系统侧</span>：单个专家的 GEMM 变小，<code>M</code> 维（该专家收到的 token 数）从数千掉到数十～数百，<strong>Tensor Core 利用率显著下降</strong>，且 kernel 数量与 launch 开销线性增长。这正是 Grouped GEMM、MegaBlocks 的<a href="https://arxiv.org/abs/2211.15841" target="_blank">块稀疏化</a>、以及 2026 年 MegaKernel 路线要解决的问题——<em>细粒度专家是模型侧的胜利，也是 kernel 侧的债务</em>。</p>
+
+<h3>维度⑤ 稀疏度：直接换算成互联带宽需求</h3>
+
+<p>稀疏度 = 激活参数 / 总参数。它决定训练与推理的 FLOPs，但对硬件更直接的传导是<strong>每层每 token 的 All-to-All 字节数</strong>：</p>
+
+<pre><code>dispatch 字节/token = k * h * bytes_per_elem      # FP8 时 bytes=1
+combine  字节/token = k * h * bytes_per_elem      # 通常 BF16, bytes=2
+
+例: h=7168, k=8, dispatch FP8 + combine BF16
+    -> 8*7168*1 + 8*7168*2 = 172 KB / token / 层
+    再乘以 MoE 层数与 batch 内 token 数, 就是单层 All-to-All 的总流量
+</code></pre>
+
+<p><span class="tag fact">对照</span>MegaMoE 论文把这条关系写成了一个漂亮的判据：每个 token-expert 对传 <code>3h</code> 字节（FP8 dispatch + BF16 combine）对应 <code>6hd</code> FLOPs，因此只要机器的<strong>算力/带宽比 ⩽ 2d</strong>（V4 配置下为 6144 FLOPs/Byte），通信就一定能被计算完全掩盖。<span class="tag infer">这条判据的实用价值极高</span>：它把"我的集群互联够不够"从玄学变成了一次除法——拿单卡 TFLOPS 除以单卡可用 NVLink 带宽，与 <code>2d</code> 比大小即可。</p>
+
+<div class="card warning">
+<h4><span class="tag infer">分析</span>五个维度里，唯一被系统层"倒逼"改回去的是维度⑤</h4>
+<p style="margin-bottom:0">模型侧的自然倾向是稀疏度越低越好（同样激活参数换更大总容量）。但 <code>k</code> 一大，All-to-All 流量线性上涨；专家一多，EP 度必须跟着涨，而 EP 一旦跨出单一 NVLink 域，带宽就从 数百 GB/s 掉到 RDMA 的几十 GB/s，出现<strong>断崖</strong>。于是出现了 <strong>node-limited routing</strong>（DeepSeek-V3：限制每个 token 最多送往 4 个节点）这类<em>纯粹为硬件拓扑而生的算法约束</em>——路由自由度被主动砍掉一块，换取通信量的可控。这是模型与硬件之间最典型的一次妥协，也说明"MoE 算法"这件事已经不可能脱离硬件单独设计。</p>
+</div>
+
+<h3>本标签的一句话结论</h3>
+
+<div class="card highlight">
+<p style="margin-bottom:0">2026 年主流大模型在五个维度上已经<strong>高度收敛</strong>：路由用 token-choice top-k（维度①）、均衡用无辅助损失 bias（维度②）、多数配 1～2 个共享专家（维度③）、专家一律细粒度化（维度④）、稀疏度压到 3%～6%（维度⑤）。<em>模型架构的差异化空间正在快速收窄</em>——真正的分野已经转移到注意力机制（MLA / 线性注意力混合 / 稀疏注意力）以及后面几个标签讨论的系统层。</p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 3 ==================== -->
+<div class="tab" id="t-model">
+
+<section>
+<h2>四、模型架构对比：配方已经收敛，但收敛到了系统最难做的那一侧</h2>
+
+<p>这一节把能查到 <code>config.json</code> 的 MoE 模型逐个拆开对齐。所有字段都取自官方模型卡或官方技术报告的<strong>实际抓取内容</strong>；凡官方页面未给出的，一律写 <span class="tag na">未公开</span>，不做任何反推。</p>
+
+<h3>4.1 主表：19 个 MoE 模型的架构对齐</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<tr>
+  <th>模型</th><th>总参 / 激活</th><th>稀疏比</th><th>层数</th><th>路由专家</th><th>top-k</th><th>共享专家</th>
+  <th>专家 FFN 维</th><th>门控</th><th>负载均衡</th><th>注意力</th><th>上下文</th><th>MTP</th><th>发布精度</th>
+</tr>
+<tr>
+  <td><strong>DeepSeek-V3 / V3.1</strong></td><td>671B / 37B</td><td>5.5%</td><td>61</td><td>256</td><td>8</td><td>1</td>
+  <td>2048</td><td>sigmoid</td><td>无辅助损失 <code>noaux_tc</code></td><td>MLA（kv_lora 512, 128 头）</td><td>163840</td><td>✅ 1</td><td>FP8 e4m3 块 128×128</td>
+</tr>
+<tr>
+  <td><strong>DeepSeek-V3.2-Exp</strong></td><td><span class="tag na">未公开</span></td><td>—</td><td>61</td><td>256</td><td>8</td><td>1</td>
+  <td>2048</td><td>sigmoid</td><td><code>noaux_tc</code></td><td><strong>MLA + DSA 稀疏注意力</strong>（<code>index_topk</code> 2048）</td><td>163840</td><td>✅</td><td>FP8 ue8m0</td>
+</tr>
+<tr>
+  <td><strong>DeepSeek-V4-Pro</strong></td><td>1.6T / 49B</td><td><strong>3.06%</strong></td><td>61</td><td><strong>384</strong></td><td><strong>6</strong></td><td>1</td>
+  <td>3072</td><td><strong>Sqrt(Softplus)</strong></td><td>无辅助损失 + 轻量 sequence-wise 均衡损失；<strong>前 3 个 MoE 层用 Hash 路由</strong></td><td>CSA + HCA 混合稀疏 + mHC 残差</td><td><strong>1M</strong></td><td>✅ 1</td><td><strong>FP4 专家 + FP8 其余</strong></td>
+</tr>
+<tr>
+  <td><strong>DeepSeek-V4-Flash</strong></td><td>284B / 13B</td><td>4.58%</td><td>43</td><td>256</td><td>6</td><td>1</td>
+  <td>2048</td><td>Sqrt(Softplus)</td><td>同上</td><td>前 2 层纯滑窗 + CSA/HCA 交错</td><td>1M</td><td>✅</td><td>FP4 + FP8</td>
+</tr>
+<tr>
+  <td><strong>Qwen3-235B-A22B</strong></td><td>235B / 22B</td><td>9.4%</td><td>94</td><td>128</td><td>8</td><td><strong>0</strong></td>
+  <td>1536</td><td>softmax</td><td>辅助损失 0.001</td><td>GQA 64Q / 4KV</td><td>40960（2507 版 262144）</td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Qwen3-30B-A3B</strong></td><td>30B / 3B</td><td>10%</td><td>48</td><td>128</td><td>8</td><td>0</td>
+  <td>768</td><td>softmax</td><td>辅助损失 0.001</td><td>GQA 32 / 4</td><td>40960</td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Qwen3-Next-80B-A3B</strong></td><td>80B / 3B</td><td>3.75%</td><td>48</td><td><strong>512</strong></td><td>10</td><td>1（512）</td>
+  <td>512</td><td>softmax</td><td>辅助损失 0.001</td><td><strong>Gated DeltaNet 线性 + 每 4 层 1 层 full</strong></td><td>262144</td><td><span class="tag na">config 未标</span></td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Qwen3.5-397B-A17B</strong></td><td>397B / 17B</td><td>4.28%</td><td>60</td><td>512</td><td>10</td><td>1（1024）</td>
+  <td>1024</td><td>softmax</td><td>辅助损失 0.001</td><td>linear + full 交错（interval 4）+ <code>attn_output_gate</code></td><td>262144（README 述可扩至 ~1M）</td><td>✅ 1</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Kimi-K2-Instruct</strong></td><td>1T / 32B</td><td>3.2%</td><td>61</td><td>384</td><td>8</td><td>1</td>
+  <td>2048</td><td>sigmoid</td><td><code>noaux_tc</code> + seq_aux 0.001</td><td>MLA 64 头</td><td>131072</td><td>❌（<code>num_nextn=0</code>）</td><td>FP8</td>
+</tr>
+<tr>
+  <td><strong>Kimi-K2-Thinking / K2.5</strong></td><td>1T / 32B</td><td>3.2%</td><td>61</td><td>384</td><td>8</td><td>1</td>
+  <td>2048</td><td>sigmoid</td><td><code>noaux_tc</code></td><td>MLA（K2.5 另加 400M 视觉编码器）</td><td>262144</td><td>❌</td><td><strong>INT4</strong>（4bit group32）</td>
+</tr>
+<tr>
+  <td><strong>Kimi-K3</strong></td><td><strong>2.8T / 104B</strong></td><td>3.71%</td><td><strong>93</strong></td><td><strong>896</strong></td><td><strong>16</strong></td><td><strong>2</strong></td>
+  <td>3072（<code>routed_expert_hidden_size</code> 3584，latent MoE）</td><td>sigmoid</td><td><code>noaux_tc</code> grouped topk</td><td><strong>KDA 69 层 + Gated MLA 24 层 + AttnRes</strong></td><td>1M</td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Llama 4 Scout</strong></td><td>109B / 17B</td><td><strong>15.6%</strong></td><td>48</td><td><strong>16</strong></td><td><strong>1</strong></td><td>1</td>
+  <td>8192</td><td>softmax</td><td>辅助损失 0.001</td><td>iRoPE（交错 NoPE + GQA 40Q/8KV，chunk 8192）</td><td><strong>10M</strong></td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Llama 4 Maverick</strong></td><td>400B / 17B</td><td>4.25%</td><td>48（MoE 隔层，<code>step=2</code>）</td><td>128</td><td>1</td><td>1</td>
+  <td>8192</td><td>softmax</td><td>辅助损失</td><td>iRoPE / GQA</td><td>1M</td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Llama 4 Behemoth</strong>（预览）</td><td>≈2T / 288B</td><td>14.4%</td><td colspan="2"><span class="tag na">未公开</span></td><td colspan="9"><span class="tag na">仅披露 16 experts，其余全部未公开，无权重发布</span></td>
+</tr>
+<tr>
+  <td><strong>Mixtral 8×7B</strong></td><td>47B / 13B</td><td><strong>27.7%</strong></td><td>32</td><td><strong>8</strong></td><td>2</td><td>0</td>
+  <td>14336</td><td>softmax</td><td><strong>辅助损失 0.02</strong></td><td>GQA 32 / 8</td><td>32768</td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Mixtral 8×22B</strong></td><td><span class="tag na">未公开</span></td><td>—</td><td>56</td><td>8</td><td>2</td><td>0</td>
+  <td>16384</td><td>softmax</td><td>辅助损失 0.001</td><td>GQA 48 / 8</td><td>65536</td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>GLM-4.5</strong></td><td>355B / 32B</td><td>9.0%</td><td>92</td><td>160</td><td>8</td><td>1</td>
+  <td>1536</td><td><span class="tag na">config 无 scoring_func</span></td><td><span class="tag na">未公开</span></td><td>GQA 96Q/8KV，QK-Norm，partial RoPE 0.5</td><td>131072</td><td>✅ 1</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>GLM-4.6</strong></td><td><span class="tag na">未公开</span></td><td>—</td><td>92</td><td>160</td><td>8</td><td>1</td>
+  <td>1536</td><td colspan="2"><span class="tag na">同 4.5</span></td><td>同 4.5</td><td>202752</td><td>✅</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>GLM-5</strong></td><td>744B / 40B</td><td>5.38%</td><td>78</td><td>256</td><td>8</td><td>1</td>
+  <td>2048</td><td><strong>sigmoid</strong></td><td><strong><code>noaux_tc</code></strong></td><td><strong>MLA + DSA</strong>（<code>GlmMoeDsa</code>，<code>index_topk</code> 2048）</td><td>202752</td><td>✅ 1</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>MiniMax-M1-80k</strong></td><td>456B / 45.9B</td><td>10.1%</td><td>80</td><td>32</td><td>2</td><td>0</td>
+  <td>9216</td><td>sigmoid</td><td>辅助损失 0.001</td><td><strong>Lightning 线性 + 每 8 层 1 层 full</strong></td><td><strong>10,240,000</strong></td><td>❌</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>MiniMax-M2</strong></td><td>230B / 10B</td><td>4.35%</td><td>62</td><td>256</td><td>8</td><td>0</td>
+  <td>1536</td><td>sigmoid + routing bias</td><td><strong>bias 校正</strong> <code>use_routing_bias</code></td><td><strong>全 full attention（放弃线性）</strong></td><td>196608</td><td>✅ <strong>3</strong></td><td>FP8</td>
+</tr>
+<tr>
+  <td><strong>gpt-oss-120b</strong></td><td>117B / 5.1B</td><td>4.36%</td><td>36</td><td>128</td><td>4</td><td>0</td>
+  <td>2880</td><td>softmax</td><td><strong>辅助损失 0.9（异常高）</strong></td><td>GQA 64/8 + 滑窗 128 / full 交替</td><td>131072</td><td>❌</td><td><strong>MXFP4（仅 MoE 权重）</strong></td>
+</tr>
+<tr>
+  <td><strong>gpt-oss-20b</strong></td><td>21B / 3.6B</td><td>17.1%</td><td>24</td><td>32</td><td>4</td><td>0</td>
+  <td>2880</td><td>softmax</td><td>辅助损失 0.9</td><td>同上</td><td>131072</td><td>❌</td><td>MXFP4</td>
+</tr>
+<tr>
+  <td><strong>Snowflake Arctic</strong></td><td>480B / 17B</td><td>3.5%</td><td>35</td><td>128</td><td>2</td><td>0（10B dense 并联残差 MoE）</td>
+  <td>4864</td><td>softmax</td><td>辅助损失 0.001</td><td>GQA 56 / 8</td><td><strong>4096</strong></td><td>❌</td><td>BF16</td>
+</tr>
+<tr>
+  <td><strong>Databricks DBRX</strong></td><td>132B / 36B</td><td>27.3%</td><td><span class="tag na">未公开</span></td><td>16</td><td>4</td><td>0</td>
+  <td><span class="tag na">未公开</span></td><td>softmax</td><td><span class="tag na">未公开</span></td><td>GQA</td><td>32768</td><td>❌</td><td><span class="tag na">未公开</span></td>
+</tr>
+</table>
+</div>
+
+<p class="ref">来源（逐条抓取）：
+<a href="https://huggingface.co/deepseek-ai/DeepSeek-V3.1" target="_blank">DeepSeek-V3.1</a> ｜
+<a href="https://huggingface.co/deepseek-ai/DeepSeek-V3.2-Exp" target="_blank">V3.2-Exp</a> ｜
+<a href="https://arxiv.org/abs/2606.19348" target="_blank">DeepSeek-V4 技术报告</a> ｜
+<a href="https://huggingface.co/Qwen/Qwen3-235B-A22B" target="_blank">Qwen3-235B</a> ｜
+<a href="https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct" target="_blank">Qwen3-Next</a> ｜
+<a href="https://huggingface.co/moonshotai/Kimi-K2-Instruct" target="_blank">Kimi-K2</a> ｜
+<a href="https://huggingface.co/moonshotai/Kimi-K3" target="_blank">Kimi-K3</a> ｜
+<a href="https://ai.meta.com/blog/llama-4-multimodal-intelligence/" target="_blank">Llama 4 官方博客</a> ｜
+<a href="https://arxiv.org/abs/2401.04088" target="_blank">Mixtral 论文</a> ｜
+<a href="https://huggingface.co/zai-org/GLM-4.5" target="_blank">GLM-4.5</a> ｜
+<a href="https://huggingface.co/MiniMaxAI/MiniMax-M2" target="_blank">MiniMax-M2</a> ｜
+<a href="https://huggingface.co/openai/gpt-oss-120b" target="_blank">gpt-oss-120b</a> ｜
+<a href="https://huggingface.co/Snowflake/snowflake-arctic-instruct" target="_blank">Arctic</a> ｜
+<a href="https://www.databricks.com/blog/introducing-dbrx-new-state-art-open-llm" target="_blank">DBRX 博客</a></p>
+
+<div class="card warning">
+<h4>数据严谨性提示（三处必须说明）</h4>
+<ol style="margin-bottom:0">
+<li><strong>DeepSeek-V4 报告存在自相矛盾</strong>：arXiv ID 为 <code>2606.*</code>（对应 2026-06），但页面自述 "Submitted on 26 Apr 2026"。本报告采信页面正文数字，但该矛盾未解释。</li>
+<li><strong>Llama 4 的层数与专家 FFN 维取自 unsloth 镜像 config</strong>，因 Meta 官方仓库 gated 无法直接读取；参数量与专家数取自 Meta 官方博客。已在来源链接中标明性质。</li>
+<li><strong>DBRX 官方仓库 gated（401）</strong>、GitHub README 404，故层数与专家中间维标 <span class="tag na">未公开</span>，未从第三方推测。</li>
+</ol>
+</div>
+
+<h3>4.2 五条已经收敛的设计选择</h3>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>2026 年的头部 MoE 已经在这五点上高度一致</h4>
+<ol>
+<li><strong>共享专家从"可选"变成"默认"。</strong>DeepSeek 全系、Kimi 全系、GLM 全系、Llama 4 全系都带 1 个（K3 是 2 个）常开专家。反例只剩 Qwen3 主线、MiniMax、gpt-oss、Mixtral、Arctic、DBRX——注意 <strong>Qwen3-Next 与 Qwen3.5 已经加回了共享专家</strong>，说明连 Qwen 也改了主意。</li>
+<li><strong>sigmoid + 无辅助损失，正在取代 softmax + 辅助损失。</strong>DeepSeek（<code>noaux_tc</code>）、Kimi（<code>noaux_tc</code> + 极小 seq_aux）、GLM-5（从 4.5 的未标注切到明确 sigmoid + <code>noaux_tc</code>）、MiniMax-M2（<code>use_routing_bias</code>）全在这一侧。仍用辅助损失的是 Qwen3 全系（0.001）、Llama 4（0.001）与 gpt-oss（<strong>0.9</strong>，比别人高两到三个数量级，值得单独注意）。</li>
+<li><strong>专家数量往上、top-k 相对往下、专家变窄。</strong>从 Mixtral 的 8 专家 / FFN 14336，到 Kimi-K3 的 896 专家 / FFN 3072、Qwen3.5 的 512 专家 / FFN 1024。专家总数涨了两个数量级，单专家宽度掉了一个数量级。</li>
+<li><strong>MTP（多 token 预测）成了大模型标配。</strong>DeepSeek 全系、GLM 全系、Qwen3.5、MiniMax-M2（3 个模块）都开。反例是 Kimi 全系（<code>num_nextn_predict_layers: 0</code>）与 Llama 4、gpt-oss。</li>
+<li><strong>注意力不再是 MHA/GQA 二选一，而是"稀疏或线性混合"。</strong>2026 年的四条路：DSA 稀疏注意力（DeepSeek-V3.2/V4、GLM-5）、KDA（Kimi-K3）、线性混合（Qwen3-Next/3.5、MiniMax-M1）、滑窗交替（gpt-oss、Llama 4 iRoPE）。而 <strong>MiniMax-M2 从 M1 的线性混合退回了全 full attention</strong>——这是全表里唯一一次明确的架构回退。</li>
+</ol>
+</div>
+
+<h3>4.3 稀疏度：一个数字决定 All-to-All 流量的数量级</h3>
+
+<p>稀疏比（激活参 ÷ 总参）是模型侧交给系统侧的<strong>唯一最重要的输入</strong>。它同时决定三件事：每卡能放多少专家、decode 阶段的算术强度、以及 All-to-All 要搬多少字节。</p>
+
+<div class="diagram"><span class="cap">图 B · 稀疏度谱系（激活参 / 总参，越靠右越稠密）</span>
+
+  3.06%   3.2%   3.5%  3.71% 3.75% 4.25%4.28%4.35%4.36%4.58%  5.38% 5.5%   9.0% 9.4% 10.1%   15.6% 17.1%  27.3%27.7%
+    │       │      │     │     │     │    │    │    │    │      │     │      │    │    │       │     │       │    │
+  V4-Pro   K2    Arctic  K3  Q3-Next Mav Q3.5 M2  oss120 V4-Fl GLM-5  V3   GLM4.5 Q3-235 M1   Scout oss20  DBRX Mixtral
+    │                                                                                                        │
+    └── 极稀疏：每卡专家必须极少，否则 decode 打不满带宽 ──────────────► 相对稠密：单机就能跑，A2A 压力小 ──┘
+
+  ★ 关键：稀疏度每降一半，同样吞吐所需的全局 batch 就要翻一倍（见 TAB ⑤ 的 b ⩾ F/B 门槛）
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="num">3.06%</div><div class="lbl">最稀疏：DeepSeek-V4-Pro<br>1.6T 总参只激活 49B</div></div>
+  <div class="kpi"><div class="num orange">27.7%</div><div class="lbl">最稠密：Mixtral 8×7B<br>8 专家 top-2 的老配方</div></div>
+  <div class="kpi"><div class="num green">896</div><div class="lbl">最多专家：Kimi-K3<br>+2 共享，top-16</div></div>
+  <div class="kpi"><div class="num purple">9.1×</div><div class="lbl">稀疏度极差<br>（27.7% ÷ 3.06%）</div></div>
+</div>
+
+<div class="card info">
+<h4>为什么"专家变多变窄"对系统是坏消息</h4>
+<p>NVIDIA 在 MoE Parallel Folding 里给出了直接证据：<em>"fine-grained MoE models achieve lower training efficiency compared to coarse-grained MoE models across all parallelism strategies"</em>
+（<a href="https://arxiv.org/html/2504.14960v1" target="_blank">arXiv:2504.14960</a>）。原因是同样的 token 数被切成更多、更小的 GEMM，每个 GEMM 的 M 维变小，Tensor Core 利用率下降，而 All-to-All 的消息数量却按专家数线性增长——<strong>模型侧为了质量做的细粒度化，成本全部转移给了系统侧</strong>。这就是 TAB ⑥ 和 TAB ⑦ 里所有工程复杂度的来源。</p>
+</div>
+
+<h3>4.4 注意力这一侧正在抢走时间预算</h3>
+
+<p>过去讨论 MoE 只看 FFN，但长上下文把这个假设打破了。DisagMoE 给出的实测很直接：Qwen-3 在 8 节点上，序列从 4K 涨到 32K 时 <strong>attention 计算占比从 28.38% 升到 50.26%</strong>，而 FFN 从 19.22% 降到 13.96%（<a href="https://arxiv.org/abs/2605.11005" target="_blank">arXiv:2605.11005</a>）。</p>
+
+<p>这解释了为什么 2026 年几乎所有新模型都在动注意力：<strong>不动注意力，MoE 优化的天花板就被 Amdahl 定律锁死</strong>。四条路线各有代价：</p>
+
+<div class="tbl-wrap">
+<table>
+<tr><th>路线</th><th>代表</th><th>机制</th><th>对系统的影响</th></tr>
+<tr><td><strong>稀疏注意力（DSA/CSA/HCA）</strong></td><td>DeepSeek-V3.2 / V4、GLM-5</td><td>用 indexer 先选出 <code>index_topk</code> 个 KV 位置再算注意力（V3.2/GLM-5 为 2048，V4-Pro 为 1024）</td><td>KV cache 读取量大幅下降；但引入第二级"选择"kernel，与 MoE 的 routing 一样是 memory-bound 小算子</td></tr>
+<tr><td><strong>线性/混合注意力</strong></td><td>Qwen3-Next、Qwen3.5、MiniMax-M1</td><td>大部分层用线性注意力（Gated DeltaNet / Lightning），每 4–8 层插一层 full attention</td><td>KV cache 显存骤降，长上下文友好；但 <strong>MiniMax-M2 已退回全 full attention</strong>，说明质量代价被认为不可接受</td></tr>
+<tr><td><strong>滑窗交替</strong></td><td>gpt-oss、Llama 4 iRoPE</td><td>局部滑窗层（gpt-oss 窗口 128）与全注意力层交替；Llama 4 交错 NoPE 层</td><td>实现最简单，Llama 4 Scout 靠它做到 10M 上下文；代价是长程依赖只能靠少数全注意力层承载</td></tr>
+<tr><td><strong>自研新算子</strong></td><td>Kimi-K3（KDA 69 层 + Gated MLA 24 层）</td><td>Kimi Delta Attention 与门控 MLA 混排，另加 AttnRes 残差</td><td>收益最大但生态成本最高，推理框架需专门适配</td></tr>
+</table>
+</div>
+
+<div class="card highlight">
+<p style="margin:0"><strong>把 4.3 和 4.4 合起来看</strong>：模型侧同时在做两件让系统更难的事——FFN 越来越稀疏、越来越碎（A2A 消息数暴涨），attention 越来越重、越来越"非标"（无法复用标准 kernel）。<em>这正是 2026 年出现 DisagMoE、MegaScale-Infer、Janus、FinDEP 这一整批"把 attention 和 FFN 拆到不同 GPU 组"系统的根本原因</em>：两类层的算通比已经差到无法共用一套并行度。</p>
+</div>
+
+<h3>4.5 推理权重显存足迹</h3>
+
+<div class="card warning">
+<p style="margin:0"><span class="tag infer">算术</span>下表的"权重显存"是<strong>参数量 × 每参数字节</strong>的直接换算，<strong>不含 KV cache、激活与框架开销</strong>；"最小 GPU 数"按 H200 141 GB/卡计算，同样是纯算术，<strong>不是官方推荐配置</strong>。凡官方页面明确给出部署建议的，单列在最后一栏。</p>
+</div>
+
+<div class="tbl-wrap">
+<table class="compact">
+<tr><th>模型</th><th>发布精度</th><th>算术权重显存</th><th>算术最小卡数（H200 141GB）</th><th>官方声明的部署硬件</th></tr>
+<tr><td>DeepSeek-V3 / V3.1</td><td>FP8</td><td>≈ 671 GB</td><td>⩾ 5 → 实务 <strong>8×H200</strong></td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>DeepSeek-V4-Pro</td><td>FP4 专家 + FP8 其余</td><td>上界 1600 GB（若全 FP8）</td><td>⩾ 12 → 实务 <strong>16×H200 / 2 节点</strong></td><td><span class="tag na">未公开</span>（仅建议 Think-Max 上下文 ⩾ 384K）</td></tr>
+<tr><td>DeepSeek-V4-Flash</td><td>FP4 + FP8</td><td>上界 284 GB</td><td>⩾ 3 → 实务 4×H200</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>Kimi-K2</td><td>FP8</td><td>≈ 1000 GB</td><td>⩾ 8（1128 GB）</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>Kimi-K2-Thinking / K2.5</td><td>INT4</td><td>≈ 500 GB</td><td>⩾ 4</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td><strong>Kimi-K3</strong></td><td>BF16</td><td><strong>≈ 5600 GB</strong></td><td>⩾ 40 → <strong>约 5 个 8 卡节点</strong></td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>Qwen3-235B-A22B</td><td>BF16</td><td>≈ 470 GB</td><td>⩾ 4</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>Qwen3-30B-A3B</td><td>BF16</td><td>≈ 60 GB</td><td><strong>1×H100 80GB</strong></td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>Qwen3.5-397B-A17B</td><td>BF16</td><td>≈ 794 GB</td><td>⩾ 6 → 实务 8×H200</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>Llama 4 Scout</td><td>BF16</td><td>≈ 218 GB</td><td>⩾ 2</td><td><strong>官方：Int4 量化下单张 H100</strong></td></tr>
+<tr><td>Llama 4 Maverick</td><td>BF16</td><td>≈ 800 GB</td><td>⩾ 6</td><td><strong>官方：单台 H100 主机（8 卡）</strong></td></tr>
+<tr><td>GLM-4.5</td><td>BF16</td><td>≈ 710 GB</td><td>⩾ 6 → 实务 8×H200</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>GLM-5</td><td>BF16</td><td>≈ 1488 GB</td><td>⩾ 11 → 实务 16×H200</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>MiniMax-M1</td><td><span class="tag na">未公开</span></td><td>BF16 推算 912 GB</td><td>⩾ 7 → 实务 8</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>MiniMax-M2</td><td>FP8</td><td>≈ 230 GB</td><td><strong>⩾ 2×H200</strong></td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>gpt-oss-120b</td><td>MXFP4（仅 MoE）</td><td>—</td><td>—</td><td><strong>官方：单张 80GB GPU（H100 / MI300X）</strong></td></tr>
+<tr><td>gpt-oss-20b</td><td>MXFP4</td><td>—</td><td>—</td><td><strong>官方：16GB 显存内可跑</strong></td></tr>
+<tr><td>Mixtral 8×7B</td><td>BF16</td><td>≈ 94 GB</td><td>⩾ 2×A100 80GB</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>Snowflake Arctic</td><td>BF16</td><td>≈ 960 GB</td><td>⩾ 7 → 实务 8×H200</td><td><span class="tag na">未公开</span></td></tr>
+<tr><td>DBRX</td><td><span class="tag na">未公开</span></td><td>BF16 推算 264 GB</td><td>⩾ 2×H200 / 4×A100 80GB</td><td><span class="tag na">未公开</span></td></tr>
+</table>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>这张表最反直觉的一行是 gpt-oss-120b</h4>
+<p>117B 总参、128 专家的 MoE，官方明确说<strong>单张 80GB GPU 就能跑</strong>。做到这一点靠的不是架构，而是<strong>只把 MoE 权重量化到 MXFP4</strong>——因为 MoE 权重占了绝大部分参数量，把它压到 4 bit 就把 117B 压进了 80GB。</p>
+<p style="margin-bottom:0">对照 Kimi-K3：2.8T 参数以 BF16 发布，算术上需要约 5 个节点仅存放权重。<em>同一年发布的两个 MoE，部署门槛差了 40 倍以上，而差距主要来自发布精度的选择而非参数量本身</em>。这说明"MoE 的硬件要求"这个问题，必须连着量化方案一起问才有意义。</p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 4 ==================== -->
+<div class="tab" id="t-train">
+
+<section>
+<h2>五、训练系统：三代重叠技术，与一条不可比的基线警戒线</h2>
+
+<div class="card danger">
+<h4>读这一节之前必须先接受的事实：跨论文比倍数是无意义的</h4>
+<p style="margin-bottom:0">下面每个系统的加速比后面都跟着<strong>它自己选的基线</strong>。Tutel 的 5.75× 对的是 2022 年的 SOTA；COMET 的 1.71× 对的是 Megatron-CUTLASS/TE；UniEP 的 1.24–1.73× 对的是 COMET；Mixture-of-Kittens 的 2.37× 对的是"NCCL/DeepEP/HybridEP 四者中最快的那个"。<em>把这些数字放在一起排名，等于把不同年份、不同硬件、不同精度的四场比赛的成绩单叠在一起看</em>。本节的价值在于机制与硬件要求的对比，不在于倍数排名。</p>
+</div>
+
+<h3>5.1 全景表</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<tr><th>系统</th><th>年份 / 出处</th><th>一句话机制</th><th>评测硬件</th><th>加速比（含基线）</th><th>MFU</th></tr>
+<tr>
+  <td><strong>MegaScale-MoE</strong><br><span class="tag tr">训练</span></td><td>2025 · arXiv:2505.11432 · 字节 Seed + 北大</td>
+  <td>attention 用 SP、专家用 EP，<strong>彻底弃用 TP</strong>；算子级双层重叠 + FP8 通信压缩</td>
+  <td><strong>1440×H800</strong>（989 TFLOPS / 80GB / HBM 3.4TB/s / NVLink 400GB/s）；NIC 与节点数未公开</td>
+  <td>对 Megatron-LM：352B 强扩展 1.65–1.88×（1440 卡 1.88×）；弱扩展 1.74–1.79×</td><td><strong>32.48% → 27.89%</strong>（240→1440 卡）</td>
+</tr>
+<tr>
+  <td><strong>COMET</strong><br><span class="tag tr">训练</span></td><td>2025 · arXiv:2502.19811 · 字节 Seed + 上交</td>
+  <td>共享张量依赖分析 + 按依赖维分解重排；thread-block 特化 + 自适应 block 分配</td>
+  <td>8×H100 80GB（实测卡间 <strong>377 GB/s</strong>）；另 8×L20 PCIe（~25 GB/s）。CUDA 12.3 / NVSHMEM 2.11</td>
+  <td>单层 1.96×、端到端 1.71×；分基线降时延 <strong>34.1% / 42.6% / 44.4% / 31.8%</strong>（Megatron-CUTLASS / Megatron-TE / FasterMoE / Tutel）</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>UniEP</strong><br><span class="tag tr">训练</span></td><td>2026 · arXiv:2604.19241 · 字节 Seed + 清华</td>
+  <td><strong>两个 MegaKernel</strong>（Dispatch+GroupGEMM、GroupGEMM+Combine），kernel 内动态分配 SM 角色 + on-chip scoreboard；约 10⁵ 配置自动搜索</td>
+  <td>两个 Hopper 集群（型号未公开），最多 <strong>128 GPU</strong>；集群1 NVLink 200GB/s 单向、集群2 400GB/s</td>
+  <td>摘要 1.03–1.38× over SOTA；<strong>对 COMET 1.24–1.73×</strong>；128 卡端到端 127→138 B tokens/day = <strong>1.09×</strong></td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>Mixture-of-Kittens</strong><br><span class="tag tr">训练</span></td><td>2026-08 · Cursor 博客 + 开源仓库（<strong>非论文</strong>）</td>
+  <td>单个完全确定性 MegaKernel；<strong>pull 式 dispatch + push 式 combine 消掉跨 GPU 信令</strong>；ring token buffer 去掉 CPU 同步；用 Blackwell CLC 做 persistent grid</td>
+  <td><strong>GB300 NVL72</strong>（72 GPU 单 NVLink 域），EP=64；端到端 <strong>512 GPU</strong> 跨多机架</td>
+  <td>对"NCCL / DeepEP / DeepEP+TE / HybridEP+Megatron 四者中最快者"：MXFP8 前向 <strong>2.37×</strong>、反向 1.78×；BF16 1.92× / 1.58×。对自家 DeepEP 生产实现端到端 760.9→1070.2 tok/s/GPU = <strong>1.41×</strong></td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>HyperParallel-MoE</strong><br><span class="tag tr">训练</span></td><td>2026 · arXiv:2605.23764 · 中科大 + 华为 + 北大</td>
+  <td>编译成 tile 级异构 taskflow，跨 <strong>AIC（矩阵核）/ AIV（向量核）</strong>队列静态调度；AIV 驱动单边通信取消 host 同步</td>
+  <td><strong>Ascend A3 NPU</strong>（每 NPU 双 die，片上 24 AIC + 50 AIV）；剖析用 256 NPU，评测台数未公开</td>
+  <td>对 MindSpore 逐算子路径：MoE-FFN <strong>1.49–1.58×</strong>，端到端仅 <strong>1.08–1.09×</strong></td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>MoE Parallel Folding</strong><br>（Megatron-Core）<br><span class="tag tr">训练</span></td><td>2025 · arXiv:2504.14960 · NVIDIA</td>
+  <td>attention 与 MoE <strong>各用一套并行映射</strong>（TP×CP×DP×PP vs ETP×EP×EDP×PP），打破 EP ⩽ DP 约束</td>
+  <td>NVIDIA Eos，DGX H100，最多 <strong>1024 GPU</strong>；<em>"450 GB/s for intra-node (NVLink) and 400Gbps for inter-node (InfiniBand)"</em></td>
+  <td>对 MCore BF16 基线 458.3 TFLOPS：+Folding 487.7（1.06×）、FP8 575.1（1.26×）、<strong>FP8+Folding 631.7（1.30×）</strong></td><td><strong>49.3%</strong>（Mixtral 8×22B）<br>39.0%（Qwen2-57B-A14B）</td>
+</tr>
+<tr>
+  <td><strong>Tutel</strong><br><span class="tag tr">训练</span></td><td>2022 · arXiv:2206.03382 · MLSys 2023 · 微软</td>
+  <td>参数与数据用同一套布局，使 <strong>EP+DP ↔ EP+MP 切换零迁移开销且数学等价</strong>；Flexible / 2DH All-to-All</td>
+  <td>Azure ND96amsr_A100_v4，最多 <strong>2048×A100 80GB</strong>；机内 3rd-gen NVLink+NVSwitch，机间 1600 Gbps IB 非阻塞</td>
+  <td>对 previous SOTA：16 卡 <strong>4.96×</strong>、2048 卡 <strong>5.75×</strong>；自适应切换单独贡献单层 1.35–14.57×</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>FasterMoE</strong><br><span class="tag tr">训练</span></td><td>2022 · PPoPP'22 · 清华</td>
+  <td>roofline 式性能模型 + <strong>dynamic shadowing</strong>（复制热专家）+ 细粒度调度 + 避拥塞专家选择</td>
+  <td>摘要仅称 <em>"using up to 64 GPUs"</em>；<strong>GPU 型号 / 显存 / 互联全部未获取</strong>（ACM 全文 403）</td>
+  <td><em>"1.37X - 17.87X speedup compared with state-of-the-art systems ... ZeRO, GShard, and BASE Layer"</em></td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>Lancet</strong><br><span class="tag tr">训练</span></td><td>2024 · arXiv:2404.19429 · MLSys 2024 · 港大 + AWS</td>
+  <td>把重叠范围扩到<strong>整张训练图</strong>：切分 MoE 层前后的非 MoE 算子与 A2A 重叠，动态规划搜切分方案</td>
+  <td>AWS p4de.24xlarge ×8 节点（8×A100 80GB + 4×100Gbps NIC）；另 p3dn ×8（V100 + 1×100Gbps）</td>
+  <td>未重叠通信时间最多减 <strong>77%</strong>；端到端最高 <strong>1.3×</strong>（基线 DeepSpeed 与 Tutel）</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>DualPipe</strong>（DeepSeek-V3）<br><span class="tag tr">训练</span></td><td>2024 · arXiv:2412.19437 · DeepSeek</td>
+  <td>双向流水，把前向与反向的计算/通信阶段互相重叠；自研跨节点 A2A kernel 并限制 SM 占用</td>
+  <td><em>"trained on a cluster equipped with 2048 NVIDIA H800 GPUs"</em>；16-way PP + 64-way EP（8 节点）+ ZeRO-1 DP，<strong>不用 TP</strong>；<em>"NVLink offers a bandwidth of 160 GB/s, roughly 3.2 times that of IB (50 GB/s)"</em></td>
+  <td><strong>对具名基线的倍数未公开</strong>；只给绝对成本：14.8T tokens 用 2.664M H800 GPU-hours</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>FlashDMoE / FlashMoE</strong><br><span class="tag inf">实为推理</span></td><td>2025 · arXiv:2506.04667 · Cornell</td>
+  <td>完全 GPU 驻留的单 persistent kernel，warp 分 Processor / Scheduler / Subscriber 三类 actor；device-initiated 通信</td>
+  <td>8×H100 80GB NVLink（PyTorch 2.6 / CUDA 12.8）；附录 4 节点×4 A100，<em>"each GPU uses a single NIC providing 25 GB/s"</em></td>
+  <td>对 COMET / FasterMoE / Megatron-CUTLASS / Megatron-TE：最高 6× 更低时延、5.7× 更高吞吐。<strong>⚠ 但 FlashDMoE 用 FP32 而基线用 FP16</strong></td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>DeepSpeed-MoE</strong><br><span class="tag tr">训练</span><span class="tag inf">推理</span></td><td>2022 · arXiv:2201.05596 · ICML 2022 · 微软</td>
+  <td><strong>不是重叠系统</strong>：PR-MoE 架构 + MoS 蒸馏做压缩，配多维并行的推理系统</td>
+  <td><span class="tag na">未公开</span>（arXiv 无可用全文 HTML）</td>
+  <td>模型缩小最多 3.7×；推理时延/成本优于现有 MoE 方案 7.3×；训练成本省 5×</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>DisagMoE</strong><br><span class="tag tr">训练</span></td><td>2026 · arXiv:2605.11005（详见 TAB ①）</td>
+  <td><strong>attention 与 FFN 部署到不相交 GPU 组</strong>（AF-Pipe），单向 many-to-many 流水替代双向 A2A</td>
+  <td>16 节点 × 8×H800 = 128 卡，ConnectX-7 8×400GbE，机内 NVLink 400 GB/s</td>
+  <td>对 Megatron 1F1B interleaved overlap 最高 <strong>1.81×</strong>；对 Tutel/COMET 1.2–1.5×；对 DualPipe 1.05–1.13×</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+  <td><strong>MegaMoE</strong><br><span class="tag tr">训练</span><span class="tag inf">推理</span></td><td>2026 · DeepGEMM 组件（详见 TAB ①）</td>
+  <td>把 Dispatch → Linear-1 → Linear-2 → Combine 融进单 persistent kernel，<strong>Expert Wave</strong> 波次流水</td>
+  <td>要求 SM90 或 SM100；Mega MoE 路径仅支持 FP8×FP4，需 PyTorch ⩾ 2.9 与对称内存多进程启动</td>
+  <td>论文：推理 1.50–1.73×，RL rollout 最高 1.96×（基线为"强非融合实现"）；PR 实测 EP8 达 2438 TFLOPS（1.54×）</td><td><span class="tag na">未公开</span></td>
+</tr>
+</table>
+</div>
+
+<h3>5.2 三个 2026 年新系统的关键细节</h3>
+
+<div class="syscard train">
+  <div class="sysname">MegaScale-MoE：把 NVLink 域大小写进了设计假设</div>
+  <div class="sysmeta">arXiv:2505.11432 ｜ 字节 Seed + 北京大学 ｜ 生产系统，1440×H800</div>
+  <dl>
+  <dt>最值得抄的一条设计决策</dt>
+  <dd><strong>对 attention 用序列并行（SP）、对专家用专家并行（EP），完全不用 TP</strong>。理由是 TP 的 all-reduce 在每层都要跑两次，而 SP+EP 的通信量更低。消融数据：<span class="tag fact">论文原文</span>SP+EP 相对 TP+TP 的 MFU 高 <strong>14.9%–32.9%</strong>。</dd>
+  <dt>硬件假设是显式写出来的</dt>
+  <dd><em>"Assuming the model is trained on a NVIDIA Hopper GPU workstation with an NVLink domain of size 8"</em>——整套并行度是按"NVLink 域 = 8"设计的。这是全部 MoE 系统里最值得记住的一句话：<strong>并行度不是调出来的，是被互联拓扑决定的</strong>。</dd>
+  <dt>MFU 随规模下降，作者自己解释了原因</dt>
+  <dd><em>"the MFU ... declines from 32.48% to 27.89%"</em>（240→1440 卡，全局 batch 固定 720）。归因于固定 batch 导致 micro-batch 变少、流水气泡增多。</dd>
+  <dt>一条反直觉的观察</dt>
+  <dd><span class="tag fact">论文原文</span><em>"the MFU value decreases as GPU compute capability increases"</em>——GPU 越强 MFU 越低，因为 routing / scatter / gather 这些 memory-intensive 算子受显存带宽限制，算力涨了它们不涨。<strong>这与 TAB ⑦ 的"带宽台阶"是同一个道理的两种表述。</strong></dd>
+  <dt>激活显存</dt>
+  <dd>SAR（选择性激活重算）相对不用 SAR 降低激活显存 <strong>45.5% / 57.2%</strong>。</dd>
+  <dt>正文瑕疵</dt>
+  <dd><span class="tag na">注意</span>正文称 <em>"across the four kinds of GPUs"</em>，但 Table 4 只列了 H800 / A100 / H20 三种，存在文内不一致。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/abs/2505.11432" target="_blank">arXiv:2505.11432</a> ｜ <a href="https://arxiv.org/html/2505.11432v1" target="_blank">HTML 全文</a></dd>
+  </dl>
+</div>
+
+<div class="syscard train">
+  <div class="sysname">UniEP：把"架构调参"变成"参数搜索"</div>
+  <div class="sysmeta">arXiv:2604.19241（2026-04）｜ 字节 Seed + 清华 ｜ 基于自研 Triton-distributed</div>
+  <dl>
+  <dt>与 COMET 的分界线</dt>
+  <dd>COMET 是"多 kernel + tile 级重叠"，UniEP 是<strong>两个 MegaKernel</strong>：一个融合 Dispatch+GroupGEMM，一个融合 GroupGEMM+Combine。kernel 内部动态给 SM 分配"算/通"角色，用片上 scoreboard 在 <strong>token 粒度</strong>管依赖。</dd>
+  <dt>为什么强调确定性</dt>
+  <dd>保持 <strong>deterministic token ordering</strong>，从而避免拆 micro-batch 带来的数值不确定性。<span class="tag infer">分析</span>这与 Mixture-of-Kittens 强调"完全确定性"是同一个卖点——2026 年"逐位可复现"从学术洁癖变成了工程需求，因为大规模训练的 loss spike 排查依赖它。</dd>
+  <dt>Relay Worker</dt>
+  <dd>做 intra-rank multicast 以节省 NVLink 流量：同一节点内多个 rank 需要同一份 token 时，只跨节点传一次再在节点内转发。</dd>
+  <dt>消融链条很清晰</dt>
+  <dd>O→B 带宽优化 1.06–1.36×；B→A <strong>自动调优贡献 1.15–1.68×</strong>（即自动搜索本身就是一半以上的收益）；完整 UniEP 对 COMET 1.24–1.73×。</dd>
+  <dt>端到端要打折</dt>
+  <dd>128 GPU、序列 512k：<em>"improved the training throughput from 127 billion tokens/day to 138 billion tokens/day, which is a 1.09× speedup"</em>——<strong>层级 1.24–1.73× 落到端到端只剩 1.09×</strong>。</dd>
+  <dt>自述局限</dt>
+  <dd>部分配置 COMET 不支持故无法对比；大计算量下优势收窄（仅 ">10% improvement"）；AMD / 新 NVIDIA 架构的可移植性只做了讨论未实测。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/abs/2604.19241" target="_blank">arXiv:2604.19241</a> ｜ <a href="https://github.com/ByteDance-Seed/Triton-distributed" target="_blank">Triton-distributed</a></dd>
+  </dl>
+</div>
+
+<div class="syscard train">
+  <div class="sysname">Mixture-of-Kittens：靠"选对通信方向"消掉了信令</div>
+  <div class="sysmeta">Cursor Research，2026-08-04 ｜ 开源 ｜ <strong>是工程博客不是论文，没有同行评审</strong></div>
+  <dl>
+  <dt>核心洞察（全篇最漂亮的一句）</dt>
+  <dd><em>"With pull-based dispatch and push-based combine, cross-GPU signalling disappears"</em>——dispatch 改成接收方主动拉、combine 改成发送方主动推，于是<strong>不需要等待来自 71 个 peer 的信号，也不需要跨 GPU memory fence</strong>。
+  <span class="tag infer">分析</span>对照 TAB 里的 tile 级信令论文（arXiv:2607.19539）：那篇的全部复杂度都花在"如何高效发信号"，而 MoK 直接论证了信号可以不存在。这是两种思路的分野。</dd>
+  <dt>硬性硬件门槛（README 原文）</dt>
+  <dd><em>"NVIDIA Blackwell SM100 or SM103 GPUs (e.g., GB200 NVL72 or GB300 NVL72)"</em>；Python ⩾ 3.12、PyTorch ⩾ 2.10、CUDA ⩾ 13.0；依赖 PyTorch symmetric memory。
+  <strong>整个 EP 组必须在一个 NVL72 NVLink 域内</strong>：<em>"an NVL72 is a multi-node rack within a single NVLink domain"</em>。</dd>
+  <dt>还有一个 tile 尺寸门槛</dt>
+  <dd>Kimi 2.5 形状（H=7168, I=2048）在 Blackwell（148 SM）下需 <strong>每次传输 ⩾ 2368 tokens</strong> 才划算。<span class="tag infer">分析</span>这实际上是"最小 batch"门槛的另一种写法，与 TAB ⑤ 的 <code>b ⩾ F/B</code> 同源。</dd>
+  <dt>为什么必须消掉 CPU 参与</dt>
+  <dd><em>"the integrated Grace CPUs ... tend to be slow relative to the GPUs"</em>——用 ring token buffer 彻底消除 CPU-GPU 同步，用 Blackwell 的 <strong>Cluster Launch Control</strong> 实现 persistent grid 并让出 SM 给 RDMA。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://cursor.com/blog/mixture-of-kittens" target="_blank">Cursor 官方博客</a> ｜ <a href="https://github.com/cursor/mixture-of-kittens" target="_blank">开源仓库</a></dd>
+  </dl>
+</div>
+
+<div class="syscard train">
+  <div class="sysname">HyperParallel-MoE：非 NVIDIA 路线里最完整的一份公开数据</div>
+  <div class="sysmeta">arXiv:2605.23764 ｜ 中科大 + 华为 + 北大 + 合肥人工智能研究院 ｜ Ascend A3 NPU</div>
+  <dl>
+  <dt>硬件模型完全不同</dt>
+  <dd>Ascend 片上是<strong>异构双核</strong>：24 个 AIC（矩阵核）+ 50 个 AIV（向量核）。HyperParallel 把 MoE 编译成 tile 级 taskflow，<strong>跨 AIC / AIV 两条队列静态调度</strong>，并用 AIV 驱动的单边通信（<code>put_mem_signal</code>）取消 host 侧集合同步。
+  <span class="tag infer">分析</span>这相当于把 NVIDIA 上"warp 特化"的思路，落在了物理上就分开的两种核上——硬件天然支持角色分工，反而不需要抢 SM。</dd>
+  <dt>并行配置</dt>
+  <dd>DP32 / TP2 / EP ∈ {4, 8, 16}（对应 32/64/128 专家，每 rank 8 个本地专家），global batch 512，不用 PP/CP。模型为 DeepSeek-V3 风格 671B/37B。</dd>
+  <dt>剖析数据是全篇最有价值的部分</dt>
+  <dd>AIC 的 MAC 利用率仅约 <strong>67%</strong>，EP 通信仅约 <strong>61% 可被隐藏</strong>。<span class="tag infer">分析</span>这两个数字说明即使做到了 tile 级异构调度，仍有三分之一的通信无法藏住——<em>"通信可以被完全隐藏"在真实系统里从未成立过</em>。</dd>
+  <dt>为什么模块 1.58× 只换来端到端 1.09×</dt>
+  <dd>作者自己解释了：端到端基线保留了 MindSpore 的 DVM 自动融合与图级规划，<em>"which can partially mask the module-level gains"</em>。<strong>这是全报告里对"模块增益如何蒸发"最诚实的一段自述。</strong></dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/abs/2605.23764" target="_blank">arXiv:2605.23764</a> ｜ <a href="https://arxiv.org/html/2605.23764v1" target="_blank">HTML 全文</a></dd>
+  </dl>
+</div>
+
+<h3>5.3 Megatron-Core 的官方约束：最实用的一份硬件规则</h3>
+
+<p>如果只读一份文档就要动手配 MoE 训练，应该读 Megatron-Core 的 MoE README。它把并行度约束写成了可执行的规则：</p>
+
+<div class="tbl-wrap">
+<table>
+<tr><th>规则（官方原文口径）</th><th>为什么</th></tr>
+<tr><td><strong><em>"Ensure EP×TP fits within a single node (typically 8 GPUs)"</em></strong></td><td>EP 的 All-to-All 与 TP 的 all-reduce 都是高频集合通信，一旦跨出 NVLink 域就掉到 IB 带宽台阶上</td></tr>
+<tr><td>跨节点扩展<strong>优先加 PP，而不是加 TP 或 EP</strong></td><td>PP 的跨节点通信只有层边界的激活值，量级远小于 A2A</td></tr>
+<tr><td>细粒度 MoE <strong>建议 ETP=1</strong></td><td>专家已经很窄（FFN 维 1024–2048），再切 TP 会让每个 GEMM 小到打不满 Tensor Core</td></tr>
+<tr><td>EP A2A Overlap 要求 <code>expert_model_parallel_size &gt; 1</code> 且 <code>CUDA_DEVICE_MAX_CONNECTIONS &gt; 1</code></td><td>重叠依赖多条独立的 GPU 硬件队列，单连接下 kernel 会被串行化</td></tr>
+<tr><td>DeepSeek-V3 级模型的 EP 通信<strong>可能超出 NVLink 带宽</strong>，需 1F1B A2A Overlap</td><td>256 专家 top-8 的流量在 8 卡域内已接近饱和</td></tr>
+<tr><td>GB200 NVL72 / MNNVL 部署<strong>建议改用 HybridEP dispatcher</strong></td><td>NVL72 的单一 NVLink 域有 72 GPU，dispatcher 需要能利用更大的 P2P 域</td></tr>
+<tr><td>Hopper 上生产训练<strong>推荐 blockwise FP8</strong></td><td>与 DeepSeek-V3 的 FP8 块量化（128×128）同源</td></tr>
+</table>
+</div>
+
+<p class="ref">来源：<a href="https://github.com/NVIDIA/Megatron-LM" target="_blank">NVIDIA/Megatron-LM</a>（<code>megatron/core/transformer/moe/README.md</code>）｜ <a href="https://arxiv.org/abs/2504.14960" target="_blank">MoE Parallel Folding, arXiv:2504.14960</a></p>
+
+<h3>5.4 一个必须单独警告的数字：FlashDMoE 的 6×</h3>
+
+<div class="card danger">
+<h4>FlashDMoE 的 kernel 数对比很有说服力，但加速比要打问号</h4>
+<p>它最有价值的贡献是把"GPU 算子数量"这个指标摆到台面上：<strong>FlashDMoE 1 个 GPU op，COMET 33 个，Megatron-CUTLASS 85 个，Megatron-TE 261 个，Megatron+DeepEP 432 个，DeepSpeed-MoE 550 个</strong>。这直观解释了 MegaKernel 化的动机——每次 kernel launch 都是一次 CPU 参与和一次同步点。</p>
+<p>但它的加速比有一个作者自己承认的关键前提：<em>"despite using FP32 while baselines use FP16"</em>——<strong>它用 FP32 而所有基线用 FP16</strong>。<span class="tag infer">分析</span>作者把这句话当作"即使吃了精度亏也更快"的加分项来写，但换个角度看，FP32 的算术强度是 FP16 的一半，这让它的"重叠效率"指标天然占优（计算时间更长，更容易把通信藏进去）。<em>这个数字不适合直接与 FP16/FP8 系统横比。</em></p>
+<p style="margin-bottom:0">另一个必须说明的点：论文标题里的 "MoE training" 是误导——作者明确写了 <em>"Lack of backward pass and training support. While this work focuses on inference, enabling training requires fusing backward computation and gradient communication into the kernel."</em> <strong>它是推理系统。</strong>另外它承认在 Ampere 及更低架构上 CUTLASS Collective Mainloop 参数次优，会拖累显存吞吐。</p>
+<p class="ref" style="margin-bottom:0">来源：<a href="https://arxiv.org/abs/2506.04667" target="_blank">arXiv:2506.04667</a></p>
+</div>
+
+<h3>5.5 三代演进：从"重排算子"到"单核内调度"</h3>
+
+<div class="diagram"><span class="cap">图 C · 计算-通信重叠技术的三代演进</span>
+
+ 第一代（2022）· 算子级 / 并行度级
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │ Tutel        零开销切换 EP+DP ↔ EP+MP，自适应 pipelining 度            │
+ │ FasterMoE    dynamic shadowing 复制热专家 + 避拥塞路由                 │
+ │ DeepSpeed    PR-MoE + 蒸馏（走的是"把模型改小"而不是"把通信藏住"）      │
+ │ 手段：多 stream + 算子重排  ｜ 粒度：整个 all-to-all                   │
+ └──────────────────────────────────────────────────────────────────────┘
+                                  ▼
+ 第二代（2024–2025）· tile 级 / 图级
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │ COMET        共享张量依赖分解 + thread-block 特化 + 自适应 block 分配  │
+ │ Lancet       把重叠范围扩到整张图（连非 MoE 算子一起切）               │
+ │ DualPipe     双向流水，前反向互相填气泡                                │
+ │ MegaScale-MoE 并行策略层面就换掉 TP，再叠算子级双层重叠 + FP8 通信      │
+ │ 手段：切 tile、切 micro-batch  ｜ 粒度：tile / 算子                    │
+ └──────────────────────────────────────────────────────────────────────┘
+                                  ▼
+ 第三代（2026）· MegaKernel / 单核内调度
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │ UniEP            两个 MegaKernel + SM 角色动态分配 + 自动搜索          │
+ │ MegaMoE          单 persistent kernel + Expert Wave 波次              │
+ │ Mixture-of-Kittens 单确定性 MegaKernel + pull/push 消信令 + CLC        │
+ │ FlashDMoE        单 kernel 三类 actor warp（但只有前向）               │
+ │ HyperParallel    tile 级异构 taskflow（AIC/AIV 双队列，Ascend）        │
+ │ 手段：persistent kernel + device 侧调度 ｜ 粒度：token / tile          │
+ │ 副产物：逐位确定性成为卖点（UniEP 与 MoK 都点名 COMET 不可复现）        │
+ └──────────────────────────────────────────────────────────────────────┘
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>三代演进背后是同一条被反复触碰的墙</h4>
+<p>每一代都在解决上一代暴露的问题：第一代用多 stream 重叠，但被 kernel launch 开销和 CPU 同步卡住；第二代切到 tile 级，但 kernel 数量爆炸（Megatron+DeepEP 达 432 个 GPU op）；第三代干脆把一切塞进一个 kernel，代价是<strong>编程复杂度与硬件绑定</strong>——MoK 直接要求 Blackwell SM100/SM103 + NVL72，MegaMoE 要求 SM90/SM100 + 对称内存。</p>
+<p style="margin-bottom:0"><em>可移植性是第三代付出的真实代价</em>。UniEP 承认 AMD 与新 NVIDIA 架构只做了讨论；FlashDMoE 承认 Ampere 上参数次优；MoK 干脆不支持 Hopper。<strong>2026 年选择 MoE 训练系统，本质上是在选择被绑定到哪一代硬件上。</strong></p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 5 ==================== -->
+<div class="tab" id="t-infer">
+
+<section>
+<h2>六、推理服务系统：一切复杂性都源于一条不等式</h2>
+
+<h3>6.1 先把这条不等式写清楚：<code>b ⩾ F / B</code></h3>
+
+<p>MoE 推理的所有工程复杂度，都可以从一条不等式推出来。MegaScale-Infer 把它写成了闭式：</p>
+
+<blockquote>
+<em>"a GPU requires that 2bhn/F ≥ 2hn/B, i.e., <strong>b ≥ F/B</strong>, to fully utilize its matrix multiplication capability."</em><br>
+<em>"For an A100 GPU, the batch size at least needs to be <strong>156 tokens</strong> (312 TFLOPS / 2 TB/s)."</em>
+<div class="src">— MegaScale-Infer, <a href="https://arxiv.org/abs/2504.02263" target="_blank">arXiv:2504.02263</a></div>
+</blockquote>
+
+<p>也就是说，要让 GEMM 从<strong>带宽受限</strong>翻到<strong>算力受限</strong>，每张卡上聚起来的 token 数必须至少等于"算力 ÷ 带宽"。这个门槛与 MoE 无关，任何 dense 模型都一样。<strong>MoE 的问题是它在这个门槛上又乘了一个稀疏度</strong>：</p>
+
+<blockquote>
+<em>"given a batch size of 156, the average number of decoding tokens dispatched to each expert is 156 × topk/#expert = 156 × 2/8 = <strong>39</strong>, with the theoretical Model Flops Utilization (MFU) for FFN modules of <strong>2/8 = 25%</strong>."</em>
+<div class="src">— 同上</div>
+</blockquote>
+
+<p>把这个逻辑套到 2026 年的模型规模上，数字变得非常刺眼。Janus 给出了 H100 上的版本：</p>
+
+<blockquote>
+<em>"Under this roofline, DeepSeek-V3 would require a batch size of about <strong>18k (5k) tokens</strong> to operate in the compute-bound regime on <strong>H100 (A100)</strong> GPUs, which is hardly achievable for many real-world inference scenarios where <strong>batch sizes are often below 100</strong>."</em>
+<div class="src">— JANUS, <a href="https://arxiv.org/abs/2512.13525" target="_blank">arXiv:2512.13525</a></div>
+</blockquote>
+
+<div class="card danger">
+<h4>把这三段连起来，就是整个 MoE 推理领域的问题陈述</h4>
+<p style="margin-bottom:0">H100 上需要 <strong>18000</strong> token 才能进入算力受限区，而真实线上请求的 batch <strong>常常低于 100</strong>——<em>差了两个数量级以上</em>。而且即使凑够了 batch，FFN 的理论 MFU 上限仍被稀疏度锁死在 <code>topk / #expert</code>。<strong>MoE 省下的是 FLOPs，但 decode 阶段的瓶颈从一开始就不是 FLOPs。</strong>后面所有系统——大规模跨节点 EP、PD 分离、attention/FFN 解耦、专家 offload——都是在回答同一个问题：<em>怎么把足够多的 token 聚到同一个专家上</em>。</p>
+</div>
+
+<h3>6.2 DeepSeek 的生产披露：唯一一份完整的真实部署数据</h3>
+
+<p>学术论文给的是实验室数字，DeepSeek 在 Open Source Week 公开的是<strong>真实生产系统的 24 小时统计</strong>。这份数据的价值无可替代，因为它同时给出了拓扑、吞吐与成本。</p>
+
+<div class="tbl-wrap">
+<table>
+<tr><th>项目</th><th>Prefill 阶段</th><th>Decode 阶段</th></tr>
+<tr><td>并行配置</td><td><strong>EP32 + DP32</strong></td><td><strong>EP144 + DP144</strong></td></tr>
+<tr><td>每 GPU 专家数</td><td><strong>9 个路由专家 + 1 个共享专家</strong></td><td><strong>2 个路由专家 + 1 个共享专家</strong></td></tr>
+<tr><td>部署单元</td><td>4 节点</td><td>18 节点</td></tr>
+<tr><td>单节点平均吞吐</td><td><strong>73.7k input tokens/s</strong></td><td><strong>14.8k output tokens/s</strong></td></tr>
+</table>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="num">278 / 226.75</div><div class="lbl">峰值 / 平均占用节点数<br>（H800，8 卡/节点）</div></div>
+  <div class="kpi"><div class="num orange">$87,072</div><div class="lbl">日均 GPU 成本<br>（按 $2 / GPU·hour）</div></div>
+  <div class="kpi"><div class="num green">56.3%</div><div class="lbl">磁盘 KV 缓存命中率<br>（608B 输入中 342B 命中）</div></div>
+  <div class="kpi"><div class="num purple">545%</div><div class="lbl">理论成本利润率<br>（官方自述按 R1 定价推算）</div></div>
+</div>
+
+<div class="card highlight">
+<h4>这份数据里最值得记住的一个设计选择</h4>
+<p><strong>decode 阶段每张卡只放 2 个路由专家</strong>，而 prefill 放 9 个。为什么要故意把 decode 的每卡专家数压到这么低？因为这正是 6.1 那条不等式的直接推论——<em>每卡专家越少，落到每个专家上的 token 就越多，专家权重的一次搬运就被更多 token 摊薄</em>。DeepSeek 自己的表述是：</p>
+<blockquote style="margin-bottom:12px"><em>"the model's high sparsity necessitates an extremely large overall batch size. This ensures sufficient batch size per expert, enabling higher throughput and lower latency. <strong>Large-scale cross-node EP is essential.</strong>"</em></blockquote>
+<p style="margin-bottom:0">所以"EP144"不是为了省显存才做那么大，<strong>而是为了把每卡专家数压到 2</strong>。这是一个把物理约束直接翻译成拓扑决策的教科书案例。</p>
+<p class="ref" style="margin-bottom:0">来源：<a href="https://github.com/deepseek-ai/open-infra-index" target="_blank">deepseek-ai/open-infra-index</a>（Day 6：DeepSeek-V3/R1 Inference System Overview）</p>
+</div>
+
+<div class="card warning">
+<p style="margin:0"><span class="tag fact">官方自述局限</span>DeepSeek 明确说明那个 545% 的利润率是<strong>按 R1 定价推算的理论值</strong>，实际收入显著更低——因为 V3 更便宜、部分服务免费、且有夜间折扣。<em>引用这个数字时必须带上这句话。</em></p>
+</div>
+
+<h3>6.3 三个 attention/FFN 解耦的推理系统</h3>
+
+<div class="syscard infer">
+  <div class="sysname">MegaScale-Infer：解耦 + 乒乓流水 + 自研 M2N</div>
+  <div class="sysmeta">arXiv:2504.02263 ｜ 字节 Seed + 北京大学 ｜ 会议 venue <span class="tag na">未能确认</span>（ACM 页面被 Cloudflare 拦截）</div>
+  <dl>
+  <dt>核心机制</dt>
+  <dd>把每层的 attention 与 FFN 拆成两个<strong>独立部署、独立扩缩</strong>的模块：attention 侧做数据并行，专家侧做专家并行。attention 侧用 <strong>ping-pong pipeline parallelism（PPPipe）</strong>把一批请求切成 m 个 micro-batch 轮转，使两侧互相掩盖通信。</dd>
+  <dt>micro-batch 数有闭式下界</dt>
+  <dd><code>m ⩾ 2 × (1 + Tc/Tf)</code>——通信时间相对 FFN 计算时间越长，需要的 micro-batch 就越多。<span class="tag infer">分析</span>这个公式的实用价值在于：它把"要切几段"从调参变成了可计算量，前提是你能测出 Tc 与 Tf。</dd>
+  <dt>为什么要自研通信库</dt>
+  <dd>解耦之后通信模式从 All-to-All 变成了 <strong>M-to-N</strong>（M 个 attention 节点 → N 个专家节点），这不是 NCCL 的强项。自研 M2N 相对 NCCL <strong>吞吐高 4.2×、延迟低 68.2%</strong>，依赖 RDMA write-with-immediate + GPUDirect。</dd>
+  <dt>硬件</dt>
+  <dd>两套 testbed：(a) 单机 8×Ampere 96GB，NVLink；(b) 多机集群，每机 8×Hopper 96GB + <strong>8×400 Gbps RDMA NIC</strong>，机内 NVLink。GPU 具体型号在正文中以架构代号出现。</dd>
+  <dt>性能</dt>
+  <dd>相对 vLLM / TensorRT-LLM / SGLang，per-GPU decode 吞吐最高 <strong>1.90×</strong>。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/abs/2504.02263" target="_blank">arXiv:2504.02263</a></dd>
+  </dl>
+</div>
+
+<div class="syscard infer">
+  <div class="sysname">JANUS：把解耦的比例做成可按 SLO 调的旋钮</div>
+  <div class="sysmeta">arXiv:2512.13525 ｜ 港中深 + TeleAI（中国电信）+ 深圳河套研究院 + 哈工大深圳</div>
+  <dl>
+  <dt>核心机制</dt>
+  <dd>同样走 attention / expert 解耦，但重点是<strong>两侧资源可按 SLO 独立配比与弹性伸缩</strong>，并针对 decode 阶段专家侧极低的算术强度设计调度，避免 attention 侧空等 All-to-All。</dd>
+  <dt>最大贡献其实是那条 roofline 更新</dt>
+  <dd>它把 MegaScale-Infer 的 A100 门槛推进到 H100 + DeepSeek-V3 规模：<strong>18k token 才进入 compute-bound</strong>，而现实 batch 常低于 100。<span class="tag infer">分析</span>这个数字比它的加速比更有引用价值，因为它量化了"为什么必须解耦"。</dd>
+  <dt>硬件</dt>
+  <dd>H100 集群；实验中在单卡上模拟 <strong>32 个专家</strong>的放置密度。A100 仅用于 roofline 推算对比。</dd>
+  <dt>性能数字的可用性</dt>
+  <dd><span class="tag na">未公开</span>论文以分组图表呈现相对 co-located 基线的提升，<strong>没有给出可引用的单一汇总倍率</strong>。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/abs/2512.13525" target="_blank">arXiv:2512.13525</a></dd>
+  </dl>
+</div>
+
+<div class="syscard infer">
+  <div class="sysname">FinDEP：在解耦之上做细粒度调度</div>
+  <div class="sysmeta">arXiv:2512.21487 ｜ 港科广 + 哈工大深圳 + 浸会 + 港科大 ｜ 全名 <em>Efficient MoE Inference with Fine-Grained Scheduling of Disaggregated Expert Parallelism</em></div>
+  <dl>
+  <dt>核心机制</dt>
+  <dd>在 disaggregated expert parallelism 之上做<strong>细粒度调度</strong>：把 attention group（ag）与 expert group（eg）的规模作为可调旋钮，按 token 级别调度以填平专家负载不均与通信气泡。</dd>
+  <dt>配置表示法</dt>
+  <dd>以 <code>(ag, eg)</code> 组规模对表示部署配置；<span class="tag na">未公开</span>TP 度数未给出。</dd>
+  <dt>硬件</dt>
+  <dd>论文 Table 2 列出 <strong>4 套 testbed A–D</strong>，覆盖不同 GPU 数与互联规格。</dd>
+  <dt>性能数字的可用性</dt>
+  <dd><span class="tag na">未公开</span>相对 disaggregated EP 基线的加速按 testbed 分别给出，无单一汇总倍率。作者承认调度收益<strong>依赖专家负载分布的可预测性</strong>。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://arxiv.org/abs/2512.21487" target="_blank">arXiv:2512.21487</a></dd>
+  </dl>
+</div>
+
+<div class="card info">
+<h4><span class="tag infer">分析</span>三个解耦系统的分工，其实是同一条曲线上的三个点</h4>
+<p style="margin-bottom:0">MegaScale-Infer 解决"能不能解耦"（给出 PPPipe 与 M2N，证明可行且有 1.90×）；Janus 解决"解耦比例怎么定"（把它变成 SLO 约束下的资源配比问题）；FinDEP 解决"解耦之后怎么调度"（token 级细粒度填气泡）。<em>加上训练侧的 DisagMoE（AF-Pipe）与 vLLM 的 AFD plugin，2026 年"attention/FFN 解耦"已经从一个论文点子变成了一个有四五个独立实现的技术方向</em>。而它们共同的前提都是 6.1 那条不等式：<strong>只有解耦后，attention 侧才能用小 batch 跑低延迟，而专家侧独立聚合出大 batch。</strong></p>
+</div>
+
+<h3>6.4 开源栈的现状：SGLang 与 vLLM</h3>
+
+<div class="syscard infer">
+  <div class="sysname">SGLang 大规模 EP：96 GPU 复现 DeepSeek 式部署</div>
+  <div class="sysmeta">LMSYS / SGLang 官方博客，2025-05-05 ｜ <strong>唯一一份完整的开源复现记录</strong></div>
+  <dl>
+  <dt>技术组合</dt>
+  <dd>PD 分离 + 大规模 EP + <strong>DeepEP</strong>（normal / low-latency 双模）+ <strong>DeepGEMM</strong>（contiguous / masked grouped GEMM）+ <strong>two-batch overlap（TBO）</strong> + <strong>EPLB</strong> 专家再平衡。</dd>
+  <dt>硬件</dt>
+  <dd>12 节点 × 8 GPU = <strong>96×H100</strong>（Atlas Cloud）；<span class="tag na">未公开</span>NVLink 代际与带宽、NIC 带宽均未披露。</dd>
+  <dt>性能</dt>
+  <dd>2k 输入长度下：prefill 单节点 <strong>52.3k token/s</strong>、decode 单节点 <strong>22.3k token/s</strong>；博客称约为 DeepSeek 官方数据的 <strong>1.2×</strong>。
+  <span class="tag fact">官方原文</span>收益来源被明确归因：<em>"these performance gains are largely attributed to <strong>4× larger batch sizes enabled by EP</strong>, which enhances scalability by significantly reducing per-GPU memory consumption of model weights."</em></dd>
+  <dt>自述局限</dt>
+  <dd>EPLB 依赖负载分布假设，真实 serving 中分布可能偏移；TBO 实现复杂；部分优化对短序列收益有限。</dd>
+  <dt>时效说明</dt>
+  <dd><span class="tag na">注意</span>本次检索<strong>未找到 2026 年的 SGLang 官方博客更新</strong>，可引用的仍是 2025-05-05 这篇。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://lmsys.org/blog/2025-05-05-large-scale-ep/" target="_blank">LMSYS 官方博客</a></dd>
+  </dl>
+</div>
+
+<div class="syscard infer">
+  <div class="sysname">vLLM：EP 已进主干，AFD 仍是实验性 plugin</div>
+  <div class="sysmeta">官方文档 + AFD Plugin 博客（2026-07-23）</div>
+  <dl>
+  <dt>状态必须说清楚</dt>
+  <dd><strong>EP 部署已是官方文档功能</strong>（支持 DeepEP + EPLB）；但 <strong>AFD（attention-FFN 解耦）是实验性外部 plugin，不在 upstream core</strong>。
+  博客自述：<em>"an experimental external plugin that brings Attention-FFN Disaggregation (AFD) to vLLM"</em>。
+  <span class="tag infer">分析</span>这与 TAB ① 里"vLLM AFD 已停滞"的说法需要更新：它没有停滞，而是以 plugin 形式在活跃开发。</dd>
+  <dt>支持范围（原文，注意不是只有 Ascend）</dt>
+  <dd><span class="tag fact">官方博客</span><em>"The project currently supports NVIDIA GPUs and Ascend NPUs, synchronous and asynchronous connectors, DeepSeek V2/V3-family model wrappers, and eager, graph, and dual-batch execution paths within clearly validated limits."</em>
+  两个连接器分别是 <code>CAMP2pAFDConnector</code>（同步）与 <code>CAMAsyncAFDConnector</code>（异步）。</dd>
+  <dt>一个非常实用的显存数字</dt>
+  <dd>官方文档给出计算式：DeepSeek-V3 <strong>每个冗余专家约 2.4 GB 显存</strong>。EPLB 通过 flag 控制冗余专家数与重排周期。
+  <span class="tag infer">分析</span>这个数字让"冗余专家"的成本变得可算：DeepSeek 官方 EPLB 用 32 个冗余专家（专家池 256→288），按 2.4 GB 算就是约 77 GB 的额外权重开销，摊到 EP144 上每卡约 0.5 GB——<em>这是"用显存换均衡"的明确定价</em>。</dd>
+  <dt>AFD plugin 的实测配置</dt>
+  <dd>该组对比跑在 <strong>Ascend 910C</strong> 上（DeepSeek-V3.2 W8A8，以 die 为单位计量）：
+  <strong>EP64 基线</strong>（DP64 / EP64 / TP1，共 64 die）vs <strong>48A16F</strong>（48 attention rank + 16 FFN rank，共 64 die）
+  vs <strong>64A16F</strong>（64 attention rank + 16 FFN rank，共 <strong>80 die</strong>）。
+  <span class="tag na">注意</span>博客明确限定了这组数字的含义：<em>"The benchmark measures saturated decode throughput rather than online-serving latency."</em>
+  <span class="tag infer">分析</span>64A16F 用了 80 die 去对比 64 die 的基线，所以看吞吐总量会失真，必须看 tokens/s/die。</dd>
+  <dt>自述局限（原文）</dt>
+  <dd><em>"This project is still experimental and needs more large-scale testing"</em>；
+  另外 EPLB 一侧需要离线或在线统计专家负载才能生效。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://docs.vllm.ai/en/latest/serving/expert_parallel_deployment.html" target="_blank">vLLM EP 部署文档</a> ｜ <a href="https://blog.vllm.ai/blog/2026-07-23-vllm-afd-plugin" target="_blank">AFD Plugin 博客</a></dd>
+  </dl>
+</div>
+
+<h3>6.5 另一条路：显存受限场景的 offloading</h3>
+
+<p>前面所有系统都假设"卡足够多"。但如果只有一两张卡，MoE 的稀疏性反而变成了优势——<strong>大部分专家在大部分时间里是不用的</strong>。这条路线上有两个代表工作。</p>
+
+<div class="tbl-wrap">
+<table>
+<tr><th>系统</th><th>机制</th><th>硬件</th><th>基线</th></tr>
+<tr>
+  <td><strong>MoE-Lightning</strong><br>arXiv:2411.11217<br>UC Berkeley</td>
+  <td><strong>CGOPipe</strong>：CPU-GPU-I/O 三路流水重叠；<strong>Hierarchical Roofline Model（HRM）</strong>指导 batch 与 offload 策略搜索。权重与 KV 分层放在 HBM / DRAM / 磁盘</td>
+  <td>Table 2 列出 6 套配置，覆盖 <strong>T4 / L4 / A100 / A6000</strong>，配不同 CPU 内存与 <strong>PCIe</strong> 带宽</td>
+  <td>FlexGen、DeepSpeed Zero-Inference、HF Accelerate（on-demand）、SE-MoE（prefetch）</td>
+</tr>
+<tr>
+  <td><strong>Pre-gated MoE</strong><br>arXiv:2308.12066<br><strong>KAIST + 中科大 + MSR</strong></td>
+  <td>把 gate 改造成 <strong>pre-gate</strong>：在第 N−1 层就预测第 N 层要激活的专家，从而把专家权重的 CPU→GPU 搬运与当前层计算重叠</td>
+  <td>A100 80GB + AMD EPYC 7V12 + <strong>1.8 TB host 内存</strong> + <strong>PCIe gen4 32 GB/s</strong></td>
+  <td>on-demand 专家取回</td>
+</tr>
+</table>
+</div>
+
+<div class="card warning">
+<p style="margin:0"><span class="tag fact">更正</span>Pre-gated MoE 的机构常被误记。核实结果为 <strong>KAIST + 中国科学技术大学 + Microsoft Research</strong>，<strong>不含 Georgia Tech</strong>（Georgia Tech 出现在 2026 年的 arXiv:2605.28302）。其 ISCA'24 的 venue 本次<span class="tag na">未能确认</span>。</p>
+</div>
+
+<div class="card info">
+<h4>这条路线给出了一个很好的稀疏度实证</h4>
+<p style="margin-bottom:0">Pre-gated MoE 指出 SwitchTransformer（top-1 of 128）每次推理 <em>"executes only <strong>0.8%</strong> of its experts"</em>。<span class="tag infer">分析</span>0.8% 意味着 99.2% 的专家权重在这次推理里是死重——对大集群这是浪费，但对<strong>单卡 offloading 场景这是机会</strong>：只要能提前知道要用哪 0.8%，就只需搬那 0.8%。<em>同一个物理事实，在两种硬件预算下变成了完全相反的结论。</em></p>
+</div>
+
+<h3>6.6 PD 分离的参考实现与 2026 年的极限探索</h3>
+
+<div class="tbl-wrap">
+<table>
+<tr><th>系统</th><th>定位</th><th>机制</th><th>硬件</th><th>性能（含基线）</th></tr>
+<tr>
+  <td><strong>Mooncake</strong><br>arXiv:2407.00079<br>USENIX <strong>FAST'25</strong><br>Moonshot / kvcache-ai</td>
+  <td>PD 分离的<strong>事实标准参考实现</strong></td>
+  <td>以 <strong>KVCache 为中心</strong>的三分架构：prefill 集群 / decode 集群 / 跨节点 KVCache 池（利用闲置 CPU-DRAM-SSD）；配 prefix caching 与<strong>预测式早拒</strong>最大化 goodput；chunked pipeline parallelism 处理长上下文 prefill</td>
+  <td><strong>A800-SXM4-80GB</strong> 节点，<strong>800 Gbps RDMA</strong>；<span class="tag na">NVLink 代际未公开</span></td>
+  <td>满足 TTFT/TBT SLO 前提下相对 vLLM 吞吐提升最高 <strong>525%</strong>；真实负载多处理 <strong>75%</strong> 请求</td>
+</tr>
+<tr>
+  <td><strong>How Far Can<br>Disaggregation Go?</strong><br>arXiv:2605.28302<br>含 Georgia Tech</td>
+  <td>2026 年的<strong>设计空间上界探索</strong></td>
+  <td>把解耦推到极致，提出 <strong>AIC++</strong> 设计空间探索，系统回答 attention / expert / KV 各维度解耦的收益上限</td>
+  <td><strong>128×B200</strong></td>
+  <td>达到约 <strong>4k tokens/s</strong> 量级（论文口径）；结论依赖 DSE 假设与 B200 代际带宽比例</td>
+</tr>
+</table>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>本标签的一句话结论</h4>
+<p style="margin-bottom:0"><strong>MoE 推理系统的全部设计，都是在同一个约束下找不同的解：如何在每个专家上凑够 token。</strong>大规模跨节点 EP 的答案是"把每卡专家数压到 2"（DeepSeek EP144）；PD 分离的答案是"让 decode 专心攒 batch"（Mooncake）；attention/FFN 解耦的答案是"让两侧各用自己合适的 batch"（MegaScale-Infer / Janus / FinDEP）；offloading 的答案是"承认凑不够，改为只搬需要的那 0.8%"（Pre-gated MoE / MoE-Lightning）。<em>四条路互不冲突，因为它们面对的硬件预算差了三个数量级。</em></p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 6 ==================== -->
+<div class="tab" id="t-lib">
+
+<section>
+<h2>七、EP 通信库：2026 年真正的胜负手</h2>
+
+<p>如果只看模型卡片，MoE 看起来是个模型问题。但把 EP 拉到 32 卡以上，它就变成了一个纯粹的通信库问题。
+这一层的库不到二十个，却决定了上面所有训练/推理系统的性能天花板——因为
+<strong>All-to-All 在 8 节点 EP 下已经占到执行时间的近 78%</strong>（DisagMoE 实测）。</p>
+
+<div class="card highlight">
+<h4><span class="tag infer">分析</span>先说结论：这一层在 2026 年发生了三件事</h4>
+<ol style="margin-bottom:0">
+<li><strong>后端从 NVSHMEM 迁向 NCCL GIN。</strong>这不是审美问题。DeepEP V2 的 release note 直接写了迁移理由，
+UltraEP 也在 README 里预告了同样的迁移路线。NVSHMEM 是一个完整的 PGAS 运行时，
+而 MoE 只需要它的一小块能力，NCCL 从 2.28 起把这块能力单独暴露成了 device API。</li>
+<li><strong>优化目标从"峰值带宽"变成"倾斜路由下的带宽稳定性"。</strong>
+MoonEP 和 UltraEP 的 benchmark 横轴都不是 token 数，而是 <em>router imbalance</em>。
+这是一个很本质的转向：在真实负载下，慢的那一个 rank 决定一切。</li>
+<li><strong>瓶颈从带宽转向同步开销。</strong>UBEP 论文把这个现象命名为"synchronization tax"，
+并给出了最有说服力的数字对比（见 §7.5）。当链路从 50 GB/s 涨到 392 GB/s 时，
+真正贵的东西已经不是搬数据，而是 flag、barrier 和 kernel launch。</li>
+</ol>
+</div>
+
+<h3>7.1 全景对照表</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>库</th><th>出品方</th><th>定位</th><th>后端</th><th>SM/架构门槛</th><th>软件下限</th><th>核心卖点</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DeepEP V2</strong></td><td>DeepSeek</td><td>EP dispatch/combine 事实标准</td>
+<td><strong>NCCL Gin</strong>（V1 为 NVSHMEM）</td><td>SM90（Hopper）或支持 SM90 PTX ISA 的架构</td>
+<td>Python ⩾3.8 · CUDA 12.3+（SM90）· <strong>PyTorch ⩾2.10</strong> · <strong>NCCL ⩾2.30.4</strong></td>
+<td>normal + low-latency 双核；V2 峰值 1.3×、SM 用量省 4×</td>
+</tr>
+<tr>
+<td><strong>MoonEP</strong></td><td>Moonshot AI</td><td>EP 通信 + 完美负载均衡</td>
+<td><span class="tag na">未公开</span>（依赖 symmetric memory / VMM）</td><td><span class="tag na">未公开</span>；设备列表为 NVIDIA GPU + Zhenwu PPU（under review）</td>
+<td><span class="tag na">未公开</span></td>
+<td>动态冗余专家，倾斜路由下通信时间近乎<strong>持平</strong></td>
+</tr>
+<tr>
+<td><strong>UltraEP</strong></td><td><strong>Dots-Infra</strong>（<span class="tag infer">非阿里</span>）</td><td>轻量专家负载均衡库</td>
+<td>NVSHMEM（README 预告将转 NCCL GIN）</td><td><strong>SM90 或 SM100</strong></td>
+<td>Python ⩾3.10 · <strong>PyTorch ⩾2.10</strong> · C++17 · CUDA 12.3+（SM90）/ 12.9+（SM100）</td>
+<td>把 rank 间倾斜从 1.30–4.01 压到 <strong>1.01–1.04</strong></td>
+</tr>
+<tr>
+<td><strong>pplx-garden</strong><br>（含 fabric-lib）</td><td>Perplexity</td><td>解耦式推理通信栈</td>
+<td>libfabric（旧 pplx-kernels 为 NVSHMEM，已废弃）</td><td><span class="tag na">未公开</span>（旧库 <code>9.0a+PTX</code>）</td>
+<td>Linux kernel ⩾5.12（DMA-BUF）· CUDA ⩾12.8 · libibverbs · <strong>GDRCopy</strong></td>
+<td><strong>SM-free while RDMA transfer</strong>；每 GPU 需独占 RDMA NIC</td>
+</tr>
+<tr>
+<td><strong>NVSHMEM</strong> 3.7.2</td><td>NVIDIA</td><td>GPU 侧 PGAS 运行时（底座）</td>
+<td>自身即后端</td><td>Volta 及以后；x86_64 / aarch64</td>
+<td>CUDA 12+ · CMake ⩾3.19；IBGDA 需 OFED ⩾5.0；NVLink SHARP 需 CUDA 12.1+ 且驱动 ⩾530.30.02</td>
+<td>对称堆 + kernel 内直接访存；<strong>原子操作强制要求 NVLink 或 GDRCopy</strong></td>
+</tr>
+<tr>
+<td><strong>NCCL device API</strong> 2.31.2</td><td>NVIDIA</td><td>四个 device 侧通信模块</td>
+<td>自身即后端</td><td>LSA/Multimem：Hopper+；<strong>GIN：Volta+</strong>；<strong>CFT：Blackwell+</strong></td>
+<td>GIN：CUDA 12.2+ · 驱动 ⩾510.40.3；CFT：CUDA <strong>13.3</strong>+ · 驱动 ⩾610.43.02</td>
+<td>把通信原语直接搬进用户 CUDA kernel</td>
+</tr>
+<tr>
+<td><strong>NCCL EP</strong></td><td>NVIDIA</td><td>基于 device API 重写的 MoE 专用库</td>
+<td>NCCL GIN</td><td>H100（EOS 集群实测）</td><td><span class="tag na">未公开</span></td>
+<td>dispatch 在多节点追平/超过 DeepEP；combine 仍落后 5–12%</td>
+</tr>
+<tr>
+<td><strong>HybridEP</strong></td><td>NVIDIA</td><td>TMA 驱动的低 SM 占用 dispatcher</td>
+<td>TMA + IBGDA</td><td>H100 / GB200（含 MNNVL）</td><td><span class="tag na">未公开</span></td>
+<td>极低 SM 占用 + 支持更大 NVLink 域 + <strong>NVFP4</strong>；无 NVLink 时走 PCIe kernel</td>
+</tr>
+<tr>
+<td><strong>TileLink</strong></td><td>学术（arXiv:2503.20313）</td><td>tile 级重叠编译器</td>
+<td>Triton → Distributed IR → PTX</td><td><strong>仅 NVIDIA</strong>；实测 H800</td><td><span class="tag na">未公开</span></td>
+<td>把重叠写成 tile-centric 原语，1.17–20.76× vs 不重叠基线</td>
+</tr>
+<tr>
+<td><strong>StepMesh</strong></td><td>StepFun</td><td>Attention-FFN 解耦专用传输</td>
+<td>BytePS / ps-lite（<strong>host 侧 push/pull</strong>）</td><td>需 RDMA NIC + GPU</td><td><strong>Ubuntu</strong> · torch ⩾2.0.0</td>
+<td><code>ZBatchPushPull</code> 零拷贝；worker/server/scheduler 三角色</td>
+</tr>
+<tr>
+<td><strong>Triton-distributed</strong></td><td>ByteDance-Seed</td><td>Triton 上的分布式原语</td>
+<td>NVSHMEM 3.3.9 + nvshmem4py</td><td>SM90a / SM80 / SM89 / <strong>AMD CDNA3</strong></td>
+<td>容器 <code>nvcr.io/nvidia/pytorch:25.04-py3</code> · cuda-python 12.4</td>
+<td>32×H800 低延迟 <strong>137 µs vs DeepEP 182 µs</strong></td>
+</tr>
+<tr>
+<td><strong>MORI / MORI-EP</strong></td><td>AMD ROCm</td><td>模块化 RDMA 接口</td>
+<td>libibverbs + XGMI</td><td>MI300X / MI308X / MI325X / MI355X（MI450X 开发中）</td><td><strong>ROCm ⩾6.4</strong> · libpci-dev · libibverbs-dev</td>
+<td>AMD 阵营唯一成熟 EP 库；NIC 支持 Pollara / CX7 / Thor2</td>
+</tr>
+<tr>
+<td><strong>UBEP</strong></td><td>南京大学 + 华为<br>（SIGCOMM'26）</td><td>superpod 专用 All-to-All 重构</td>
+<td>华为 CANN + <strong>UB 总线</strong></td><td>Ascend NPU（需 <strong>512B 原子 Load/Store</strong>）</td><td>CANN 栈</td>
+<td>A2A 延迟 −52.4%，端到端 TPOT +11.1%</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="card warning">
+<h4><span class="tag infer">署名更正</span>两条必须纠正的归属</h4>
+<p><strong>UltraEP 不是阿里的。</strong>唯一真实存在的仓库是 <a href="https://github.com/Dots-Infra/UltraEP" target="_blank">Dots-Infra/UltraEP</a>，
+<code>alibaba/UltraEP</code> 返回 404。论文为 <a href="https://arxiv.org/abs/2606.04101" target="_blank">arXiv:2606.04101</a>。</p>
+<p style="margin-bottom:0"><strong>AcclEP 无法核实。</strong>GitHub 代码搜索返回 <code>total_count = 0</code>，<code>alibaba/AcclEP</code> 为 404。
+它存在的唯一证据是 MoonEP 致谢清单里的一行字面文本 <code>AcclEP (Alibaba's EP communication library)</code>。
+<span class="tag na">未公开</span>因此本报告不对它的任何技术特性做描述——有名字不等于有可核实的实现。</p>
+</div>
+
+<h3>7.2 DeepEP V2：事实标准，但代价写在 README 里</h3>
+
+<div class="syscard lib">
+  <div class="sysname">DeepEP V2 — 从 NVSHMEM 搬到 NCCL Gin</div>
+  <div class="sysmeta">DeepSeek 出品 ｜ normal kernel（训练/prefill）+ low-latency kernel（decode）双核架构</div>
+  <dl>
+  <dt>为什么换后端</dt>
+  <dd><span class="tag fact">官方文档</span>V2 的 release note 原文：
+  <em>"V2 has also switched from the NVSHMEM backend to the more lightweight NCCL Gin backend"</em>。
+  收益写得同样直白：<em>"V2 achieves up to 1.3x peak performance, while saving up to 4x SM count"</em>。
+  <span class="tag infer">分析</span>省 SM 是这一代最重要的指标——SM 省下来就能给计算，这正是 MegaKernel 化的前提。</dd>
+  <dt>带宽实测（8K tokens / hidden 7168 / top-8 / FP8 dispatch + BF16 combine）</dt>
+  <dd>
+  <div class="tbl-wrap">
+  <table class="compact">
+  <thead><tr><th>配置</th><th>dispatch</th><th>combine</th><th>SM 用量</th></tr></thead>
+  <tbody>
+  <tr><td>SM90 + CX7, EP 8×2</td><td>90 GB/s</td><td>81 GB/s</td><td>12 SM</td></tr>
+  <tr><td>SM90, EP 8×4</td><td>61 GB/s</td><td>61 GB/s</td><td>6 SM</td></tr>
+  <tr><td>SM100 + CX7, EP 8×2</td><td>90 GB/s</td><td>91 GB/s</td><td>12 SM</td></tr>
+  <tr><td><strong>SM100, EP 8 纯 NVLink</strong></td><td><strong>726 GB/s</strong></td><td><strong>740 GB/s</strong></td><td>64 SM</td></tr>
+  <tr><td>SM100, EP 8 纯 NVLink</td><td>643 GB/s</td><td>675 GB/s</td><td>24 SM</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <span class="tag fact">官方文档</span>读表必须注意官方的免责声明：
+  <em>"the results are logical bandwidth… under the EP 8 x 2 case, 90 GB/s actually contains local rank traffic"</em>。
+  也就是说 90 GB/s 里混入了本地流量，不能直接当成网络带宽。</dd>
+  <dt>V1 遗产数字（仍是很多论文的对比基线）</dt>
+  <dd>Ampere(SM80) + Hopper，NVSHMEM 后端，H800 上 NVLink ~160 GB/s + CX7 ~50 GB/s。
+  节点内 EP8 <strong>153/158 GB/s</strong>；跨节点 EP16 43/43、EP32 58/57、EP64 51/50 GB/s。
+  low-latency 核（128 tokens）：EP8 77 µs/98 GB/s、EP16 118 µs/63、EP32 155 µs/48、EP64 173 µs/43、EP128 192 µs/39、EP256 194 µs/39；
+  对应 combine 延迟 114/195/273/314/369/360 µs。
+  <span class="tag infer">分析</span>注意 EP16 反而比 EP8 慢很多、又比 EP32 慢——这不是 bug，是节点内/跨节点的分界效应。</dd>
+  <dt>那段著名的"未定义行为"</dt>
+  <dd><span class="tag fact">官方文档</span>DeepEP 自己承认用了 PTX 未定义行为来提速：
+  <em>"using read-only PTX <code>ld.global.nc.L1::no_allocate.L2::256B</code> to read volatile data… correctness is tested to be guaranteed with .L1::no_allocate on Hopper"</em>。
+  逃生开关是 <code>DISABLE_AGGRESSIVE_PTX_INSTRS=1</code>。
+  <span class="tag infer">分析</span>这行代码是"为什么 DeepEP 快"的一部分答案，也是"为什么别人不敢照抄"的原因。</dd>
+  <dt>V2 的代价（官方自己列的）</dt>
+  <dd><em>"Buffer size consumption is larger than V1"</em>；
+  <em>"0 SM RDMA low-latency EP is no longer supported"</em>；
+  <em>"Engram, PP, and CP are experimental"</em>；
+  <em>"fully tested with InfiniBand… theoretically compatible with RoCE"</em>；
+  <em>"Congestion control is disabled because it hurts maximum bandwidth"</em>。
+  EP2048 在文档中被声称支持但<strong>未给出实测数据</strong>。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://github.com/deepseek-ai/DeepEP" target="_blank">github.com/deepseek-ai/DeepEP</a></dd>
+  </dl>
+</div>
+
+<h3>7.3 均衡派：MoonEP 与 UltraEP 把横轴换成了 imbalance</h3>
+
+<div class="syscard lib">
+  <div class="sysname">MoonEP — 用动态冗余专家换取"完美均衡"</div>
+  <div class="sysmeta">Moonshot AI 出品 ｜ 默认分支为 <code>master</code></div>
+  <dl>
+  <dt>一句话定位</dt>
+  <dd><span class="tag fact">官方文档</span>README 原文：
+  <em>"keeps token loads perfectly balanced across ranks via dynamic redundant experts"</em>。
+  它不是在"更快地搬倾斜的数据"，而是在"让数据不再倾斜"。</dd>
+  <dt>核心机制</dt>
+  <dd>每个 rank 收到 <code>S × K</code> 个 token，用一块 <code>[E+B, H, H']</code> 的对称张量承载
+  E 个主专家 + B 个冗余专家。训练时 <code>B = E/R</code>，推理时 <code>B = 3–4</code> 即可。
+  <span class="tag infer">分析</span>训练和推理的 B 差了一个量级，说明训练侧的倾斜比推理侧严重得多——这与"训练要跑满长序列、推理 batch 很小"的直觉一致。</dd>
+  <dt>关键结论</dt>
+  <dd><span class="tag fact">官方文档</span><em>"MoonEP's comm time stays almost flat as maxvio grows, while DeepEP v2 — whose latency is set by the hottest rank — degrades steadily"</em>。
+  benchmark 条件是 <em>"run on H20 with EP=8, sweeping the router imbalance"</em>，
+  并且在所有倾斜水平上都胜过 DeepEP v2，而 <strong>DeepEP 在极端倾斜下直接 OOM</strong>。
+  <span class="tag na">未公开</span>但绝对 GB/s 数值、SM 门槛、CUDA / PyTorch 最低版本一概未给。</dd>
+  <dt>硬件要求</dt>
+  <dd>设备列表：<code>NVIDIA GPU; Zhenwu PPU (under review, coming soon)</code>。
+  需要 NVLink 与 symmetric memory / VMM——<code>buffer.destroy()</code> 的文档说明是
+  <em>"explicitly release VMM/NVLink resources"</em>，这实际上暴露了它的硬性依赖。</dd>
+  <dt>使用陷阱</dt>
+  <dd><span class="tag fact">官方文档</span>零拷贝视图<em>"alias buffer state that the next dispatch / combine overwrites — do not hold them across communication calls"</em>。
+  <span class="tag infer">分析</span>这是所有零拷贝 EP 库的共同雷区，接入时最容易踩。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://github.com/MoonshotAI/MoonEP" target="_blank">github.com/MoonshotAI/MoonEP</a></dd>
+  </dl>
+</div>
+
+<div class="syscard lib">
+  <div class="sysname">UltraEP — 把倾斜从 4.01 压到 1.01 的那一组数字</div>
+  <div class="sysmeta">Dots-Infra 出品 ｜ <a href="https://arxiv.org/abs/2606.04101" target="_blank">arXiv:2606.04101</a> ｜ 自我定位 <em>"a lightweight yet high-performance expert load balancing library"</em></div>
+  <dl>
+  <dt>实测（EP64 / 256 专家 / 每 rank 4 主 + 2 冗余 / topk 8 / 每 rank 8k tokens / bf16 / 42 SM）</dt>
+  <dd>
+  <div class="tbl-wrap">
+  <table class="compact">
+  <thead><tr><th>指标</th><th>倾斜 1.51</th><th>倾斜 2.01</th><th>倾斜 3.03</th></tr></thead>
+  <tbody>
+  <tr><td>均衡后倾斜</td><td><strong>1.01</strong></td><td><strong>1.01</strong></td><td><strong>1.01</strong></td></tr>
+  <tr><td><code>update_placement</code></td><td>0.067 ms</td><td>0.072 ms</td><td>0.078 ms</td></tr>
+  <tr><td><code>reroute</code></td><td>0.039 ms</td><td>0.037 ms</td><td>0.036 ms</td></tr>
+  <tr><td><code>weight_sync</code>（直连）</td><td>0.214 ms</td><td>0.265 ms</td><td>0.317 ms</td></tr>
+  <tr><td><strong>关键路径带宽</strong></td><td><strong>706 GB/s</strong></td><td><strong>712 GB/s</strong></td><td><strong>715 GB/s</strong></td></tr>
+  <tr><td>自适应 relay</td><td>0.194 ms</td><td>0.195 ms</td><td>0.188 ms</td></tr>
+  <tr><td><code>grad_reduce</code>（已重叠）</td><td>1.935 ms</td><td>2.181 ms</td><td>2.425 ms</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <span class="tag infer">分析</span>这张表最漂亮的地方是<strong>关键路径带宽随倾斜上升</strong>（706→715 GB/s），
+  而直连 <code>weight_sync</code> 随倾斜恶化（0.214→0.317 ms）——自适应 relay 几乎持平（0.194→0.188 ms）正是它的价值所在。</dd>
+  <dt>论文规模</dt>
+  <dd>256 GPU、106B–671B 模型。原文结论：
+  <em>"achieves 94.3% of the force-balanced ideal throughput, delivering 1.49× improvement over no-balancing, while reducing the final inter-rank imbalance from 1.30−4.01 to 1.01−1.04"</em>。</dd>
+  <dt>依赖与已知限制</dt>
+  <dd>SM90 或 SM100；Python ⩾3.10、PyTorch ⩾2.10、C++17；CUDA 12.3+（SM90）/ 12.9+（SM100）；
+  <code>nvidia-nvshmem-cu13==3.4.5</code>。README 原话：
+  <em>"NVSHMEM is the only dependency (will switch to the more lightweight NCCL GIN in future)"</em>。
+  限制原文：<em>"When the NVLink domain is smaller than the EP group, the achievable imbalance floor sits slightly above the ideal 1.0"</em>。
+  <span class="tag infer">分析</span>又一次撞在"NVLink 域大小"这条铁律上——这和 §7.6 的判断完全一致。</dd>
+  </dl>
+</div>
+
+<h3>7.4 NVIDIA 官方阵营：从 PGAS 底座到 MoE 专用库</h3>
+
+<div class="card info">
+<h4><span class="tag fact">官方文档</span>NVSHMEM 与 NCCL device API 的分工</h4>
+<p><strong>NVSHMEM 3.7.2</strong> 是底座。它的对称堆定义原文：
+<em>"NVSHMEM provides an easy-to-use interface to allocate memory that is symmetrically distributed across the GPUs… also provides a CUDA kernel-side interface that allows NVIDIA CUDA threads to access any location in the symmetrically-distributed memory."</em>
+硬件面：Volta 及以后的数据中心 GPU；
+<em>"All GPUs must be P2P-connected via NVLink/PCIe or via GPUDirect RDMA"</em>；
+网络支持 InfiniBand / RoCE（CX-4 及以上）、Slingshot-11、Amazon EFA。
+最容易被忽略的一条硬约束：<em>"Support for atomics requires a NVLink connection or a GPUDirect RDMA connection and GDRCopy."</em>
+<span class="tag na">未公开</span>官方文档不提供带宽表。</p>
+<p style="margin-bottom:0"><strong>NCCL 2.31.2 device API</strong> 是"只取所需"的替代品。原文：
+<em>"Starting with version 2.28, NCCL provides a device-side communication API, making it possible to use communication primitives directly from user CUDA kernels."</em>
+四个模块分别是 <code>LSA</code>（Load/Store Accessible）、<code>Multimem</code>（NVLink SHARP，Hopper+）、
+<code>GIN</code>（GPU-Initiated Networking，<em>since NCCL 2.28.7</em>）、<code>CFT</code>（Compute Fabric Transport，<em>since NCCL 2.31</em>）。
+它同样依赖对称内存：<em>"The device API relies on symmetric memory… which in turn depends on GPU virtual memory management (see NCCL_CUMEM_ENABLE) and optionally – for multimem support – on NVLink SHARP"</em>。
+一条重要的运维警告：<em>"Kernels utilizing GIN are currently not backwards compatible and need to be recompiled when NCCL is upgraded."</em></p>
+</div>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>NCCL device 模块</th><th>GPU 门槛</th><th>CUDA</th><th>驱动</th><th>网络/其它</th></tr></thead>
+<tbody>
+<tr><td>LSA</td><td>Hopper+（P2P 可访问域内）</td><td>—</td><td>—</td><td>NVLink / PCIe P2P</td></tr>
+<tr><td>Multimem</td><td>Hopper+</td><td>—</td><td>—</td><td>需 NVLink SHARP</td></tr>
+<tr><td><strong>GIN</strong>（CPU Proxy）</td><td><strong>Volta 或更新</strong></td><td>12.2+</td><td>⩾510.40.3</td><td>CX4+</td></tr>
+<tr><td><strong>GIN</strong>（GDAKI）</td><td>Volta 或更新</td><td>12.2+</td><td>⩾510.40.3</td><td>CX4+ · <code>rdma-core ⩾44.0</code> · OFED ⩾5.8 或 DOCA ⩾3.1.0 · DMA-BUF 需 kernel ⩾6.1</td></tr>
+<tr><td><strong>CFT</strong></td><td><strong>Blackwell 或更新</strong></td><td><strong>13.3+</strong></td><td>⩾610.43.02</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="syscard lib">
+  <div class="sysname">NCCL EP — NVIDIA 用自己的 device API 重写一遍 DeepEP</div>
+  <div class="sysmeta"><a href="https://arxiv.org/abs/2603.13606" target="_blank">arXiv:2603.13606</a> ｜ 自我定位 <em>"a ground-up MoE communication library built entirely on NCCL's Device API"</em></div>
+  <dl>
+  <dt>接口与架构</dt>
+  <dd>暴露 <code>ncclEpDispatch</code> / <code>ncclEpCombine</code>，同样是 LL（1–128 tokens）+ HT（4096+）双模。
+  与前作的关系写得很清楚：<em>"The key adaptation in NCCL EP replaces Hybrid-EP's IBGDA calls with NCCL GIN primitives."</em></dd>
+  <dt>硬件（NVIDIA EOS）</dt>
+  <dd>576 节点，H100 80GB HBM3，<code>NVLink 4th Gen, 900 GB/s, 18 links/GPU</code>，<code>InfiniBand 8 × 400 Gbit/s</code>。</dd>
+  <dt>诚实的性能结论</dt>
+  <dd><span class="tag fact">论文原文</span><em>"For dispatch, NCCL EP matches or exceeds DeepEP at multi-node scales (2–8 nodes)… while trailing by ∼4% at single-node. For combine, NCCL EP trails DeepEP by 5–12% at 1–4 nodes and converges at 8 nodes."</em>
+  vLLM 0.10 端到端：吞吐落后 DeepEP 7–10%，ITL/TPOT 落后 7–9%（1 节点 755.1 vs 811.2 tok/s；4 节点 563.3 vs 617.0 tok/s；TPOT 54.1 vs 49.3 ms）。
+  <span class="tag infer">分析</span>NVIDIA 官方库跑不过 DeepSeek 的库，而且自己把差距写进论文——这是 2026 年最值得注意的一个信号：
+  DeepEP 的领先来自那些"不太干净"的手工优化（见 §7.2 的 PTX 未定义行为），而 NCCL EP 换来的是可维护性与向前兼容。</dd>
+  <dt>NVIDIA 自己的领域判断</dt>
+  <dd><em>"Mixture-of-Experts (MoE) architectures have become essential for scaling large language models, driving the development of specialized device-initiated communication libraries such as DeepEP, Hybrid-EP, and others."</em></dd>
+  </dl>
+</div>
+
+<div class="syscard lib">
+  <div class="sysname">HybridEP + ECHO — TMA 路线，以及"热专家克隆"</div>
+  <div class="sysmeta"><a href="https://arxiv.org/abs/2603.07685" target="_blank">arXiv:2603.07685</a> ｜ 以两种形态存在：DeepEP 的 <code>hybrid-ep</code> 实验分支，以及 Megatron-Core 的官方 dispatcher</div>
+  <dl>
+  <dt>两种形态</dt>
+  <dd>DeepEP 实验分支的描述：<em>"A new backend implementation using TMA instructions for minimal SM usage and larger NVLink domain support… PCIe kernel support for non-NVLink environments; NVFP4 data type support"</em>。
+  Megatron-Core 侧的描述：<em>"developed by NVIDIA. It follows the same token-based principle as DeepEP, exploits hardware primitives such as TMA and IBGDA, and targets comparable or higher bandwidth with lower SM usage, including Multi-Node NVLink (MNNVL) deployments."</em></dd>
+  <dt>延迟实测（hidden 7168 / seq 4096 / 256 专家，单位 µs，HybridEP vs 朴素 all-to-all）</dt>
+  <dd>
+  <div class="tbl-wrap">
+  <table class="compact">
+  <thead><tr><th>平台 / EP</th><th>EP8</th><th>EP16</th><th>EP32</th><th>EP64</th></tr></thead>
+  <tbody>
+  <tr><td>GB200 dispatch</td><td>391 / 735</td><td>578 / 743</td><td>612 / 769</td><td>675 / 930</td></tr>
+  <tr><td>GB200 combine</td><td>353 / 741</td><td>527 / 765</td><td>646 / 758</td><td>744 / 827</td></tr>
+  <tr><td>H100 dispatch</td><td>661 / 1265</td><td>1485 / 5774</td><td>3064 / 8059</td><td><strong>4626 / 9164</strong></td></tr>
+  <tr><td>H100 combine</td><td>624 / 1277</td><td>1688 / 5628</td><td>3088 / 7815</td><td>4398 / 8727</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <span class="tag infer">分析</span>这张表是全报告最能说明"NVLink 域大小 &gt; 算力"的证据：
+  GB200 从 EP8 到 EP64 延迟只涨 <strong>1.7×</strong>（391→675 µs），H100 却涨了 <strong>7.0×</strong>（661→4626 µs）。
+  同一个库、同一份代码，差别几乎全部来自 MNNVL 把 EP64 装进了单一 NVLink 域。</dd>
+  <dt>附带产物 ECHO</dt>
+  <dd>同一篇论文里的 Megatron-Core 特性：<em>"ECHO: Elastic Cloning for Hot Experts… dynamically cloning hot experts to spare slots on underutilized ranks"</em>，
+  经由 <em>"HybridEP-based sync-free communication"</em> 实现，落地于 Megatron-LM PR#2368。
+  <span class="tag infer">分析</span>ECHO 与 MoonEP / UltraEP 在解决同一个问题（热专家），思路也一致：复制而非搬运。</dd>
+  </dl>
+</div>
+
+<h3>7.5 第三阵营：把"同步开销"当成主敌</h3>
+
+<div class="syscard lib">
+  <div class="sysname">UBEP — 2026 年最重要的一个概念：synchronization tax</div>
+  <div class="sysmeta">南京大学 + 华为，SIGCOMM'26 ｜ <a href="https://arxiv.org/abs/2607.06202" target="_blank">arXiv:2607.06202</a> ｜ 自我定位 <em>"a production-ready communication library that rethinks MoE's All-to-All primitives for modern superpod architectures"</em></div>
+  <dl>
+  <dt>核心论点（原文）</dt>
+  <dd><span class="tag fact">论文原文</span><em>"as link bandwidth scales in superpods, the relative cost of synchronization primitives, such as flags, barriers, and kernel launches becomes dominant, a phenomenon we term the 'synchronization tax'"</em>。</dd>
+  <dt>为什么在 superpod 上才暴露</dt>
+  <dd><span class="tag fact">论文原文</span><em>"On the CM384 architecture, however, the bandwidth increases by over an order of magnitude to 392 GB/s. As a result, token dispatch reaches bandwidth saturation very quickly, leaving phase-level synchronization as the dominant constraint."</em>
+  对比锚点很清晰：<strong>CM384 的 UB 总线 392 GB/s vs IB/RoCE v2 的 50 GB/s</strong>。
+  <span class="tag infer">分析</span>这解释了一个反直觉的现象——网络越快，通信库越难写。带宽富裕之后，所有固定开销都变成了瓶颈。</dd>
+  <dt>硬件与规模</dt>
+  <dd><em>"We implemented UBEP on the Huawei CANN stack and evaluated it on up to 256 NPU dies allocated from a production CM384 superpod"</em>——即 16 台 Ascend 服务器 / 256 NPU die。
+  硬性依赖 <em>"the 512B atomic Load/Store capability supported by the Ascend NPU"</em>。
+  <span class="tag infer">分析</span>512B 原子操作是这套设计的地基，也意味着它<strong>无法移植到 NVIDIA</strong>。</dd>
+  <dt>收益</dt>
+  <dd><em>"reduces All-to-All latency by 52.4% compared to the baseline CANN EP, translating to an 11.1% improvement in end-to-end TPOT"</em>；
+  各项分解贡献 34.7%–52.4%。
+  <span class="tag infer">分析</span>52.4% → 11.1% 又一次印证了本报告反复出现的规律：模块级收益到端到端会大幅缩水。</dd>
+  </dl>
+</div>
+
+<div class="syscard lib">
+  <div class="sysname">pplx-garden / fabric-lib — "SM-free while RDMA transfer"</div>
+  <div class="sysmeta">Perplexity 出品 ｜ 旧仓库 pplx-kernels 已废弃：<em>"We deprecated the old NVSHMEM-based kernels… check out pplx-garden"</em></div>
+  <dl>
+  <dt>设计取向</dt>
+  <dd>fabric-lib 的核心卖点是 <em>"SM-free while RDMA transfer"</em>——把 RDMA 传输完全从 SM 上摘下来。
+  <span class="tag infer">分析</span>这与 DeepEP V2「省 4× SM」、HybridEP「minimal SM usage」是同一个方向的三种实现。
+  2026 年 EP 库的共同 KPI 已经变成"少占 SM"，而不是"多跑带宽"。</dd>
+  <dt>硬件要求（比同类都更苛刻）</dt>
+  <dd><code>Linux Kernel 5.12 or higher (for DMA-BUF support)</code>、<code>CUDA 12.8 or higher</code>、
+  libfabric、libibverbs、<strong>GDRCopy</strong>、<code>SYS_PTRACE</code> + <code>SYS_ADMIN</code> 权限，以及
+  <em>"RDMA network with GPUDirect RDMA support. Each GPU should have at least one dedicated RDMA NIC."</em>
+  <span class="tag na">未公开</span>GPU 型号与 SM 门槛未给出（旧库为 <code>TORCH_CUDA_ARCH_LIST=9.0a+PTX</code>）。</dd>
+  <dt>实测（decode，128 tokens，dispatch / combine µs）</dt>
+  <dd>
+  <div class="tbl-wrap">
+  <table class="compact">
+  <thead><tr><th>EP</th><th>pplx + EFA</th><th>pplx + CX7</th><th>DeepEP + CX7</th></tr></thead>
+  <tbody>
+  <tr><td>EP64</td><td>266.7 / 391.2</td><td>187.5 / 309.1</td><td><strong>177.9 / 325.0</strong></td></tr>
+  <tr><td>EP8</td><td>49.7 / 64.2</td><td>50.5 / 65.3</td><td><strong>42.6 / 72.0</strong></td></tr>
+  </tbody>
+  </table>
+  </div>
+  prefill（4096 tokens，EP64）：pplx + CX7 <strong>4665.2 / 8771.1</strong> vs DeepEP + CX7 <strong>5071.6 / 5922.7</strong>。
+  <span class="tag infer">分析</span>格局很有意思：pplx 的 dispatch 在 prefill 更快（4665 vs 5072），combine 却慢了近 1.5×（8771 vs 5923）。
+  说明它的优化重心在"发出去"，而 combine 的规约路径仍是短板。</dd>
+  <dt>旧库遗产数字</dt>
+  <dd>1 token/GPU：NVLINK dispatch EP8 41.6 µs ± 1.3；IBGDA dispatch EP128 125.9 / EP64 121.0 / EP32 115.7 / EP16 102.7 µs；
+  IBRC EP128 高达 <strong>488.4 µs</strong>。128 tokens/GPU：IBGDA dispatch EP128 307.7 / combine 593.9 µs，vs DeepEP 192 / 369 µs。
+  <span class="tag infer">分析</span>IBRC 488 µs vs IBGDA 126 µs 是"设备侧发起通信"价值的最直白证明——差了 3.9×。</dd>
+  <dt>来源</dt>
+  <dd><a href="https://github.com/perplexityai/pplx-garden" target="_blank">github.com/perplexityai/pplx-garden</a> ｜ <a href="https://github.com/perplexityai/pplx-kernels" target="_blank">pplx-kernels（已废弃）</a></dd>
+  </dl>
+</div>
+
+<h3>7.6 非 NVIDIA 与编译器路线</h3>
+
+<div class="syscard lib">
+  <div class="sysname">MORI / MORI-EP — AMD 阵营的答案</div>
+  <div class="sysmeta">AMD ROCm 出品 ｜ 自我定位 <em>"MORI (Modular RDMA Interface) is a bottom-up, modular, and composable framework"</em></div>
+  <dl>
+  <dt>硬件矩阵</dt>
+  <dd>GPU：MI308X / MI300X / MI325X / MI355X（MI450X 开发中）。NIC：Pollara / CX7 / Thor2。
+  软件：<code>ROCm ⩾6.4</code>、libpci-dev、libibverbs-dev。节点内走 <strong>XGMI</strong> 而非 NVLink。</dd>
+  <dt>带宽（4096 tokens / hidden 7168 / top-8 / FP8 dispatch + BF16 combine，GB/s）</dt>
+  <dd>
+  <div class="tbl-wrap">
+  <table class="compact">
+  <thead><tr><th>配置</th><th>dispatch XGMI</th><th>dispatch RDMA</th><th>combine XGMI</th><th>combine RDMA</th></tr></thead>
+  <tbody>
+  <tr><td>MI300X + CX7, EP8</td><td>307</td><td>—</td><td>330</td><td>—</td></tr>
+  <tr><td>MI300X + CX7, EP16-V1</td><td>171</td><td>52</td><td>219</td><td>67</td></tr>
+  <tr><td>MI300X + CX7, EP32-V1</td><td>103*</td><td>57*</td><td>91*</td><td>50*</td></tr>
+  <tr><td>MI355X + AINIC, EP8</td><td><strong>345</strong></td><td>—</td><td><strong>420</strong></td><td>—</td></tr>
+  <tr><td>MI355X + AINIC, EP16-V1</td><td>179</td><td>54</td><td>234</td><td>71</td></tr>
+  <tr><td>MI355X + AINIC, EP32-V1</td><td>85</td><td>46</td><td>110</td><td>61</td></tr>
+  </tbody>
+  </table>
+  </div>
+  low-latency（128 tokens）：MI300X + CX7 EP8 dispatch 35 µs / 134 GB/s、combine 47 µs / 204 GB/s；
+  MI355X + AINIC EP8 dispatch 31 µs / 142 GB/s、combine 36 µs / <strong>276 GB/s</strong>。
+  <span class="tag na">注意</span>官方标注：<em>"* Stale data from previous kernel version; updated numbers pending re-benchmarking."</em>
+  带星号的 EP32 数据不可作为结论依据。</dd>
+  </dl>
+</div>
+
+<div class="syscard lib">
+  <div class="sysname">TileLink 与 Triton-distributed — 让重叠变成可编译的东西</div>
+  <div class="sysmeta">前者 <a href="https://arxiv.org/abs/2503.20313" target="_blank">arXiv:2503.20313</a>，后者 ByteDance-Seed 开源</div>
+  <dl>
+  <dt>TileLink</dt>
+  <dd>把重叠抽象成 tile-centric 原语，编译链为 Triton → Distributed IR → PTX。
+  <span class="tag fact">论文原文</span><em>"Evaluation on 8×H800 GPUs shows that TileLink can achieve from 1.17× to 20.76× speedups over non-overlapping baselines"</em>；
+  8 个模型端到端平均 <strong>1.32×</strong>；<em>"two nodes with 8×H800 (totally 16 GPUs)… average speedup to PyTorch is 1.29×"</em>；
+  self-attention 相对 Torch 5.04×、相对 RingAttn 1.97×。限制：<em>"Currently, TileLink targets only NVIDIA GPUs."</em>
+  <span class="tag na">未公开</span>GB/s 与 CUDA 版本门槛未给。
+  <span class="tag infer">分析</span>1.17–20.76× 这个区间跨度 17 倍，说明基线是"完全不重叠"，属于宽松基线，跨论文比较无意义。</dd>
+  <dt>Triton-distributed</dt>
+  <dd>容器 <code>nvcr.io/nvidia/pytorch:25.04-py3</code>，依赖 <code>cuda.core==0.2.0</code>、<code>nvidia-nvshmem-cu12==3.3.9</code>、
+  <code>nvshmem4py-cu12==0.1.2</code>、<code>cuda-python==12.4</code>。后端覆盖 <code>Nvidia SM90a / SM80 / SM89 / AMD CDNA3</code>——
+  是本表里唯一同时支持两家 GPU 的项目。
+  <span class="tag fact">官方文档</span>关键实测：
+  <em>"The performance of this example on 32 H800 GPUs is 137us (128 tokens per rank, topk=8, hidden_size=7168, dtype=fp8), while DeepEP is 182 us (note: DeepEP doesn't use NVLink for inference)."</em>
+  <span class="tag infer">分析</span>括号里那句注释很关键：这个 1.33× 领先建立在"DeepEP 推理不用 NVLink"的前提上，属于配置差异而非纯算法胜出。
+  2025-12-22 的更新日志：<em>"Updated EP functions, support low-latency mode, token saving, and Mega-EP"</em>。</dd>
+  <dt>StepMesh（对照）</dt>
+  <dd>StepFun 出品，<em>"designed to provide high-performance and low-latency communication for Attention-FFN decoupling architectures"</em>，
+  基于 BytePS / ps-lite，提供 <code>ZBatchPushPull</code> 零拷贝，分 worker / server / scheduler 三角色。
+  要求 <code>Ubuntu OS</code>、<em>"Servers with RDMA NICs and GPU cards."</em>、<code>torch ⩾2.0.0</code>。
+  <span class="tag na">未公开</span>带宽与延迟均未给出，指向 Step-3 报告 <a href="https://arxiv.org/abs/2507.19427" target="_blank">arXiv:2507.19427</a>。
+  <span class="tag infer">分析</span>它仍是 <strong>host 侧 push/pull</strong> 模型，不是设备侧发起——在这一代库里属于上一代范式，
+  但对 AF 解耦这种"跨角色、非对称"的通信模式，参数服务器抽象反而更自然。</dd>
+  </dl>
+</div>
+
+<h3>7.7 这一层的三条硬约束</h3>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>选库之前先看这三件事，比看带宽表有用</h4>
+<ol style="margin-bottom:0">
+<li><strong>NVLink 域能不能装下你的 EP 组。</strong>这是全层最强的约束，反复出现在三处独立证据里：
+HybridEP 在 GB200 上 EP8→EP64 只涨 1.7×，在 H100 上涨 7.0×；
+UltraEP 承认 <em>"When the NVLink domain is smaller than the EP group, the achievable imbalance floor sits slightly above the ideal 1.0"</em>；
+DeepEP SM100 纯 NVLink EP8 能跑 726 GB/s，一旦跨节点就掉到 61–90 GB/s。
+<strong>同一个库在域内域外差一个数量级</strong>，选型时这条比 TFLOPS 重要得多。</li>
+<li><strong>你的 router 有多倾斜。</strong>如果倾斜稳定在 1.5 以下，DeepEP V2 够用；
+一旦 maxvio 上到 2–4，就必须考虑 MoonEP / UltraEP / ECHO 这类"复制热专家"的方案——
+因为 DeepEP 的延迟由最热的 rank 决定，MoonEP 的文档明确说了在极端倾斜下 DeepEP 会 OOM。</li>
+<li><strong>你能付多少 SM。</strong>2026 年这一层的共同 KPI 已经不是带宽而是 SM 占用：
+DeepEP V2 省 4×、HybridEP 用 TMA 做到 minimal SM、fabric-lib 做到 SM-free。
+原因很实在——MegaKernel 化要求通信和计算挤在同一个 persistent kernel 里，通信占的 SM 就是计算失去的 SM。</li>
+</ol>
+</div>
+
+<div class="card warning">
+<h4><span class="tag infer">分析</span>一个容易被忽视的结论：官方库跑不过民间库</h4>
+<p style="margin-bottom:0">NCCL EP 是 NVIDIA 用自家 device API 从零重写的 MoE 库，硬件是 576 节点的 EOS 集群，
+结果 combine 落后 DeepEP 5–12%、vLLM 端到端落后 7–10%，而且这些数字是 NVIDIA 自己写进论文的。
+同时 DeepEP 的 README 里明确写着它依赖 PTX 未定义行为
+（<code>ld.global.nc.L1::no_allocate.L2::256B</code> 读 volatile 数据）并提供了关闭开关。
+这两件事放在一起看，结论是：<strong>当前 EP 通信的性能领先，有一部分来自愿意越过规范边界的工程胆量</strong>，
+而这部分优势本质上是不可持续的——它会随着 NCCL GIN 这类"官方通路"成熟而被抹平，
+代价是短期内损失 5–12% 性能，换来向前兼容与可维护性。选库时要清楚自己在这条权衡上站哪一边。</p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 7 ==================== -->
+<div class="tab" id="t-hw">
+
+<section>
+<h2>八、硬件要求：先建立"带宽台阶"这把尺子</h2>
+
+<p>把所有系统的硬件要求排成一张表之前，必须先说清一件事：<strong>MoE 的硬件门槛几乎从不由算力决定，而由"哪一级互联承担 All-to-All"决定</strong>。同一套代码，EP 恰好放进单节点 NVLink 域和跨出去一步，性能差的不是百分比而是倍数。下面这个台阶图是读后面所有表格的前提。</p>
+
+<div class="diagram"><span class="cap">图 F · 数据搬运的带宽台阶（每一级下降都是一个数量级）</span>
+
+  单向带宽(量级)
+      │
+  TB/s├──── ① SM ↔ HBM ────────────────────────────── 3.35 TB/s (H100 SXM HBM3)
+      │                                               8 TB/s (B200 HBM3e)
+      │     ★ 本地 GEMM / 共享专家计算所在的层级
+      │
+      ├──── ② GPU ↔ GPU 同一 NVLink 域 ─────────────── 900 GB/s  (NVLink 4, H100)
+      │                                               1.8 TB/s  (NVLink 5, Blackwell)
+      │     ★ EP 的 All-to-All 最希望待在这一级
+      │       域大小: DGX H100 = 8 卡 | GB200 NVL72 / GB300 NVL72 = 72 卡
+      │
+      │  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+      │  ┃  ⚠ 断崖: 从 ② 跌到 ③ 通常是 10~20 倍, 且延迟从 us 级进入更差量级 ┃
+      │  ┃    这一步是 MoE 系统设计里唯一真正"生死攸关"的边界              ┃
+      │  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+      │
+      ├──── ③ 节点 ↔ 节点 RDMA ──────────────────────── 400 Gb/s = 50 GB/s / NIC
+      │                                               (ConnectX-7, 常见 8 NIC/节点)
+      │                                               800 Gb/s (ConnectX-8)
+      │     ★ 跨节点 EP 落在这一级; DeepEP 的 RDMA kernel、IBGDA 都在优化它
+      │
+  GB/s└──── ④ 跨机架 / 跨 pod ─────────────────────────  更低, 且拓扑不再均匀
+
+  ┌── 由此推出的三条硬性设计规则 ──────────────────────────────────────────┐
+  │ 1. 能不跨 ② 就绝不跨。Megatron-Core 官方建议 EP x TP 必须放进单节点。   │
+  │ 2. 必须跨时, 先在节点内做一轮聚合再跨节点 = 层次化 All-to-All / 2DH。   │
+  │ 3. 算法侧主动配合: node-limited routing 限制每 token 触达的节点数。      │
+  └────────────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>为什么"算力/带宽比"是比 TFLOPS 更好的指标</h3>
+
+<p>MegaMoE 给出的判据值得单独拎出来当成通用工具：每个 token-expert 对的通信量是 <code>3h</code> 字节，对应计算量是 <code>6hd</code> FLOPs（<code>d</code> 为专家中间维度），于是</p>
+
+<pre><code>若  单卡算力 / 单卡可用互联带宽  <=  2d   ->  计算是瓶颈, 通信可被完全隐藏
+若  单卡算力 / 单卡可用互联带宽  >   2d   ->  通信是瓶颈, 再怎么重叠也藏不住
+
+举例(概念性推算, 非论文数字):
+  H100 BF16 稠密 ~ 990 TFLOPS, NVLink4 单向 450 GB/s
+  -> 比值 ~ 2200 FLOPs/Byte, 而 2d (d=3072) = 6144  ->  节点内 EP 计算受限, 可藏
+  同一张卡若走 RDMA 50 GB/s
+  -> 比值 ~ 19800 FLOPs/Byte  >>  6144            ->  通信受限, 必然暴露
+</code></pre>
+
+<p><span class="tag infer">分析</span>这个除法解释了本报告里几乎所有系统的设计选择：节点内 EP 天然处在"计算受限"区间，所以 MegaKernel 类方案（MegaMoE、UniEP、Mixture-of-Kittens）都把 benchmark 放在节点内或单一大 NVLink 域里，就能拿到接近理想的重叠；一旦跨节点进入"通信受限"区间，纯重叠失效，必须换武器——要么削减通信量本身（DisagMoE 用单向多对多替代双向 All-to-All），要么改变部署形态（attention/FFN 分离），要么在算法侧限制路由跨度。<em>换句话说：重叠类工作和分离类工作并不是竞品，它们分别属于台阶的两侧。</em></p>
+
+<h3>显存这一侧：容量与带宽的两笔账</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>阶段</th><th>显存主要被什么占用</th><th>MoE 特有的放大因素</th><th>缓解手段</th></tr></thead>
+<tbody>
+<tr><td><strong>训练</strong></td><td>参数 + 梯度 + 优化器状态 + 激活</td><td>总参数量远大于激活参数量，<strong>但显存按总参数算</strong>——这是 MoE 最贵的地方（671B 总参即使只激活 37B，权重依然要全部放下）</td><td>EP 切分专家（每卡只放 N/EP 个专家）、ZeRO-1/ZeRO-3、FSDP+EP、重计算</td></tr>
+<tr><td><strong>推理 prefill</strong></td><td>权重 + 大批 token 的激活</td><td>专家权重必须常驻，且路由倾斜时某些卡的临时缓冲显著变大</td><td>FP8/MXFP4 权重量化、大 EP 度摊薄权重、静态 shape 预分配</td></tr>
+<tr><td><strong>推理 decode</strong></td><td>权重 + KV cache</td><td>每 token 只算 <code>k/N</code> 的专家，<strong>算术强度极低</strong>，几乎纯粹是权重搬运受限</td><td>大 batch 聚合提高强度、MLA 压缩 KV、PD 分离、低延迟 EP kernel</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card warning">
+<h4><span class="tag infer">分析</span>MoE 在 decode 阶段的处境最尴尬</h4>
+<p style="margin-bottom:0">稠密模型 decode 时每张卡要读全部权重、算全部 FLOPs；MoE decode 时每张卡仍要"准备好"自己那份专家权重，但每步只有一小部分被真正用到。<strong>算术强度（FLOPs / Byte）被稀疏度直接除掉了一遍</strong>，于是 decode 变成极端的带宽受限场景。这正是"低延迟 EP kernel"（DeepEP 的 low-latency 模式）和 PD 分离必须存在的原因：只有把足够多的请求聚到一起，才能把每份专家权重的一次搬运摊到更多 token 上。<em>MoE 省的是 FLOPs，但 decode 阶段瓶颈本来就不是 FLOPs——这是理解 MoE 推理部署一切复杂性的起点。</em></p>
+</div>
+</section>
+
+<section>
+<h2 style="margin-top:8px">八（续）、逐系统硬件总矩阵</h2>
+
+<p>下面这张表把本报告涉及的每一个系统的<strong>实测硬件</strong>集中在一起。
+必须强调：这是各论文/仓库<em>实际跑过</em>的配置，不是"最低要求"——绝大多数论文并不公开最低要求。
+凡未披露的一律标 <span class="tag na">未公开</span>，不做任何推算。</p>
+
+<h3>训练系统</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>系统</th><th>实测规模</th><th>GPU / NPU</th><th>节点内互联</th><th>跨节点</th><th>软件下限</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MegaScale-MoE</strong></td><td><strong>1440 GPU</strong>（352B 模型）</td>
+<td>H800（989 TFLOPS BF16 / 80GB / HBM 3.4 TB/s）；另测 A100（312 / 80 / 2.0 TB/s）、H20（148 / 96 / 4.0 TB/s）</td>
+<td>NVLink 400 GB/s</td><td><span class="tag na">未公开</span></td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+<td><strong>COMET</strong></td><td>8 GPU</td>
+<td>8×H100；另测 <strong>8×L20（PCIe）</strong></td>
+<td>H100 实测 <strong>377 GB/s</strong>；L20 仅约 <strong>25 GB/s</strong></td><td>—（单节点）</td>
+<td>CUDA 12.3 · NVSHMEM 2.11 · PyTorch 2.4.0 · Megatron <code>6dbe4c</code></td>
+</tr>
+<tr>
+<td><strong>UniEP</strong></td><td>128 GPU</td>
+<td>Hopper 两套集群：cluster1 989 TFLOPS BF16 / 80GB / HBM 3.35 TB/s；cluster2 148 TFLOPS / 96GB / HBM 3.90 TB/s</td>
+<td>cluster1 NVLink <strong>200 GB/s 单向</strong>；cluster2 <strong>400 GB/s</strong></td><td><span class="tag na">未公开</span></td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+<td><strong>Mixture-of-Kittens</strong></td><td>端到端 <strong>512 GPU</strong></td>
+<td><strong>GB300 NVL72</strong>，SM100 / SM103</td>
+<td>NVL72 单一 <strong>72 卡</strong> NVLink 域</td><td>NVL72 域外</td>
+<td><strong>CUDA ⩾13.0 · PyTorch ⩾2.10 · Python ⩾3.12</strong>；tile 阈值 <code>T ⩾ 2368</code></td>
+</tr>
+<tr>
+<td><strong>HyperParallel-MoE</strong></td><td>profiling <strong>256 NPU</strong></td>
+<td><strong>华为 Ascend A3</strong>：每 die <strong>24 AIC（矩阵核）+ 50 AIV（向量核）</strong></td>
+<td>华为 UB / HCCS</td><td>—</td><td>CANN 栈</td>
+</tr>
+<tr>
+<td><strong>Megatron-Core</strong><br>（含 MoE Parallel Folding）</td><td>最多 <strong>1024 GPU</strong>（NVIDIA Eos）</td>
+<td>DGX H100</td>
+<td><em>"450 GB/s for intra-node (NVLink)"</em></td><td><em>"400Gbps for inter-node (InfiniBand)"</em></td>
+<td>PyTorch 2.5.0 · CUDA 12.6</td>
+</tr>
+<tr>
+<td><strong>Tutel</strong></td><td><strong>2048 GPU</strong></td>
+<td>Azure <code>ND96amsr_A100_v4</code>：8×A100 80GB + 96 核 AMD Epyc + 1.9 TiB RAM</td>
+<td>NVLink</td><td>每 VM <strong>8×200 Gbps HDR IB</strong>，VM 间 1600 Gbps</td>
+<td>PyTorch 1.8.0 · NCCL 2.10.3-1</td>
+</tr>
+<tr>
+<td><strong>Lancet</strong></td><td>8 节点 × 2 种机型</td>
+<td>AWS <code>p4de.24xlarge</code>×8（8×A100 80GB）；<code>p3dn</code>×8（V100）</td>
+<td>NVLink</td><td>p4de <strong>4×100 Gbps</strong>；p3dn 仅 <strong>1×100 Gbps</strong></td>
+<td>CUDA 11.3 · NCCL 2.12.12（<strong>PXN</strong>）</td>
+</tr>
+<tr>
+<td><strong>DualPipe</strong>（DeepSeek-V3）</td><td><strong>2048 GPU</strong></td>
+<td>H800</td>
+<td>NVLink <strong>160 GB/s</strong></td><td>IB <strong>50 GB/s</strong>（比值 ≈ <strong>3.2×</strong>）</td><td><span class="tag na">未公开</span></td>
+</tr>
+<tr>
+<td><strong>FlashDMoE</strong></td><td>8 GPU / 16 GPU</td>
+<td>8×H100；另测 4 节点 × 4×A100</td>
+<td>NVLink</td><td>A100 集群<strong>每卡仅 25 GB/s NIC</strong></td>
+<td>PyTorch 2.6 · CUDA 12.8</td>
+</tr>
+<tr>
+<td><strong>DisagMoE</strong></td><td><strong>128 GPU</strong>（16 节点 × 8）</td>
+<td>H800 80GB，每节点 168 CPU</td>
+<td>NVLink 400 GB/s</td><td><strong>ConnectX-7 8×400 GbE</strong></td><td>基于 Megatron-LM · MILP 求解用 Gurobi</td>
+</tr>
+<tr>
+<td><strong>MegaMoE</strong></td><td>EP8（PR#316 实测 2438 TFLOPS）</td>
+<td><strong>SM90 / SM100</strong>；FP8 × FP4 混合</td>
+<td>对称内存 + NVLink</td><td><span class="tag na">未公开</span></td><td><strong>PyTorch ⩾2.9</strong>（DeepGEMM 内）</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>推理服务系统</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>系统</th><th>实测规模</th><th>GPU</th><th>网络</th><th>备注</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DeepSeek 生产部署</strong></td><td>prefill 4 节点 / decode <strong>18 节点</strong></td>
+<td>H800</td><td>NVLink + IB</td>
+<td>prefill EP32+DP32 / 9+1 专家；decode EP144+DP144 / 2+1 专家</td>
+</tr>
+<tr>
+<td><strong>MegaScale-Infer</strong></td><td>8 GPU × 2 代</td>
+<td>8×Ampere 96GB；8×Hopper 96GB</td><td><strong>8×400 Gbps RDMA</strong></td><td>自研 <strong>M2N</strong> 通信替代 All-to-All</td>
+</tr>
+<tr>
+<td><strong>Mooncake</strong></td><td><span class="tag na">规模未公开</span></td>
+<td><strong>A800-SXM4-80GB</strong></td><td><strong>800 Gbps RDMA</strong></td><td>注意：仓库在 <code>kvcache-ai</code> 组织下，<strong>不在</strong> MoonshotAI 下</td>
+</tr>
+<tr>
+<td><strong>SGLang</strong>（大 EP）</td><td><strong>96 GPU</strong></td>
+<td>H100</td><td><span class="tag na">未公开</span></td><td>PD 分离 + DeepEP + EPLB</td>
+</tr>
+<tr>
+<td><strong>arXiv:2605.28302</strong></td><td><strong>128 GPU</strong></td>
+<td><strong>B200</strong></td><td><span class="tag na">未公开</span></td><td>本报告涉及的唯一 Blackwell 规模化推理实测</td>
+</tr>
+<tr>
+<td><strong>Pre-gated MoE</strong></td><td>单卡 + 大内存主机</td>
+<td>A100 80GB + AMD <strong>EPYC 7V12</strong> + <strong>1.8 TB 主机内存</strong></td><td><strong>PCIe gen4 = 32 GB/s</strong></td><td>把 PCIe 当作"第四级台阶"来用</td>
+</tr>
+<tr>
+<td><strong>MoE-Lightning</strong></td><td>单卡消费级/工作站</td>
+<td><strong>T4 / L4 / A100 / A6000</strong></td><td>PCIe</td><td>本表中硬件门槛最低的一档</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>EP 通信库的架构门槛（选型时最先要过的一关）</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>库</th><th>SM / 架构门槛</th><th>CUDA / ROCm</th><th>PyTorch</th><th>其它硬性依赖</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>DeepEP V2</strong></td><td>SM90，或支持 SM90 PTX ISA 的架构</td><td>12.3+（SM90）</td><td><strong>⩾2.10</strong></td><td><strong>NCCL ⩾2.30.4</strong> · NVLink + RDMA</td></tr>
+<tr><td>DeepEP V1（遗产）</td><td>SM80（Ampere）+ Hopper</td><td><span class="tag na">未公开</span></td><td><span class="tag na">未公开</span></td><td>NVSHMEM</td></tr>
+<tr><td><strong>UltraEP</strong></td><td><strong>SM90 或 SM100</strong></td><td>12.3+（SM90）/ <strong>12.9+（SM100）</strong></td><td>⩾2.10</td><td>NVSHMEM <code>cu13==3.4.5</code> · C++17 · Python ⩾3.10</td></tr>
+<tr><td><strong>MoonEP</strong></td><td><span class="tag na">未公开</span>（设备列表：NVIDIA GPU + Zhenwu PPU 审核中）</td><td><span class="tag na">未公开</span></td><td><span class="tag na">未公开</span></td><td>NVLink + symmetric memory / <strong>VMM</strong></td></tr>
+<tr><td><strong>pplx-garden / fabric-lib</strong></td><td><span class="tag na">未公开</span>（旧库 <code>9.0a+PTX</code>）</td><td><strong>12.8+</strong></td><td><span class="tag na">未公开</span></td><td><strong>Linux kernel ⩾5.12</strong>（DMA-BUF）· libfabric · libibverbs · <strong>GDRCopy</strong> · <code>SYS_PTRACE</code>+<code>SYS_ADMIN</code> · 每 GPU 独占一张 RDMA NIC</td></tr>
+<tr><td><strong>NVSHMEM 3.7.2</strong></td><td>Volta 及以后；x86_64 / aarch64</td><td>12+</td><td>—</td><td>CMake ⩾3.19；<strong>原子操作需 NVLink 或 GPUDirect RDMA + GDRCopy</strong>；NVLink SHARP 需 CUDA 12.1+ 且驱动 ⩾530.30.02；IBGDA 需 OFED ⩾5.0</td></tr>
+<tr><td><strong>NCCL GIN</strong></td><td>Volta 或更新</td><td>12.2+</td><td>—</td><td>驱动 ⩾510.40.3 · CX4+ · GDAKI 需 <code>rdma-core ⩾44.0</code> + OFED ⩾5.8 / DOCA ⩾3.1.0，DMA-BUF 需 kernel ⩾6.1</td></tr>
+<tr><td><strong>NCCL CFT</strong></td><td><strong>Blackwell 或更新</strong></td><td><strong>13.3+</strong></td><td>—</td><td>驱动 ⩾610.43.02</td></tr>
+<tr><td><strong>Triton-distributed</strong></td><td><strong>SM90a / SM80 / SM89 / AMD CDNA3</strong></td><td>容器内 cuda-python 12.4</td><td>容器 <code>pytorch:25.04-py3</code></td><td>NVSHMEM 3.3.9 + nvshmem4py 0.1.2</td></tr>
+<tr><td><strong>MORI / MORI-EP</strong></td><td>MI308X / MI300X / MI325X / MI355X（MI450X 开发中）</td><td><strong>ROCm ⩾6.4</strong></td><td><span class="tag na">未公开</span></td><td>libpci-dev · libibverbs-dev · NIC：Pollara / CX7 / Thor2</td></tr>
+<tr><td><strong>UBEP</strong></td><td>Ascend NPU（需 <strong>512B 原子 Load/Store</strong>）</td><td>CANN</td><td>—</td><td>CM384 superpod，UB 总线 <strong>392 GB/s</strong></td></tr>
+<tr><td><strong>StepMesh</strong></td><td>需 GPU + RDMA NIC</td><td><span class="tag na">未公开</span></td><td>⩾2.0.0</td><td><strong>限 Ubuntu</strong></td></tr>
+<tr><td><strong>TileLink</strong></td><td><em>"targets only NVIDIA GPUs"</em>；实测 H800</td><td><span class="tag na">未公开</span></td><td><span class="tag na">未公开</span></td><td>Triton 工具链</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="num">2.10</div><div class="lbl">DeepEP V2 与 UltraEP 共同要求的<br>PyTorch 最低版本（相当激进）</div></div>
+  <div class="kpi"><div class="num orange">13.3</div><div class="lbl">NCCL CFT 要求的 CUDA 版本<br>且必须 Blackwell 以上</div></div>
+  <div class="kpi"><div class="num green">72</div><div class="lbl">GB200/GB300 NVL72 的单一<br>NVLink 域卡数（DGX H100 只有 8）</div></div>
+  <div class="kpi"><div class="num purple">7.0×</div><div class="lbl">HybridEP 在 H100 上 EP8→EP64<br>的延迟增幅；GB200 上仅 1.7×</div></div>
+</div>
+
+<h3>三条能直接拿去做决策的硬件规律</h3>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>把上面所有表格压缩成三句话</h4>
+<ol style="margin-bottom:0">
+<li><strong>NVLink 域的大小是唯一的一级变量。</strong>这不是修辞。同一份 HybridEP 代码，
+GB200 上 EP8→EP64 延迟只涨 1.7×（391→675 µs），H100 上涨 7.0×（661→4626 µs）；
+DeepEP 在 SM100 纯 NVLink EP8 下 726 GB/s，跨节点掉到 61–90 GB/s；
+MegaScale-MoE 干脆把 SP=EP=8 严格对齐 NVLink 域；
+Megatron-Core 官方建议 EP×TP 必须放进单节点；
+UltraEP 承认域小于 EP 组时倾斜下限就压不到 1.0。
+<strong>五份独立证据指向同一件事</strong>：先问"我的 EP 组能否装进一个域"，再问算力。</li>
+<li><strong>软件版本门槛在 2026 年突然变陡，这是新的实际障碍。</strong>
+DeepEP V2 与 UltraEP 都要求 PyTorch ⩾2.10，DeepEP V2 还要 NCCL ⩾2.30.4，
+Mixture-of-Kittens 要 CUDA ⩾13.0 + Python ⩾3.12，NCCL CFT 要 CUDA 13.3 + 驱动 610.43.02，
+fabric-lib 甚至要求 Linux kernel ⩾5.12 与 <code>SYS_ADMIN</code> 权限。
+<span class="tag infer">分析</span>对企业环境来说，<em>驱动和内核版本往往比 GPU 型号更难改</em>——
+选型时这一列的杀伤力常常被低估。</li>
+<li><strong>低端硬件不是没有 MoE 方案，而是方案完全不同。</strong>
+8×L20（PCIe，25 GB/s）、p3dn（1×100 Gbps）、A100+PCIe gen4（32 GB/s）、T4/L4，
+这些配置上能跑的是 COMET 的 PCIe 路径、Lancet、Pre-gated MoE、MoE-Lightning——
+共同点是<strong>不再假设通信可以被藏住，而是把权重搬运本身当成主要设计对象</strong>（offload、预取、门控前移）。
+把节点内 MegaKernel 方案搬到这类硬件上必然失败，因为它们的前提（计算受限区间）根本不成立。</li>
+</ol>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 8 ==================== -->
+<div class="tab" id="t-pick">
+
+<section>
+<h2>九、横向对比与选型：怎么读这些倍数，以及该选谁</h2>
+
+<div class="card danger">
+<h4><span class="tag infer">最重要的一条阅读纪律</span>不要跨论文比较加速比</h4>
+<p style="margin-bottom:0">本报告出现的倍数从 1.05× 到 20.76× 不等，但它们<strong>互相不可比</strong>，原因有三层：
+（1）<strong>基线不同</strong>——TileLink 的 20.76× 对的是"完全不重叠"，DualPipe 的 1.05–1.13× 对的是已经高度优化的 1F1B interleaved；
+（2）<strong>测量层级不同</strong>——有的是 MoE 层，有的是 MoE-FFN 模块，有的是端到端；
+（3）<strong>硬件不同</strong>——同一个库在 GB200 和 H100 上的表现差 4 倍以上。
+唯一正确的读法是：<em>只在"同基线、同层级、同硬件"的三元组内部比较</em>。下面第一张表就是为了让这条纪律可执行。</p>
+</div>
+
+<h3>9.1 模块级收益 vs 端到端收益：所有论文的共同真相</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>系统</th><th>模块/层级收益</th><th>端到端收益</th><th>缩水倍数</th><th>对比基线</th><th>为什么会缩水</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>UniEP</strong></td><td>1.24–1.73×</td><td><strong>1.09×</strong></td><td>≈ <strong>1.4–1.6×</strong></td><td><span class="tag na">论文内基线</span></td>
+<td>attention 与 dense 部分未优化</td>
+</tr>
+<tr>
+<td><strong>HyperParallel-MoE</strong></td><td>MoE-FFN 模块 1.58×</td><td><strong>1.08–1.09×</strong></td><td>≈ <strong>1.45×</strong></td><td>Ascend 基线实现</td>
+<td>作者自己写明：<em>"which can partially mask the module-level gains"</em></td>
+</tr>
+<tr>
+<td><strong>Mixture-of-Kittens</strong></td><td>MoE 层 <strong>2.37×</strong></td><td><strong>1.41×</strong></td><td>≈ <strong>1.68×</strong></td><td>GB300 NVL72 上的基线</td>
+<td>非 MoE 层占比稀释</td>
+</tr>
+<tr>
+<td><strong>UBEP</strong></td><td>All-to-All 延迟 <strong>−52.4%</strong></td><td>TPOT <strong>+11.1%</strong></td><td>≈ <strong>4.7×</strong></td><td>baseline CANN EP</td>
+<td>A2A 只是 TPOT 的一个组成部分</td>
+</tr>
+<tr>
+<td><strong>MegaScale-MoE</strong></td><td>—</td><td><strong>1.88×</strong>（1440 卡 / 352B）</td><td>—</td><td>Megatron-LM</td>
+<td>该数字本身即端到端；对应 MFU <strong>27.89%</strong></td>
+</tr>
+<tr>
+<td><strong>DisagMoE</strong></td><td>未重叠通信量削减 45–88%</td><td><strong>1.81×</strong>（vs Megatron 1F1B interleaved overlap）</td><td>—</td><td>三种不同基线，倍数差异极大</td>
+<td>vs Tutel/COMET 仅 1.2–1.5×，vs DualPipe 仅 1.05–1.13×</td>
+</tr>
+<tr>
+<td><strong>MegaMoE</strong></td><td>1.50–1.73×；RL rollout <strong>1.96×</strong></td><td><span class="tag na">未公开</span></td><td>—</td><td>DeepGEMM 内部基线</td>
+<td>PR#316 报告 EP8 下 2438 TFLOPS = 1.54×</td>
+</tr>
+<tr>
+<td><strong>TileLink</strong></td><td>1.17–<strong>20.76×</strong></td><td>8 模型平均 <strong>1.32×</strong>；16 卡 1.29×</td><td>—</td><td><strong>完全不重叠</strong>（宽松基线）</td>
+<td>20.76× 只说明基线极弱，不代表相对成熟系统的优势</td>
+</tr>
+<tr>
+<td><strong>NCCL EP</strong></td><td>dispatch 多节点追平或超过 DeepEP</td><td>vLLM 端到端<strong>落后 7–10%</strong></td><td>—</td><td>DeepEP</td>
+<td>combine 落后 5–12%；这是罕见的"负收益"诚实披露</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>缩水倍数 1.4–4.7× 这件事本身就是最有价值的信息</h4>
+<p>把上表的"缩水倍数"一列单独看：UniEP 1.4–1.6×、HyperParallel 1.45×、Mixture-of-Kittens 1.68×、UBEP 4.7×。
+这不是论文在注水，而是 <strong>Amdahl 定律在 MoE 上的具体形态</strong>：MoE 层再快，attention、dense、LayerNorm、
+采样、KV cache 读写都不会跟着变快。而且随着序列变长，attention 占比还在上升——DisagMoE 实测 Qwen-3 在
+4K→32K 时 attention 从 <strong>28.38% 涨到 50.26%</strong>。</p>
+<p style="margin-bottom:0"><strong>由此得到一条实操建议</strong>：如果你的业务是长上下文，
+先做 attention 侧的优化（MLA / DSA / 线性混合 / AF 分离），再做 MoE 通信优化，投入产出比会高得多。
+反过来，如果你的序列短、batch 大（典型的短对话高并发），MoE 通信才是第一优先级。
+<em>这也解释了为什么 2026 年冒出了一整批 attention/FFN 分离系统——它们本质上是在承认"MoE 层已经不是唯一的大头"。</em></p>
+</div>
+
+<h3>9.2 三条技术路线的正面对撞</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>维度</th><th>路线 A：就地重叠</th><th>路线 B：MegaKernel 融合</th><th>路线 C：角色分离</th></tr>
+</thead>
+<tbody>
+<tr><td>代表工作</td><td>Tutel · FasterMoE · Lancet · COMET · DualPipe</td><td>MegaMoE · UniEP · MegaMoE(expert wave) · Mixture-of-Kittens · HyperParallel</td><td>DisagMoE（训练）· MegaScale-Infer · JANUS · FinDEP · vLLM AFD</td></tr>
+<tr><td>核心手法</td><td>算子重排 / 多 stream / tile 级分解</td><td>单 persistent kernel + warp & threadblock 角色特化 + device 侧调度</td><td>attention 与 FFN 部署到不相交的 GPU 组，各自独立并行度</td></tr>
+<tr><td>解决的问题</td><td>把通信塞进计算的空隙</td><td>消除 kernel 边界与 launch 开销，把通信压进 SM 内部</td><td>承认两类层的算通比天生失衡，干脆不让它们共享资源</td></tr>
+<tr><td>硬件前提</td><td>较宽松，PCIe 也能跑（COMET 测过 L20）</td><td><strong>严格</strong>：大 NVLink 域 + 新 CUDA/驱动（MoK 要 GB300 NVL72 + CUDA 13）</td><td>要求高速网络在两组之间承载中间激活（MegaScale-Infer 用 8×400 Gbps）</td></tr>
+<tr><td>可移植性</td><td><strong>最好</strong></td><td><strong>最差</strong>——绑定架构、绑定 SM 版本、绑定 tile 阈值</td><td>中等，但需要框架级改造</td></tr>
+<tr><td>典型收益</td><td>1.2–1.5×（MoE 层）</td><td>1.5–2.4×（MoE 层），端到端 1.09–1.41×</td><td>1.81×（DisagMoE vs 1F1B）；推理侧看吞吐/成本</td></tr>
+<tr><td>额外产物</td><td>—</td><td><strong>逐位确定性</strong>（UniEP 与 Mixture-of-Kittens 都把这个当卖点，并点名 COMET 不可逐位复现）</td><td>两侧可独立扩缩容、独立选硬件（decode 侧可用便宜卡）</td></tr>
+<tr><td>什么时候选它</td><td>硬件杂、要跨代兼容、团队人力有限</td><td>硬件统一且够新、追极致性能、能承担绑定风险</td><td>长上下文、或 prefill/decode 特性差异极大的线上服务</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="diagram"><span class="cap">图 G · 2023 → 2026 三代演进，以及为什么会走到 MegaKernel</span>
+
+第一代 (2021-2023) 算子级重排
+┌──────────────────────────────────────────────────────────────────────┐
+│ Tutel / FasterMoE / DeepSpeed-MoE                                    │
+│   手法: 把 All-to-All 拆成多个 chunk, 与 GEMM 交错; 多 CUDA stream   │
+│   粒度: 算子 (kernel) 级                                             │
+│   限制: kernel 边界仍在, launch 开销与 tail effect 无法消除          │
+└──────────────────────────────────────────────────────────────────────┘
+                                 ▼
+第二代 (2024-2025) tile 级细粒度重叠
+┌──────────────────────────────────────────────────────────────────────┐
+│ COMET / Lancet / TileLink                                            │
+│   手法: 沿 tile 维度分解 shared tensor, 让通信与计算在 tile 粒度咬合 │
+│   粒度: tile 级, 但仍是"多 kernel + 多 stream"                       │
+│   代价: 调度复杂, 且 COMET 被后来者点名"不可逐位复现"                │
+└──────────────────────────────────────────────────────────────────────┘
+                                 ▼
+第三代 (2026) MegaKernel / persistent kernel
+┌──────────────────────────────────────────────────────────────────────┐
+│ MegaMoE / UniEP / Mixture-of-Kittens / HyperParallel-MoE             │
+│   手法: 单个常驻 kernel 内部做 warp / threadblock 角色特化,          │
+│         device 侧自调度; pull-dispatch + push-combine 消除跨卡信号;  │
+│         on-chip scoreboard / ring token buffer / CLC                 │
+│   粒度: warp 级, kernel 边界彻底消失                                 │
+│   新卖点: 逐位确定性 (bit-wise reproducibility)                      │
+│   新代价: 强绑定 SM 版本 / NVLink 域大小 / CUDA 与驱动版本           │
+└──────────────────────────────────────────────────────────────────────┘
+
+  与之并行的第四条线 (2026) —— 干脆别让它们共享资源
+┌──────────────────────────────────────────────────────────────────────┐
+│ DisagMoE (训练, AF-Pipe) / MegaScale-Infer / JANUS / FinDEP          │
+│   动机: attention 占比 28.38% -> 50.26% (4K -> 32K), 算通比天生失衡  │
+│   手法: attention 组与 FFN 组分开部署, roofline / MILP 定算力配比     │
+└──────────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>9.3 选型决策表：先看你有什么硬件</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>你的硬件</th><th>训练该用</th><th>推理该用</th><th>EP 通信库</th><th>关键注意事项</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>单卡 80GB 及以下</strong><br>（T4 / L4 / A6000 / A100）</td>
+<td>不现实（权重按<strong>总参</strong>算）</td>
+<td><strong>MoE-Lightning</strong> / <strong>Pre-gated MoE</strong>；或直接选 MXFP4 量化的 gpt-oss-120b（可塞进单张 80GB）</td>
+<td>不需要</td>
+<td>瓶颈是 PCIe（gen4 仅 32 GB/s），设计目标必须是"减少权重搬运"而非"隐藏通信"</td>
+</tr>
+<tr>
+<td><strong>单节点 8×H100 / H800</strong></td>
+<td><strong>COMET</strong>（8×H100 实测 377 GB/s）或 <strong>Megatron-Core</strong>，务必让 <code>EP×TP ⩽ 8</code></td>
+<td><strong>SGLang</strong> 或 <strong>vLLM</strong> 的 EP 模式</td>
+<td><strong>DeepEP V2</strong>（SM90 纯 NVLink 路径）</td>
+<td>这是性价比最高的一档：EP 完全在 NVLink 域内，重叠类方案几乎都能拿到理想收益</td>
+</tr>
+<tr>
+<td><strong>多节点 Hopper</strong><br>（+ CX7 8×400 Gbps）</td>
+<td><strong>UniEP</strong>（128 卡实测）或 <strong>MegaScale-MoE</strong>（1440 卡）；长序列考虑 <strong>DisagMoE</strong></td>
+<td><strong>SGLang PD 分离</strong>（96×H100 实测）+ EPLB</td>
+<td><strong>DeepEP V2</strong>；router 倾斜大则换 <strong>MoonEP</strong> / <strong>UltraEP</strong></td>
+<td>已跌到"通信受限"区间。此时纯重叠收益有限，要么削减通信量，要么改部署形态</td>
+</tr>
+<tr>
+<td><strong>GB200 / GB300 NVL72</strong></td>
+<td><strong>Mixture-of-Kittens</strong>（512 卡端到端 1.41×）</td>
+<td>NVL72 内做大 EP；可参考 128×B200 的 arXiv:2605.28302</td>
+<td><strong>HybridEP</strong>（TMA + MNNVL）</td>
+<td>最大优势是 <strong>72 卡单一 NVLink 域</strong>——EP64 可以完全域内。但软件门槛陡：CUDA ⩾13.0、PyTorch ⩾2.10、Python ⩾3.12</td>
+</tr>
+<tr>
+<td><strong>华为 Ascend</strong></td>
+<td><strong>HyperParallel-MoE</strong>（AIC/AIV 异构 taskflow，256 NPU profiling）</td>
+<td><strong>vLLM AFD 插件</strong>（实验性；910C 有公开 benchmark，但该插件同时支持 NVIDIA GPU）</td>
+<td><strong>UBEP</strong>（CM384，UB 392 GB/s）或 baseline CANN EP</td>
+<td>UBEP 依赖 <strong>512B 原子 Load/Store</strong>，无法移植到 NVIDIA；反之 NVIDIA 侧方案也无法直接搬来</td>
+</tr>
+<tr>
+<td><strong>AMD Instinct</strong><br>（MI300X / MI355X）</td>
+<td><span class="tag na">生态尚未成熟</span></td>
+<td><span class="tag na">未公开成规模的 MoE 推理实测</span></td>
+<td><strong>MORI / MORI-EP</strong>（ROCm ⩾6.4）</td>
+<td>XGMI 节点内 dispatch 最高 345 GB/s（MI355X），但 RDMA 侧仅 46–71 GB/s；EP32 数据官方标注为过期</td>
+</tr>
+<tr>
+<td><strong>PCIe 无 NVLink</strong><br>（8×L20 等）</td>
+<td><strong>COMET</strong> 的 PCIe 路径 / <strong>Lancet</strong></td>
+<td>低并发场景 + 量化</td>
+<td><strong>HybridEP</strong>（提供 <em>"PCIe kernel support for non-NVLink environments"</em>）</td>
+<td>COMET 实测 L20 上只有约 <strong>25 GB/s</strong>，是 H100 的 1/15。所有"重叠能藏住通信"的假设在此失效</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>9.4 模型侧选型：稀疏度决定你的部署形态</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead>
+<tr><th>你的约束</th><th>推荐的模型形态</th><th>代表模型</th><th>系统侧后果</th></tr>
+</thead>
+<tbody>
+<tr><td>只有单张 80GB</td><td>小总参 + 极致量化</td><td><strong>gpt-oss-120b</strong>（MXFP4，可塞进单卡）</td><td>不需要 EP，问题退化为普通推理</td></tr>
+<tr><td>单节点，要最大能力</td><td>中等总参 + 高稀疏</td><td>Mixtral · Qwen3-235B-A22B</td><td>EP ⩽ 8，NVLink 域内，最舒服的区间</td></tr>
+<tr><td>多节点，追极致质量</td><td>大总参 + 细粒度专家 + 共享专家</td><td>DeepSeek-V3（256+1，top-8）· GLM-4.5（160+1）</td><td>EP 必然跨节点；<strong>细粒度专家使 All-to-All 流量更碎更倾斜</strong></td></tr>
+<tr><td>极端稀疏路线</td><td>超多专家 + 大 top-k</td><td><strong>Kimi-K3（896+2，top-16）</strong>，权重约 <strong>5600 GB</strong></td><td>只能大规模 EP；NVIDIA 官方也承认 <em>"fine-grained MoE models achieve lower training efficiency"</em></td></tr>
+<tr><td>长上下文优先</td><td>先解决 attention 预算</td><td>DSA 稀疏注意力 · 线性混合（Gated DeltaNet / KDA）· 滑窗交替</td><td>attention 在 32K 时已占 50.26%，这时优化 MoE 通信的边际收益最低</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card highlight">
+<h4><span class="tag infer">分析</span>模型侧的收敛，恰恰是系统侧最难做的那一侧</h4>
+<p style="margin-bottom:0">2026 年的模型配方已经高度一致：细粒度窄专家 + 1~2 个共享专家 + sigmoid gating + 无辅助损失的均衡（bias 校正）。
+问题是这四条<strong>每一条都在给系统增加难度</strong>：细粒度让每次 All-to-All 的消息更小更碎（带宽利用率下降）；
+共享专家引入了一条必须与路由专家并行的额外计算路径；sigmoid + 无辅助损失让路由分布更自由、也更容易倾斜；
+top-k 变大直接乘倍通信量。
+<em>换句话说，模型侧的每一次"质量提升"，都是系统侧的一张账单</em>——这正是为什么 MoE 的竞争重心已经从模型架构转移到了通信库和 kernel。</p>
+</div>
+
+<h3>9.5 趋势展望：2027 年会发生什么</h3>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>从这批 2026 年工作里能读出的五条趋势</h4>
+<ol style="margin-bottom:0">
+<li><strong>后端统一到 NCCL device API。</strong>证据链已经很完整：DeepEP V2 已迁移（<em>"switched from the NVSHMEM backend to the more lightweight NCCL Gin backend"</em>），
+UltraEP 预告要迁（<em>"will switch to the more lightweight NCCL GIN in future"</em>），NCCL EP 是原生实现，
+NVIDIA 还给 Blackwell 准备了下一代 CFT 模块。
+<span class="tag infer">分析</span>代价是短期性能倒退 5–12%，换来的是不必再依赖 PTX 未定义行为。
+预计 2027 年这个差距会被抹平，届时 DeepEP 的"手工优化护城河"会显著变浅。</li>
+<li><strong>优化目标从带宽转向"同步开销"。</strong>UBEP 的 synchronization tax 是一个会被反复引用的概念：
+当链路从 50 GB/s 涨到 392 GB/s，token dispatch 几乎瞬间打满带宽，
+<em>"leaving phase-level synchronization as the dominant constraint"</em>。
+NVL72、CM384 这类 superpod 越普及，这个问题就越突出。
+2027 年的论文标题里出现 barrier / flag / kernel-launch 的频率会明显上升。</li>
+<li><strong>"少占 SM"取代"跑满带宽"成为 EP 库的第一 KPI。</strong>
+DeepEP V2 省 4× SM、HybridEP 用 TMA 做到 minimal SM、fabric-lib 做到 SM-free while RDMA transfer——
+三家不同出品方在同一年给出同一个方向。原因是 MegaKernel 化把通信和计算挤进了同一个 persistent kernel，
+通信占的每一个 SM 都是从计算那里抢的。</li>
+<li><strong>逐位确定性从"学术洁癖"变成产品特性。</strong>UniEP 与 Mixture-of-Kittens 都把 bit-wise reproducibility
+写进卖点，并且都点名 COMET 不可逐位复现。
+<span class="tag infer">分析</span>这背后是 RL / RLHF 的现实需求：训练与 rollout 的数值不一致会直接导致策略漂移，
+而 MegaMoE 恰好报告了 <strong>RL rollout 1.96×</strong> 的收益——两件事指向同一个市场。</li>
+<li><strong>attention 会抢走 MoE 的风头。</strong>最硬的数字是 DisagMoE 的 28.38% → 50.26%。
+当 attention 吃掉一半时间预算，继续优化 MoE 通信的边际收益就很低了。
+2026 年已经出现 DisagMoE、MegaScale-Infer、JANUS、FinDEP、vLLM AFD 这一整批分离系统，
+以及 DSA / KDA / Gated DeltaNet 这批注意力改造——
+<em>预计 2027 年的重心会是"attention 与 FFN 各用什么硬件"这个部署问题，而不再是"All-to-All 怎么更快"</em>。</li>
+</ol>
+</div>
+
+<div class="card warning">
+<h4><span class="tag infer">分析</span>最后一条给决策者的提醒</h4>
+<p style="margin-bottom:0">本报告最反直觉的一条结论是：<strong>官方库跑不过民间库，而且差距的来源是"愿不愿意越过规范边界"</strong>。
+NCCL EP 在 576 节点 EOS 集群上、由 NVIDIA 亲手用自家 device API 重写，
+combine 仍落后 DeepEP 5–12%、vLLM 端到端落后 7–10%，且这些数字是 NVIDIA 自己披露的；
+而 DeepEP 的 README 明确写着它用 <code>ld.global.nc.L1::no_allocate.L2::256B</code> 读 volatile 数据，
+并提供 <code>DISABLE_AGGRESSIVE_PTX_INSTRS=1</code> 作为逃生开关。
+选型时必须自己决定站哪一边：<em>要那 5–12%，还是要升级 NCCL 时不用重新验证正确性</em>。
+对多数团队，后者更值钱。</p>
+</div>
+</section>
+
+</div>
+<!-- ==================== TAB 9 ==================== -->
+<div class="tab" id="t-ref">
+
+<section>
+<h2>十、参考文献与来源清单</h2>
+
+<p>本报告的每一个技术数字都可以追到下面某一行。凡是原文没写的，正文里一律标注
+<span class="tag na">未公开</span> 而不做估算；凡是笔者的推断，一律标注 <span class="tag infer">分析</span>。
+下表按层次组织，与图 A 的四层结构对应。</p>
+
+<div class="card warning">
+<p style="margin:0"><span class="tag infer">说明</span>
+本表只收录<strong>可公开访问并已逐条核验可达</strong>的来源。
+少数在正文中被提及但无法核实的项目（例如 <code>AcclEP</code>，GitHub 代码搜索返回 <code>total_count = 0</code>）
+不在此表内，正文中也已明确标注其不可核实。
+部分 ACM DL 的 DOI 因访问限制无法核验，故一律改用对应的 arXiv 或 GitHub 页面。</p>
+</div>
+
+<h3>10.1 模型架构（第 ① 层）</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>模型 / 工作</th><th>关键配置</th><th>来源</th></tr></thead>
+<tbody>
+<tr><td><strong>DeepSeek-V3</strong></td><td>256 路由 + 1 共享，top-8，MLA，无辅助损失均衡，MTP</td><td><a href="https://arxiv.org/abs/2412.19437" target="_blank">arXiv:2412.19437</a></td></tr>
+<tr><td><strong>DeepSeek-V3.1</strong></td><td>config.json 直读</td><td><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3.1" target="_blank">HF: DeepSeek-V3.1</a></td></tr>
+<tr><td><strong>DeepSeek-V3.2-Exp</strong></td><td>DSA 稀疏注意力，<code>index_topk</code></td><td><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3.2-Exp" target="_blank">HF: DeepSeek-V3.2-Exp</a></td></tr>
+<tr><td><strong>DeepSeekMoE</strong>（细粒度专家的源头）</td><td>细粒度切分 + 共享专家隔离</td><td><a href="https://arxiv.org/abs/2401.06066" target="_blank">arXiv:2401.06066</a></td></tr>
+<tr><td><strong>Kimi-K2</strong></td><td>config.json 直读</td><td><a href="https://huggingface.co/moonshotai/Kimi-K2-Instruct" target="_blank">HF: Kimi-K2-Instruct</a></td></tr>
+<tr><td><strong>Kimi-K3</strong></td><td>896 路由 + 2 共享，top-16，KDA</td><td><a href="https://huggingface.co/moonshotai/Kimi-K3" target="_blank">HF: Kimi-K3</a></td></tr>
+<tr><td><strong>Qwen3-235B-A22B</strong></td><td>128 专家，top-8，<strong>无共享专家</strong></td><td><a href="https://huggingface.co/Qwen/Qwen3-235B-A22B" target="_blank">HF: Qwen3-235B-A22B</a></td></tr>
+<tr><td><strong>Qwen3-Next-80B-A3B</strong></td><td>Gated DeltaNet 线性混合</td><td><a href="https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct" target="_blank">HF: Qwen3-Next-80B-A3B</a></td></tr>
+<tr><td><strong>GLM-4.5</strong></td><td>160 路由 + 1 共享</td><td><a href="https://huggingface.co/zai-org/GLM-4.5" target="_blank">HF: GLM-4.5</a></td></tr>
+<tr><td><strong>gpt-oss-120b</strong></td><td><strong>MXFP4</strong> 量化，可塞进单张 80GB</td><td><a href="https://huggingface.co/openai/gpt-oss-120b" target="_blank">HF: gpt-oss-120b</a></td></tr>
+<tr><td><strong>MiniMax-M2</strong></td><td>config.json 直读</td><td><a href="https://huggingface.co/MiniMaxAI/MiniMax-M2" target="_blank">HF: MiniMax-M2</a></td></tr>
+<tr><td><strong>Mixtral 8×7B</strong></td><td>8 专家，top-2（最早的开源 MoE 标杆）</td><td><a href="https://arxiv.org/abs/2401.04088" target="_blank">arXiv:2401.04088</a></td></tr>
+<tr><td><strong>Llama 4 Maverick</strong></td><td>128 路由 + 1 共享，<strong>top-1</strong>，iRoPE</td><td><a href="https://ai.meta.com/blog/llama-4-multimodal-intelligence/" target="_blank">Meta AI 博客</a></td></tr>
+<tr><td><strong>DBRX</strong></td><td>16 专家，top-4</td><td><a href="https://www.databricks.com/blog/introducing-dbrx-new-state-art-open-llm" target="_blank">Databricks 博客</a></td></tr>
+<tr><td><strong>Snowflake Arctic</strong></td><td>dense-MoE 混合架构</td><td><a href="https://huggingface.co/Snowflake/snowflake-arctic-instruct" target="_blank">HF: snowflake-arctic-instruct</a></td></tr>
+<tr><td><strong>GShard</strong></td><td>MoE 的奠基工作，辅助损失均衡的来源</td><td><a href="https://arxiv.org/abs/2006.16668" target="_blank">arXiv:2006.16668</a></td></tr>
+<tr><td><strong>Switch Transformer</strong></td><td>top-1 路由，capacity factor 概念</td><td><a href="https://arxiv.org/abs/2101.03961" target="_blank">arXiv:2101.03961</a></td></tr>
+<tr><td><strong>BASE Layers</strong></td><td>把路由建模成分配问题</td><td><a href="https://arxiv.org/abs/2103.16716" target="_blank">arXiv:2103.16716</a></td></tr>
+<tr><td><strong>Expert Choice Routing</strong></td><td>由专家挑 token，天然均衡</td><td><a href="https://arxiv.org/abs/2202.09368" target="_blank">arXiv:2202.09368</a></td></tr>
+<tr><td><strong>MegaBlocks</strong></td><td>dropless MoE，块稀疏 GEMM</td><td><a href="https://arxiv.org/abs/2211.15841" target="_blank">arXiv:2211.15841</a></td></tr>
+<tr><td><strong>MoBA</strong>（Moonshot 块稀疏注意力）</td><td>与 MoE 思路同源的注意力稀疏化</td><td><a href="https://github.com/MoonshotAI/MoBA" target="_blank">github.com/MoonshotAI/MoBA</a></td></tr>
+<tr><td><strong>FlashKDA</strong></td><td>Kimi Delta Attention 的 kernel 实现</td><td><a href="https://github.com/MoonshotAI/FlashKDA" target="_blank">github.com/MoonshotAI/FlashKDA</a></td></tr>
+<tr><td><strong>Moonlight</strong></td><td>Muon 优化器 + MoE</td><td><a href="https://github.com/MoonshotAI/Moonlight" target="_blank">github.com/MoonshotAI/Moonlight</a></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>10.2 训练系统（第 ②③ 层）</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>系统</th><th>核心手法</th><th>来源</th></tr></thead>
+<tbody>
+<tr><td><strong>DisagMoE</strong></td><td>AF-Pipe：attention 与 FFN 部署到不相交 GPU 组；roofline + MILP 定配比</td><td><a href="https://arxiv.org/abs/2605.11005" target="_blank">arXiv:2605.11005</a> ｜ <a href="https://arxiv.org/html/2605.11005" target="_blank">HTML 全文</a></td></tr>
+<tr><td><strong>COMET</strong></td><td>tile 级细粒度重叠 + shared tensor 分解</td><td><a href="https://arxiv.org/abs/2502.19811" target="_blank">arXiv:2502.19811</a></td></tr>
+<tr><td><strong>MegaScale-MoE</strong></td><td>1440×H800 上 352B 模型，MFU 27.89%</td><td><a href="https://arxiv.org/abs/2505.11432" target="_blank">arXiv:2505.11432</a> ｜ <a href="https://arxiv.org/html/2505.11432v1" target="_blank">HTML 全文</a></td></tr>
+<tr><td><strong>MoE Parallel Folding</strong></td><td>把 attention 与 MoE 的并行度解耦（ETP / EDP）</td><td><a href="https://arxiv.org/abs/2504.14960" target="_blank">arXiv:2504.14960</a> ｜ <a href="https://arxiv.org/html/2504.14960v1" target="_blank">HTML 全文</a></td></tr>
+<tr><td><strong>Mixture-of-Kittens</strong></td><td>MegaKernel + pull-dispatch/push-combine + CLC；GB300 NVL72</td><td><a href="https://cursor.com/blog/mixture-of-kittens" target="_blank">Cursor 博客</a> ｜ <a href="https://github.com/cursor/mixture-of-kittens" target="_blank">GitHub</a></td></tr>
+<tr><td><strong>MegaMoE</strong></td><td>DeepGEMM 内的融合 MoE MegaKernel；FP8×FP4；对称内存</td><td><a href="https://github.com/deepseek-ai/DeepGEMM" target="_blank">DeepGEMM</a> ｜ <a href="https://github.com/deepseek-ai/DeepGEMM/pull/304" target="_blank">PR#304</a> ｜ <a href="https://github.com/deepseek-ai/DeepGEMM/pull/316" target="_blank">PR#316</a></td></tr>
+<tr><td><strong>Megatron-LM / Megatron-Core</strong></td><td>官方并行度组合约束；ECHO 落地</td><td><a href="https://github.com/NVIDIA/Megatron-LM" target="_blank">GitHub</a> ｜ <a href="https://github.com/NVIDIA/Megatron-LM/pull/2368" target="_blank">PR#2368（MoE ECHO）</a></td></tr>
+<tr><td><strong>Tutel</strong></td><td>动态自适应并行 + 2048×A100 实测</td><td><a href="https://arxiv.org/abs/2206.03382" target="_blank">arXiv:2206.03382</a> ｜ <a href="https://github.com/microsoft/tutel" target="_blank">GitHub</a></td></tr>
+<tr><td><strong>FasterMoE</strong></td><td>影子专家 + 拥塞感知调度（ACM DOI 受限，改用仓库）</td><td><a href="https://github.com/thu-pacman/FasterMoE" target="_blank">github.com/thu-pacman/FasterMoE</a></td></tr>
+<tr><td><strong>Lancet</strong></td><td>非对称并行 + AWS 低带宽机型实测</td><td><a href="https://arxiv.org/abs/2404.19429" target="_blank">arXiv:2404.19429</a></td></tr>
+<tr><td><strong>FlashDMoE</strong></td><td>完全 device 侧的 MoE kernel</td><td><a href="https://arxiv.org/abs/2506.04667" target="_blank">arXiv:2506.04667</a></td></tr>
+<tr><td><strong>DeepSpeed-MoE</strong></td><td>PR-MoE + Mixture-of-Students</td><td><a href="https://arxiv.org/abs/2201.05596" target="_blank">arXiv:2201.05596</a></td></tr>
+<tr><td><strong>UniEP</strong></td><td>双 MegaKernel + 自动搜索；逐位确定性</td><td><a href="https://arxiv.org/abs/2606.19348" target="_blank">arXiv:2606.19348</a> ｜ <a href="https://arxiv.org/html/2606.19348v1" target="_blank">HTML 全文</a></td></tr>
+<tr><td><strong>HyperParallel-MoE</strong></td><td>昇腾 AIC/AIV 异构 taskflow；模块 1.58× → 端到端 1.08–1.09×</td><td><a href="https://arxiv.org/abs/2605.23764" target="_blank">arXiv:2605.23764</a> ｜ <a href="https://arxiv.org/html/2605.23764v1" target="_blank">HTML 全文</a></td></tr>
+<tr><td><strong>DeepSeek 基础设施总览</strong></td><td>DualPipe、EPLB 等开源组件索引</td><td><a href="https://github.com/deepseek-ai/open-infra-index" target="_blank">open-infra-index</a></td></tr>
+<tr><td><strong>checkpoint-engine</strong></td><td>RL 场景下的权重热更新</td><td><a href="https://github.com/MoonshotAI/checkpoint-engine" target="_blank">github.com/MoonshotAI/checkpoint-engine</a></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>10.3 推理服务系统（第 ② 层推理侧）</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>系统</th><th>核心手法</th><th>来源</th></tr></thead>
+<tbody>
+<tr><td><strong>MegaScale-Infer</strong></td><td>attention/FFN 分离部署 + 自研 M2N 通信</td><td><a href="https://arxiv.org/abs/2504.02263" target="_blank">arXiv:2504.02263</a></td></tr>
+<tr><td><strong>SGLang 大规模 EP</strong></td><td>96×H100，PD 分离 + DeepEP + EPLB</td><td><a href="https://lmsys.org/blog/2025-05-05-large-scale-ep/" target="_blank">LMSYS 博客</a> ｜ <a href="https://github.com/sgl-project/sglang" target="_blank">GitHub</a></td></tr>
+<tr><td><strong>vLLM EP 部署</strong></td><td>官方专家并行部署文档</td><td><a href="https://docs.vllm.ai/en/latest/serving/expert_parallel_deployment.html" target="_blank">vLLM 文档</a> ｜ <a href="https://github.com/vllm-project/vllm" target="_blank">GitHub</a></td></tr>
+<tr><td><strong>vLLM AFD 插件</strong></td><td>attention-FFN 分离；<strong>同时支持 NVIDIA GPU 与 Ascend NPU</strong>，公开 benchmark 跑在 910C（<span class="tag infer">更正</span>并未停滞，以实验性插件形态活跃开发）</td><td><a href="https://blog.vllm.ai/blog/2026-07-23-vllm-afd-plugin" target="_blank">vLLM 博客 2026-07-23</a></td></tr>
+<tr><td><strong>Mooncake</strong></td><td>KV cache 中心的分离式架构（注意：在 <code>kvcache-ai</code> 组织下）</td><td><a href="https://github.com/kvcache-ai/Mooncake" target="_blank">github.com/kvcache-ai/Mooncake</a></td></tr>
+<tr><td><strong>Pre-gated MoE</strong></td><td>门控前移以预取专家权重；A100 + 1.8TB 主机内存</td><td><a href="https://arxiv.org/abs/2308.00951" target="_blank">arXiv:2308.00951</a></td></tr>
+<tr><td><strong>MoE-Lightning</strong></td><td>T4/L4/A6000 等低端卡上的 offload 推理</td><td><a href="https://arxiv.org/abs/2411.11217" target="_blank">arXiv:2411.11217</a></td></tr>
+<tr><td><strong>128×B200 大规模 MoE 推理</strong></td><td>本报告涉及的唯一 Blackwell 规模化推理实测</td><td><a href="https://arxiv.org/abs/2605.28302" target="_blank">arXiv:2605.28302</a></td></tr>
+<tr><td><strong>专家卸载 / 稀疏推理综述类</strong></td><td>MoE 推理的内存墙分析</td><td><a href="https://arxiv.org/abs/2408.15664" target="_blank">arXiv:2408.15664</a></td></tr>
+<tr><td><strong>MoE 推理系统分析</strong></td><td><code>b ⩾ F/B</code> 一类判据的来源之一</td><td><a href="https://arxiv.org/abs/2512.13525" target="_blank">arXiv:2512.13525</a></td></tr>
+<tr><td><strong>大规模 EP 部署实践</strong></td><td>倾斜路由与冗余专家的生产经验</td><td><a href="https://arxiv.org/abs/2512.21487" target="_blank">arXiv:2512.21487</a></td></tr>
+<tr><td><strong>Step-3</strong></td><td>StepMesh 的性能数据指向此报告</td><td><a href="https://arxiv.org/abs/2507.19427" target="_blank">arXiv:2507.19427</a></td></tr>
+<tr><td><strong>MoE 推理成本与调度</strong></td><td>解耦架构的成本模型</td><td><a href="https://arxiv.org/abs/2604.19241" target="_blank">arXiv:2604.19241</a></td></tr>
+<tr><td><strong>稀疏专家扩展定律</strong></td><td>稀疏度与质量的权衡</td><td><a href="https://arxiv.org/abs/2106.04426" target="_blank">arXiv:2106.04426</a></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>10.4 EP 通信库（第 ④ 层）</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>库</th><th>关键事实</th><th>来源</th></tr></thead>
+<tbody>
+<tr><td><strong>DeepEP</strong>（V1 / V2）</td><td>V2 迁到 NCCL Gin，峰值 1.3×、SM 省 4×；PTX 未定义行为与逃生开关</td><td><a href="https://github.com/deepseek-ai/DeepEP" target="_blank">github.com/deepseek-ai/DeepEP</a></td></tr>
+<tr><td><strong>MoonEP</strong></td><td>动态冗余专家；倾斜下通信时间近乎持平；H20 EP=8 实测</td><td><a href="https://github.com/MoonshotAI/MoonEP" target="_blank">github.com/MoonshotAI/MoonEP</a></td></tr>
+<tr><td><strong>UltraEP</strong></td><td><strong>Dots-Infra 出品，非阿里</strong>；倾斜 1.30–4.01 → 1.01–1.04；关键路径 706–715 GB/s</td><td><a href="https://arxiv.org/abs/2606.04101" target="_blank">arXiv:2606.04101</a> ｜ <a href="https://github.com/Dots-Infra/UltraEP" target="_blank">GitHub</a></td></tr>
+<tr><td><strong>pplx-garden / fabric-lib</strong></td><td>SM-free while RDMA transfer；每 GPU 需独占 RDMA NIC</td><td><a href="https://github.com/perplexityai/pplx-garden" target="_blank">pplx-garden</a> ｜ <a href="https://github.com/perplexityai/pplx-kernels" target="_blank">pplx-kernels（已废弃）</a></td></tr>
+<tr><td><strong>NVSHMEM</strong> 3.7.2</td><td>对称堆；原子操作需 NVLink 或 GDRCopy；Volta 及以后</td><td><a href="https://docs.nvidia.com/nvshmem/api/index.html" target="_blank">NVSHMEM 官方文档</a></td></tr>
+<tr><td><strong>NCCL device API</strong> 2.31.2</td><td>LSA / Multimem / <strong>GIN</strong>（2.28.7 起）/ <strong>CFT</strong>（2.31 起，Blackwell+CUDA 13.3）</td><td><a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/index.html" target="_blank">NCCL 官方文档</a></td></tr>
+<tr><td><strong>NCCL EP</strong></td><td>NVIDIA 原生 MoE 库；combine 落后 DeepEP 5–12%，vLLM 端到端落后 7–10%</td><td><a href="https://arxiv.org/abs/2603.13606" target="_blank">arXiv:2603.13606</a></td></tr>
+<tr><td><strong>HybridEP + ECHO</strong></td><td>TMA 低 SM 占用；GB200 EP8→EP64 仅涨 1.7× vs H100 涨 7.0×</td><td><a href="https://arxiv.org/abs/2603.07685" target="_blank">arXiv:2603.07685</a> ｜ <a href="https://github.com/NVIDIA/Megatron-LM/pull/2368" target="_blank">Megatron PR#2368</a></td></tr>
+<tr><td><strong>UBEP</strong></td><td><strong>synchronization tax</strong>；CM384 UB 392 GB/s vs IB 50 GB/s；A2A −52.4% → TPOT +11.1%</td><td><a href="https://arxiv.org/abs/2607.06202" target="_blank">arXiv:2607.06202</a></td></tr>
+<tr><td><strong>TileLink</strong></td><td>tile-centric 原语；1.17–20.76× vs 不重叠基线（宽松基线）</td><td><a href="https://arxiv.org/abs/2503.20313" target="_blank">arXiv:2503.20313</a></td></tr>
+<tr><td><strong>Triton-distributed</strong></td><td>32×H800 低延迟 137 µs vs DeepEP 182 µs；支持 AMD CDNA3</td><td><a href="https://github.com/ByteDance-Seed/Triton-distributed" target="_blank">github.com/ByteDance-Seed/Triton-distributed</a></td></tr>
+<tr><td><strong>MORI / MORI-EP</strong></td><td>AMD 阵营；MI355X XGMI combine 420 GB/s；EP32 数据官方标注过期</td><td><a href="https://github.com/ROCm/mori" target="_blank">github.com/ROCm/mori</a></td></tr>
+<tr><td><strong>StepMesh</strong></td><td>AF 解耦专用；仍是 host 侧 push/pull；限 Ubuntu</td><td><a href="https://github.com/stepfun-ai/StepMesh" target="_blank">github.com/stepfun-ai/StepMesh</a></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>10.5 关键原文引述索引</h3>
+
+<div class="tbl-wrap">
+<table class="compact">
+<thead><tr><th>引述</th><th>出处</th><th>本报告用它论证什么</th></tr></thead>
+<tbody>
+<tr><td><em>"V2 has also switched from the NVSHMEM backend to the more lightweight NCCL Gin backend"</em></td><td>DeepEP README</td><td>后端统一到 NCCL device API 的趋势</td></tr>
+<tr><td><em>"V2 achieves up to 1.3x peak performance, while saving up to 4x SM count"</em></td><td>DeepEP README</td><td>"少占 SM"成为第一 KPI</td></tr>
+<tr><td><em>"using read-only PTX ld.global.nc.L1::no_allocate.L2::256B to read volatile data"</em></td><td>DeepEP README</td><td>民间库性能领先的部分来源是越过规范边界</td></tr>
+<tr><td><em>"keeps token loads perfectly balanced across ranks via dynamic redundant experts"</em></td><td>MoonEP README</td><td>均衡派的定位：让数据不再倾斜，而非更快地搬倾斜数据</td></tr>
+<tr><td><em>"MoonEP's comm time stays almost flat as maxvio grows, while DeepEP v2 — whose latency is set by the hottest rank — degrades steadily"</em></td><td>MoonEP README</td><td>优化目标从峰值带宽转向倾斜稳定性</td></tr>
+<tr><td><em>"reducing the final inter-rank imbalance from 1.30−4.01 to 1.01−1.04"</em></td><td>UltraEP 论文</td><td>均衡技术的实际效果量级</td></tr>
+<tr><td><em>"When the NVLink domain is smaller than the EP group, the achievable imbalance floor sits slightly above the ideal 1.0"</em></td><td>UltraEP README</td><td>NVLink 域大小是一级变量</td></tr>
+<tr><td><em>"the relative cost of synchronization primitives… becomes dominant, a phenomenon we term the 'synchronization tax'"</em></td><td>UBEP 论文</td><td>2027 年的新瓶颈</td></tr>
+<tr><td><em>"For combine, NCCL EP trails DeepEP by 5–12% at 1–4 nodes and converges at 8 nodes."</em></td><td>NCCL EP 论文</td><td>官方库跑不过民间库，且由 NVIDIA 自己披露</td></tr>
+<tr><td><em>"which can partially mask the module-level gains"</em></td><td>HyperParallel-MoE 论文</td><td>模块级收益到端到端必然缩水</td></tr>
+<tr><td>attention 占比 <strong>28.38% → 50.26%</strong>（4K → 32K）</td><td>DisagMoE 论文</td><td>attention 正在抢走 MoE 的时间预算</td></tr>
+<tr><td>All-to-All 占比 <strong>22% → 78%</strong>（单节点 → 8 节点）</td><td>DisagMoE 论文</td><td>为什么 EP 通信库是胜负手</td></tr>
+<tr><td><em>"fine-grained MoE models achieve lower training efficiency"</em></td><td>NVIDIA（MoE Parallel Folding）</td><td>模型侧的质量提升是系统侧的账单</td></tr>
+<tr><td><em>"Support for atomics requires a NVLink connection or a GPUDirect RDMA connection and GDRCopy."</em></td><td>NVSHMEM 文档</td><td>最容易被忽略的硬件硬约束</td></tr>
+<tr><td><em>"Kernels utilizing GIN are currently not backwards compatible and need to be recompiled when NCCL is upgraded."</em></td><td>NCCL 文档</td><td>迁移到官方通路的运维代价</td></tr>
+<tr><td><em>"* Stale data from previous kernel version; updated numbers pending re-benchmarking."</em></td><td>MORI README</td><td>为什么本报告对 MORI 的 EP32 数据不下结论</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card analysis">
+<h4><span class="tag infer">分析</span>关于这份清单本身的一点说明</h4>
+<p style="margin-bottom:0">整理过程中最花时间的不是找资料，而是<strong>剔除看起来存在但无法核实的东西</strong>。
+典型的三个例子：用户最初提到的 <code>MoonMoE</code> 实际不存在（真实项目是 <strong>MoonEP</strong>）；
+<code>UltraEP</code> 被广泛误认为是阿里的项目（真实归属是 <strong>Dots-Infra</strong>，<code>alibaba/UltraEP</code> 返回 404）；
+<code>AcclEP</code> 除了在 MoonEP 致谢里出现过一次字符串外，<strong>没有任何可访问的仓库或论文</strong>。
+这一层的信息噪音很大，名字相似、归属混乱、版本迭代快。
+<em>所以本报告的每一张表都优先引用仓库 README 与论文原文，而不是二手综述</em>——
+这也是为什么正文里有那么多逐字引述。</p>
+</div>
+</section>
+
+</div>
+</div><!-- /container -->
+
+<div class="footer">
+  <p style="margin-bottom:6px">本报告由 QoderWork 基于公开论文、官方仓库与官方模型卡整理，所有数字均标注来源与对比基线。</p>
+  <p style="margin-bottom:6px">凡原文未披露的硬件配置、加速比或部署规模，一律标注"未公开"，未做任何估算或补全。</p>
+  <p style="margin-bottom:0">生成日期：2026-08-27 ｜ 引用来源均为可点击链接，建议对照原文核验</p>
+</div>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('.nav button');
+  var tabs = document.querySelectorAll('.tab');
+  function show(id) {
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.remove('active');
+      if (tabs[i].id === id) { tabs[i].classList.add('active'); }
+    }
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].classList.remove('active');
+      if (buttons[j].getAttribute('data-tab') === id) { buttons[j].classList.add('active'); }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  for (var k = 0; k < buttons.length; k++) {
+    buttons[k].addEventListener('click', function () {
+      show(this.getAttribute('data-tab'));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

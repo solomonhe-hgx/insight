@@ -1,0 +1,3462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NCCL Compute Fabric Transport (CFT) 代码实现详细分析</title>
+<style>
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bd:#30363d; --bd2:#21262d;
+  --fg:#e6edf3; --fg2:#c9d1d9; --dim:#8b949e; --dim2:#6e7681;
+  --blue:#58a6ff; --green:#3fb950; --yellow:#d29922; --red:#f85149;
+  --purple:#bc8cff; --orange:#ffa657; --cyan:#39c5cf; --pink:#f778ba;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg2);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+  font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:36px 26px 90px}
+h1{font-size:31px;line-height:1.35;color:var(--fg);margin:0 0 6px;font-weight:650;letter-spacing:-.3px}
+.sub{color:var(--dim);font-size:14.5px;margin:0 0 4px}
+h2{font-size:22.5px;color:var(--fg);margin:56px 0 16px;padding-bottom:9px;
+  border-bottom:1px solid var(--bd);font-weight:640;scroll-margin-top:20px}
+h3{font-size:17.5px;color:var(--blue);margin:32px 0 11px;font-weight:620}
+h4{font-size:15px;color:var(--orange);margin:22px 0 8px;font-weight:620}
+p{margin:11px 0}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:12.6px;background:var(--bg3);
+  padding:1.5px 5px;border-radius:5px;color:var(--orange);border:1px solid var(--bd2)}
+pre{background:#010409;border:1px solid var(--bd);border-radius:9px;padding:14px 16px;
+  overflow-x:auto;font-family:var(--mono);font-size:12.4px;line-height:1.62;
+  color:var(--fg2);margin:13px 0}
+pre code{background:none;border:none;padding:0;color:inherit;font-size:inherit}
+table{width:100%;border-collapse:collapse;margin:15px 0;font-size:13.6px;
+  background:var(--bg2);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+th{background:var(--bg3);color:var(--fg);text-align:left;padding:9px 11px;
+  font-weight:620;border-bottom:1px solid var(--bd);font-size:13px}
+td{padding:8px 11px;border-bottom:1px solid var(--bd2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+.toc{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:16px 20px;margin:26px 0}
+.toc-t{color:var(--fg);font-weight:640;font-size:15px;margin-bottom:8px}
+.toc ol{margin:0;padding-left:22px;columns:2;column-gap:34px}
+.toc li{margin:4px 0;font-size:13.8px;break-inside:avoid}
+.box{border:1px solid var(--bd);border-left:3px solid var(--blue);
+  background:var(--bg2);border-radius:0 8px 8px 0;padding:12px 16px;margin:15px 0}
+.box.g{border-left-color:var(--green)}
+.box.y{border-left-color:var(--yellow)}
+.box.r{border-left-color:var(--red)}
+.box.p{border-left-color:var(--purple)}
+.box.c{border-left-color:var(--cyan)}
+.lab{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.5px;
+  padding:1px 7px;border-radius:4px;margin-right:7px;vertical-align:1.5px}
+.lab.src{background:#1f3b5c;color:var(--blue)}
+.lab.ana{background:#3d2b56;color:var(--purple)}
+.lab.key{background:#1c3a26;color:var(--green)}
+.lab.warn{background:#4a3608;color:var(--yellow)}
+.lab.gap{background:#4a1d1a;color:var(--red)}
+.lab.done{background:#1c3a26;color:var(--green)}
+.lab.meas{background:#0f3b3f;color:var(--cyan)}
+tr.closed{background:#12251a}
+tr.closed:hover{background:#173021}
+tr.closed td:first-child{border-left:3px solid var(--green)}
+.strike{text-decoration:line-through;color:var(--dim2)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px;margin:15px 0}
+.kv .i{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:11px 13px}
+.kv .i .n{font-family:var(--mono);font-size:19px;color:var(--cyan);font-weight:650;line-height:1.3}
+.kv .i .l{font-size:12.5px;color:var(--dim);margin-top:3px}
+pre.out{background:#05080c;border-color:#1d2b3a;font-size:11.9px;line-height:1.55}
+pre.out b{color:var(--green)}
+pre.out i{color:var(--yellow);font-style:normal}
+pre.out u{color:var(--red);text-decoration:none}
+.bitmap{font-family:var(--mono);font-size:11.5px;line-height:1.5;letter-spacing:.5px}
+.bitmap .R{color:var(--red)}
+.bitmap .H{color:var(--green)}
+.bits{width:100%;border-collapse:collapse;margin:14px 0;font-family:var(--mono);font-size:12px;
+  background:var(--bg2);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.bits td,.bits th{padding:7px 6px;text-align:center;border:1px solid var(--bd2)}
+.bits th{background:var(--bg3);font-size:11.5px;color:var(--dim)}
+.bits .f-tag{background:#3d1f1c;color:var(--red);font-weight:700}
+.bits .f-le{background:#1f3b5c;color:var(--blue);font-weight:700}
+.bits .f-off{background:#1c3a26;color:var(--green);font-weight:700}
+.fp{font-family:var(--mono);font-size:12.2px;color:var(--cyan);
+  background:var(--bg3);border:1px solid var(--bd2);border-radius:5px;
+  padding:2px 7px;display:inline-block;margin:2px 0}
+.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:14px;margin:16px 0}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:13px 15px}
+.card .h{color:var(--fg);font-weight:640;font-size:14.5px;margin-bottom:6px}
+.card .b{font-size:13.4px;color:var(--dim)}
+em{color:var(--purple);font-style:normal}
+b{color:var(--fg);font-weight:620}
+.t-ok{color:var(--green);font-weight:620}
+.t-no{color:var(--red);font-weight:620}
+.t-mid{color:var(--yellow);font-weight:620}
+.foot{margin-top:70px;padding-top:20px;border-top:1px solid var(--bd);
+  color:var(--dim2);font-size:12.8px}
+hr{border:none;border-top:1px dashed var(--bd);margin:26px 0}
+ul,ol{padding-left:24px}
+li{margin:5px 0}
+.mono-sm{font-family:var(--mono);font-size:12px}
+details.srcfull{margin:13px 0;border:1px solid var(--bd);border-radius:9px;background:var(--bg2);overflow:hidden}
+details.srcfull>summary{cursor:pointer;padding:11px 15px;font-size:13.4px;color:var(--cyan);
+  font-family:var(--mono);list-style:none;user-select:none}
+details.srcfull>summary::-webkit-details-marker{display:none}
+details.srcfull>summary::before{content:'\25B6';margin-right:9px;font-size:10px;color:var(--dim);display:inline-block;transition:transform .15s}
+details.srcfull[open]>summary::before{transform:rotate(90deg)}
+details.srcfull>summary:hover{background:var(--bg3)}
+details.srcfull[open]>summary{border-bottom:1px solid var(--bd)}
+details.srcfull pre{margin:0;border:none;border-radius:0;max-height:640px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>NCCL Compute Fabric Transport (CFT) 代码实现详细分析</h1>
+<p class="sub">分析对象：<span class="fp">github.com/NVIDIA/nccl</span> · master @ <span class="fp">fd168324</span>（Merge branch 'staging' into master）· 特性首发版本 NCCL 2.31</p>
+<p class="sub">分析方式：仓库同步后逐文件通读源码。本报告所有代码块均为源码逐字摘录，凡属笔者推断的内容一律以 <span class="lab ana">解读</span> 标记隔离。</p>
+
+<div class="toc">
+  <div class="toc-t">目录</div>
+  <ol>
+    <li><a href="#s0">结论速览：CFT 到底做了什么</a></li>
+    <li><a href="#s1">仓库同步与改动面清单</a></li>
+    <li><a href="#s2">第 1 层：CUDA Driver 封装（cuLogicalEndpoint*）</a></li>
+    <li><a href="#s3">第 2 层：Host 运行时（cft_dev_runtime.cc）</a></li>
+    <li><a href="#s4">第 3 层：devComm / team / le_id 寻址代数</a></li>
+    <li><a href="#s5">第 4 层：Device API 与 fabric PTX 实现</a></li>
+    <li><a href="#s6">第 5 层：CFT Barrier（第一个内部消费者）</a></li>
+    <li><a href="#s7">集成点、配置项与失败语义</a></li>
+    <li><a href="#s8">公开 API、语言绑定与官方示例</a></li>
+    <li><a href="#s9">设计要点解读与横向对比</a></li>
+    <li><a href="#s10">取证说明与遗留问题</a></li>
+    <li><a href="#s11">§11 实测（B200 + CUDA 13.3）：G2 闭合证据</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. 结论速览：CFT 到底做了什么</h2>
+
+<p>CFT 是 NCCL 2.31 引入的<b>第四种数据通路</b>（前三者为 LSA / NVLS-multimem / GIN）。它的本质是：把 CUDA 13.3 新增的 <b>Logical Endpoint（LE）</b> 驱动对象接进 NCCL 的 symmetric window 体系，然后在 device 侧用 Blackwell 新增的 <code>fabric.*</code> PTX 指令族，让 kernel 内部直接发起 <b>shared memory ↔ 远端 window</b> 的异步搬运与规约。</p>
+
+<div class="three">
+  <div class="card">
+    <div class="h">与 LSA 的区别</div>
+    <div class="b">LSA 走的是 <b>SM load/store 单元</b>（Generic proxy），对端内存被映射进本地 VA，靠普通 <code>ld/st</code> 访问。CFT 走的是 <b>fabric proxy</b>——一个独立的硬件搬运代理，不占用 SM 的 LSU，由 <code>fabric.try_put/get/red</code> 提交、由 mbarrier 收完成通知。</div>
+  </div>
+  <div class="card">
+    <div class="h">与 GIN 的区别</div>
+    <div class="b">GIN 是<b>跨节点</b> IB/网络通路，寻址单位是 (window, peer)。CFT 当前作用域被硬编码为 <b>LSA 域（= NVLink 域，通常一节点内）</b>：<code>computeCftSize()</code> 直接返回 <code>computeLsaSize()</code>。</div>
+  </div>
+  <div class="card">
+    <div class="h">数据面在 shared memory</div>
+    <div class="b">这是 CFT 最反直觉的一点：<b>所有 CFT 操作的本地端都是 shared memory</b>，不是 global memory。<code>put(smemSource)</code>、<code>get(smemDestination)</code>。远端才是 window（global）。这使 CFT 天然是「SMEM ↔ 远端 HBM」的直连通路。</div>
+  </div>
+</div>
+
+<p>按代码分层，CFT 的实现是一条清晰的 5 层栈：</p>
+
+<table>
+<thead><tr><th style="width:5%">层</th><th style="width:26%">文件</th><th style="width:8%">行数</th><th>该层做的事</th></tr></thead>
+<tbody>
+<tr><td><b>1</b></td><td><span class="fp">src/include/cudawrap.h</span></td><td>+42</td><td>12 个 <code>cuLogicalEndpoint*</code> 驱动函数的 PFN 封装 + CUDA&lt;13.3 时的降级 stub</td></tr>
+<tr><td><b>2</b></td><td><span class="fp">src/cft_dev_runtime.cc</span></td><td>323（新增）</td><td>能力探测、LE 创建/导出/导入、window→LE 绑定、host 侧 LE 查询 API</td></tr>
+<tr><td><b>3</b></td><td><span class="fp">nccl_device/core.h</span> + <span class="fp">impl/comm__types.h</span> + <span class="fp">impl/core__funcs.h</span></td><td>~+120</td><td><code>cftCaps</code> 需求位、<code>ncclTeamCft*</code> team 抽象、<code>le_id</code> 的纯算术推导</td></tr>
+<tr><td><b>4</b></td><td><span class="fp">nccl_device/cft.h</span> + <span class="fp">impl/cft__funcs.h</span> + <span class="fp">impl/cft__types.h</span></td><td>88 + 738 + 41（全新）</td><td><b>核心</b>：15 个 device 方法、24 组规约特化、9 种跨 proxy fence、全部 inline PTX</td></tr>
+<tr><td><b>5</b></td><td><span class="fp">nccl_device/cft_barrier.h</span> + <span class="fp">impl/cft_barrier__{funcs,types}.h</span> + <span class="fp">nccl_device/cft_barrier.cc</span></td><td>38+172+73+21（全新）</td><td>第一个真实消费者：用 CFT put / redMultimem 实现跨 rank barrier</td></tr>
+</tbody>
+</table>
+
+<div class="box y">
+<p><span class="lab warn">关键默认值</span>NCCL 2.31 里 <code>hostCftMode</code> 的<b>默认值是 Disable</b>（<span class="fp">src/init.cc</span>）。也就是说：即使硬件、驱动、CUDA 版本全部满足，<b>只注册 window 并不会创建任何 LE</b>。要拿到 LE，必须显式 <code>reqs.cftCaps = NCCL_CFT</code> 走 <code>ncclDevCommCreate()</code>，或者显式把 <code>config.hostCftMode</code> 设成 <code>Enable</code>/<code>Fallback</code>。</p>
+</div>
+
+<h2 id="s1">1. 仓库同步与改动面清单</h2>
+
+<h3>1.1 同步操作</h3>
+<pre><code>$ git fetch --all --tags --prune
+$ git log --oneline 7b83616d..origin/master | wc -l
+30
+$ git merge --ff-only origin/master
+Updating 7b83616d..fd168324   # 7b83616d = tag v2.31.2-1</code></pre>
+
+<h3>1.2 CFT 相关 commit（master 内共 24 个，按时间正序读更清楚）</h3>
+
+<p>把 <code>git log --grep=cft -i</code> 的结果倒过来看，可以还原出 CFT 的开发顺序，这条时间线本身就是很好的设计意图证据：</p>
+
+<table>
+<thead><tr><th style="width:11%">commit</th><th style="width:37%">标题</th><th>解读</th></tr></thead>
+<tbody>
+<tr><td class="mono-sm">88ad7e2f</td><td>cudawrap: add cuLogicalEndpoint driver wrappers</td><td>起点：先接驱动</td></tr>
+<tr><td class="mono-sm">6095baad</td><td>Add CFT host runtime, types, team and device API</td><td>主体一次性落地（host+device+team）</td></tr>
+<tr><td class="mono-sm">baebc89d</td><td>docs/examples: add CFT barrier device API example</td><td>示例</td></tr>
+<tr><td class="mono-sm">6edfefc4</td><td>cft: update flush</td><td rowspan="2">flush 语义反复调整——见 §5.5</td></tr>
+<tr><td class="mono-sm">09fec250</td><td>cft: update flush and smem to meet PTX semantics</td></tr>
+<tr><td class="mono-sm">34cda558</td><td>cft: use shorthand for ncclCoopThread{} in cft barrier arrive</td><td>清理</td></tr>
+<tr><td class="mono-sm">7a7e7e88</td><td>cft: add workaround for LLVM bug in CU12.9.0</td><td>编译器 bug 规避</td></tr>
+<tr><td class="mono-sm">0ec12627</td><td>cft: remove CFT teams from devComm</td><td><b>设计收敛</b>：team 不再存进 devComm，改为运行时算（见 §4.2）</td></tr>
+<tr><td class="mono-sm">d5ec7880</td><td>cft: add elected flush for coop CTA to avoid overflow arvCount</td><td>mbarrier arrive count 溢出修复</td></tr>
+<tr><td class="mono-sm">97f4bafe</td><td>cft: improve debug mode information for users</td><td>对应 <code>NCCL_DEVICE_CFT_ENABLE_DEBUG</code></td></tr>
+<tr><td class="mono-sm">9a8e168a</td><td>cft/ncclMemFence: remove un-needed coop.sync</td><td>fence 优化</td></tr>
+<tr><td class="mono-sm">49d96e24</td><td>cft: make mbarrier 16B aligned to meet pullred requirements</td><td>对应 <code>alignas(16) uint64_t bar</code></td></tr>
+<tr><td class="mono-sm">fa7e81d4</td><td>cft: don't elect(coop) thread for ncclCft::pullRed</td><td><b>pullRed 全 warp 发起</b>，与其它 op 相反（见 §5.10）</td></tr>
+<tr><td class="mono-sm">60095495</td><td>cft: rename ncclCftOpAdd to ncclCftOpSum for consistency</td><td>命名对齐 <code>ncclSum</code></td></tr>
+<tr><td class="mono-sm">1907af6f</td><td>cft: template CFT operations on cooperative group</td><td><b>大重构</b>：所有 op 加 <code>OpCoop</code> 模板参数</td></tr>
+<tr><td class="mono-sm">e28fa1e8 / 82288fc9 / 9c7a3613</td><td>add eager window register → Revert → add（再次）</td><td>eager 注册反复了三次，说明这是最难拿准的部分</td></tr>
+<tr><td class="mono-sm">da6a6b7b</td><td>cft: refactor win reg code path</td><td>→ 现在的 <span class="fp">dev_runtime.cc:696-736</span></td></tr>
+<tr><td class="mono-sm">cdb08bf8</td><td>cft: add device attribute and env to guide CFT support</td><td>→ <code>NCCL_CFT_ENABLE</code> + 两个 device attribute</td></tr>
+<tr><td class="mono-sm">764685dd</td><td>cft: disable CFT MC support when NVLS is disabled</td><td>MC LE 依赖 NVLS</td></tr>
+<tr><td class="mono-sm">1a997809</td><td>cft: refactor failure code for symTeamObtain</td><td>错误路径</td></tr>
+<tr><td class="mono-sm">2a03cdc2</td><td>Squash commit for CFT Documentation</td><td>→ 两份 rst</td></tr>
+<tr><td class="mono-sm">70911486</td><td>nccl4py: expose the CFT API</td><td>Python 绑定</td></tr>
+</tbody>
+</table>
+
+<div class="box c">
+<p><span class="lab ana">解读</span><b>下一版已在路上。</b><code>git log --all</code> 里有三个尚未进 master 的 CFT commit，指向已经确定的后续方向：</p>
+<ul>
+<li><code>a554c8bd</code> / <code>dc5a9b9d</code> <b>cft: add counted logical endpoint support</b> —— "counted LE"，配合 <code>0daf6ddc devruntime: implement same logic for CFT counted and uncounted</code>。这与 <span class="fp">fabric_instruction/</span> 目录里已存在的 <code>fabric_try_put_counted_bytes.ptx</code> 一类 PTX 变体对应（其 device 侧指令语义已在 <a href="#s5-6">§5.6</a> / <a href="#s11-5">§11.5</a> 实测查清）。</li>
+<li><code>adeae9a2</code> <b>cft: remove unsupported redCpMask and redMultimemCpMask</b> —— 现有 master 中的 <code>redCpMask</code>/<code>redMultimemCpMask</code> 两个 API <b>将被删除</b>，说明硬件实际不支持带 cp_mask 的 red。<span class="lab warn">警告</span>不要依赖这两个接口。</li>
+</ul>
+</div>
+
+<h3>1.3 文件面</h3>
+
+<p>路径含 <code>cft</code> 的全新文件 13 个；含 CFT 标识符的被改动文件共 46 个。核心清单：</p>
+
+<table>
+<thead><tr><th style="width:44%">文件</th><th style="width:8%">行数</th><th>性质</th></tr></thead>
+<tbody>
+<tr><td><span class="fp">src/cft_dev_runtime.cc</span></td><td>323</td><td>新增 · host 运行时全部逻辑</td></tr>
+<tr><td><span class="fp">src/include/nccl_device/cft.h</span></td><td>88</td><td>新增 · device API 声明</td></tr>
+<tr><td><span class="fp">src/include/nccl_device/impl/cft__funcs.h</span></td><td>738</td><td>新增 · <b>全部 PTX 实现</b></td></tr>
+<tr><td><span class="fp">src/include/nccl_device/impl/cft__types.h</span></td><td>41</td><td>新增 · smem 状态与 RedOp tag</td></tr>
+<tr><td><span class="fp">src/include/nccl_device/cft_barrier.h</span></td><td>38</td><td>新增 · barrier 声明</td></tr>
+<tr><td><span class="fp">src/include/nccl_device/impl/cft_barrier__funcs.h</span></td><td>172</td><td>新增 · barrier 实现</td></tr>
+<tr><td><span class="fp">src/include/nccl_device/impl/cft_barrier__types.h</span></td><td>73</td><td>新增 · barrier 内存布局</td></tr>
+<tr><td><span class="fp">src/nccl_device/cft_barrier.cc</span></td><td>21</td><td>新增 · barrier 资源需求</td></tr>
+<tr><td><span class="fp">docs/examples/06_device_api/04_cft_barrier/</span></td><td>167</td><td>新增 · 可运行示例</td></tr>
+<tr><td><span class="fp">docs/userguide/source/{usage/cft.rst, api/device_cft.rst}</span></td><td>200+336</td><td>新增 · 文档</td></tr>
+<tr><td colspan="3" style="background:var(--bg3);color:var(--dim)">—— 以下为被修改的既有文件 ——</td></tr>
+<tr><td><span class="fp">src/include/cudawrap.h</span></td><td>+42</td><td>驱动封装</td></tr>
+<tr><td><span class="fp">src/dev_runtime.cc</span></td><td>66 处命中</td><td>集成主战场</td></tr>
+<tr><td><span class="fp">src/init.cc</span></td><td>+~20</td><td><code>hostCftMode</code> 校验与默认值</td></tr>
+<tr><td><span class="fp">src/nccl.h.in</span></td><td>+8</td><td><code>ncclHostCftMode_t</code> 公开枚举</td></tr>
+<tr><td><span class="fp">src/include/nccl_device/{core.h, impl/*}</span></td><td>+~120</td><td>公开 device 头</td></tr>
+<tr><td><span class="fp">bindings/nccl4py/**</span></td><td>16 文件</td><td>Python + CuTe DSL 绑定</td></tr>
+<tr><td><span class="fp">contrib/nccl4rust/crates/nccl/src/device.rs</span></td><td>—</td><td>Rust 绑定</td></tr>
+</tbody>
+</table>
+
+<h2 id="s2">2. 第 1 层：CUDA Driver 封装（cuLogicalEndpoint*）</h2>
+
+<p>commit <code>88ad7e2f</code>，全部在 <span class="fp">src/include/cudawrap.h</span>。NCCL 从不直接链接 driver API，一律走 <code>cuGetProcAddress</code> 拿到的 PFN。CFT 依赖的 12 个函数按 NCCL 既有模式接入，但引入了一个<b>新的双重宏</b>来处理"CUDA Toolkit 头文件里连类型都还不存在"的情况：</p>
+
+<pre><code>#if CUDA_VERSION &gt;= 13030
+#define DECLARE_CUDA_TYPE_EXTERN_V13030(...)          /* 类型由 cudaTypedefs.h 提供，宏体为空 */
+#define DECLARE_CUDA_PFN_EXTERN_V13030(sym, ...) DECLARE_CUDA_PFN_EXTERN(sym, 13030)
+#else
+#define DECLARE_CUDA_TYPE_EXTERN_V13030(...) __VA_ARGS__     /* 自己把类型补出来 */
+#define DECLARE_CUDA_PFN_EXTERN_V13030(sym, ...) \
+  static inline CUresult pfn_##sym(__VA_ARGS__) { return CUDA_ERROR_NOT_SUPPORTED; }
+#endif</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>这个宏对是整套 CFT 能"用老 toolkit 编译、在老驱动上跑而不崩"的唯一原因：</p>
+<ul>
+<li><b>类型层</b>：CUDA&lt;13.3 时 <code>DECLARE_CUDA_TYPE_EXTERN_V13030</code> 把参数<em>原样展开</em>，即由 NCCL 自己定义一套 shim 结构体/枚举，让后面所有引用这些类型的代码照样编过。</li>
+<li><b>函数层</b>：同时把 <code>pfn_cuLogicalEndpointXxx</code> 定义成一个<em>无条件返回 <code>CUDA_ERROR_NOT_SUPPORTED</code> 的 inline 函数</em>。于是调用点一行 <code>#if</code> 都不用写，运行时自然走失败路径。</li>
+</ul>
+</div>
+
+<p>shim 类型定义（CUDA&lt;13.3 分支下的真实内容）：</p>
+
+<pre><code>// CFT support requires cuda 13.3
+DECLARE_CUDA_TYPE_EXTERN_V13030(
+  typedef struct {
+    int type;                              // CU_LOGICAL_ENDPOINT_TYPE_{UNICAST,MULTICAST}
+    int flags;
+    int ipcHandleTypes;                    // CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC
+    size_t size;
+    struct { int device; } unicast;         // UC：绑到哪个 device
+    struct { unsigned int numDevices; } multicast;  // MC：多少个 device 参与
+  } CUlogicalEndpointProp;
+  typedef struct {} CUlogicalEndpointFabricHandle;
+  enum { CU_LOGICAL_ENDPOINT_TYPE_UNICAST = 0, CU_LOGICAL_ENDPOINT_TYPE_MULTICAST = 0,
+         CU_LOGICAL_ENDPOINT_FLAG_NONE = 0, CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC = 0, };
+)</code></pre>
+
+<p>12 个函数原型（这是目前公开可见的、最完整的 LE 驱动 API 面）：</p>
+
+<table>
+<thead><tr><th style="width:29%">函数</th><th>签名（去掉 <code>DECLARE_CUDA_PFN_EXTERN_V13030</code> 外壳）</th><th style="width:20%">语义</th></tr></thead>
+<tbody>
+<tr><td><code>cuLogicalEndpointIdReserve</code></td><td class="mono-sm">(uint32_t* id, uint32_t count)</td><td>预留 <b>连续</b> count 个 LE id</td></tr>
+<tr><td><code>cuLogicalEndpointIdRelease</code></td><td class="mono-sm">(uint32_t id, uint32_t count)</td><td>归还 id 区间</td></tr>
+<tr><td><code>cuLogicalEndpointCreate</code></td><td class="mono-sm">(uint32_t id, CUlogicalEndpointProp* prop)</td><td>在指定 id 上实例化 LE</td></tr>
+<tr><td><code>cuLogicalEndpointDestroy</code></td><td class="mono-sm">(uint32_t id)</td><td>销毁</td></tr>
+<tr><td><code>cuLogicalEndpointAddDevice</code></td><td class="mono-sm">(uint32_t id, CUdevice dev)</td><td><b>MC 专用</b>：加入组播成员</td></tr>
+<tr><td><code>cuLogicalEndpointQuery</code></td><td class="mono-sm">(uint32_t id, uint32_t count, int* status)</td><td>查 ready 状态（可批量查连续区间）</td></tr>
+<tr><td><code>cuLogicalEndpointGetLimits</code></td><td class="mono-sm">(cuuint64_t* bindAlignment, cuuint64_t* maxSize, CUlogicalEndpointProp* prop)</td><td>查绑定对齐与最大 size</td></tr>
+<tr><td><code>cuLogicalEndpointExport</code></td><td class="mono-sm">(CUlogicalEndpointFabricHandle* h, uint32_t id, int ipcHandleType)</td><td>导出可跨进程 handle</td></tr>
+<tr><td><code>cuLogicalEndpointImport</code></td><td class="mono-sm">(uint32_t id, CUlogicalEndpointFabricHandle* h, int ipcHandleType)</td><td>导入到<b>指定的本地 id</b></td></tr>
+<tr><td><code>cuLogicalEndpointBindAddr</code></td><td class="mono-sm">(uint32_t id, CUdevice dev, size_t offset, void* addr, size_t size, int flags)</td><td><b>把一段 VA 映射进 LE 的偏移空间</b></td></tr>
+<tr><td><code>cuLogicalEndpointUnbind</code></td><td class="mono-sm">(uint32_t id, CUdevice dev, size_t offset, size_t size)</td><td>解绑</td></tr>
+</tbody>
+</table>
+
+<div class="box g">
+<p><span class="lab key">这一层的核心洞察</span><code>cuLogicalEndpointImport(id, handle, ...)</code> 的第一个参数是<b>入参而非出参</b>——导入方自己指定要把远端 LE 落在<em>哪个本地 id</em> 上。配合 <code>IdReserve(count)</code> 返回<b>连续</b>区间，这就使得 <code>le_id</code> 可以被设计成<b>可计算的</b>而非不透明句柄。§4.3 会看到 NCCL 正是这么做的：<code>le_id = baseId + rank</code>。</p>
+</div>
+
+<h2 id="s3">3. 第 2 层：Host 运行时（cft_dev_runtime.cc）</h2>
+
+<p>全新文件，323 行，是 CFT host 侧的<b>全部</b>逻辑。分五个职责。</p>
+
+<h3>3.1 能力探测：为什么你的 B200 上 CFT 可能是关的</h3>
+
+<pre><code>NCCL_PARAM(CftEnable, "CFT_ENABLE", 1);
+
+// Returns the CUDA version supported by CFT on this GPU, or 0 when CFT is unsupported.
+ncclResult_t ncclGpuCftSupport(struct ncclComm* comm, int* gpuCftSupport) {
+  *gpuCftSupport = 0;
+#if CUDA_VERSION &gt;= 13030
+  if (ncclParamCftEnable()) {
+    int driverVersion;
+    NCCLCHECK(ncclCudaDriverVersion(&amp;driverVersion));
+    int unicastSupported = 0, multicastSupported = 0;
+    if (driverVersion &gt;= 13030) {
+      CUCHECK(cuDeviceGetAttribute(&amp;unicastSupported,
+              CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_SUPPORTED, (CUdevice)comm-&gt;cudaDev));
+      CUCHECK(cuDeviceGetAttribute(&amp;multicastSupported,
+              CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_MULTICAST_SUPPORTED, (CUdevice)comm-&gt;cudaDev));
+    }
+    if (unicastSupported &amp;&amp; multicastSupported) *gpuCftSupport = std::min(CUDA_VERSION, driverVersion);
+  }
+#endif
+  return ncclSuccess;
+}</code></pre>
+
+<p>四个必须<b>同时</b>成立的条件：</p>
+<ol>
+<li>编译期 <code>CUDA_VERSION &gt;= 13030</code>（toolkit ≥ 13.3）</li>
+<li>运行期 <code>driverVersion &gt;= 13030</code></li>
+<li><code>LOGICAL_ENDPOINT_UNICAST_SUPPORTED</code> 为真</li>
+<li><code>LOGICAL_ENDPOINT_MULTICAST_SUPPORTED</code> <b>也</b>为真</li>
+</ol>
+
+<div class="box y">
+<p><span class="lab warn">注意第 4 条</span>探测是 <code>unicastSupported &amp;&amp; multicastSupported</code>。<b>只支持 unicast LE 的系统会被整体判为不支持 CFT</b>，连 UC 通路也用不了。这是一个偏保守的门禁，值得留意——它意味着 CFT 的可用性实际上被绑在了 multicast LE 能力上。另外整个特性可以用 <code>NCCL_CFT_ENABLE=0</code> 一键关闭。</p>
+</div>
+
+<p>返回值不是布尔而是<b>版本号</b>（<code>min(编译版本, 驱动版本)</code>），后续代码用 <code>&gt;= 13030</code> 做特性门禁，为将来按版本分级留了口子。当前唯一的用法在 team 规模计算里：</p>
+
+<pre><code>int computeCftSize(struct ncclComm* comm) {
+  if (comm-&gt;devrState.bigSize != 0) return comm-&gt;devrState.cftSize;
+  int res = 1;
+  if (comm-&gt;gpuCftSupport &gt;= 13030) res = computeLsaSize(comm);
+  return res;
+}
+
+int computeCftMcSize(struct ncclComm* comm) {  /* 同上，返回 computeLsaSize(comm) */ }</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span><b>CFT 的作用域 == LSA 域。</b>两个 size 函数都直接返回 <code>computeLsaSize(comm)</code>，没有独立的拓扑发现。所以 2.31 的 CFT 是<b>纯 NVLink 域内</b>的通路，不跨节点（跨节点仍归 GIN）。同时 <code>cftSize == cftMcSize</code>，二者当前完全重合——这也解释了为什么 <code>NCCL_CFT_TEAM_HIER_MULTIMEM</code> 这个层次化模式在当前配置下会退化成单元素 team。</p>
+</div>
+
+<h3>3.2 前置概念：big VA space 与 bigOffset（CFT 寻址的地基）</h3>
+
+<p>下一小节起，<code>mem-&gt;bigOffset</code> 会反复出现，并且它是 CFT「零地址交换」能力的<b>唯一来源</b>。这个概念不属于 CFT 新增，而是 NCCL symmetric window 体系既有的机制；CFT 做的事就是<b>把它原封不动地复用到 Logical Endpoint 上</b>。因为报告后文大量依赖它，这里先单独讲清。</p>
+
+<h4>3.2.1 big VA space：每 rank 一段等长的巨大虚拟地址窗口</h4>
+
+<p>NCCL 在 <code>ncclDevrInitOnce()</code> 里为每个 rank 划定一段长度为 <code>bigSize</code> 的虚拟地址窗口：</p>
+
+<pre><code>// src/dev_runtime.cc:176-184
+devr-&gt;bigSize = ncclParamWinStride();               // NCCL_WIN_STRIDE，默认 -1
+if (-devr-&gt;bigSize &lt;= 1) {
+  devr-&gt;bigSize = 1;
+  for (int r = 0; r &lt; comm-&gt;nRanks; ++r) {
+    devr-&gt;bigSize = std::max&lt;size_t&gt;(devr-&gt;bigSize, comm-&gt;peerInfo[r].totalGlobalMem);
+  }
+}
+devr-&gt;bigSize = alignUp(devr-&gt;bigSize, size_t(1) &lt;&lt; 32);   // 向上对齐到 4GB
+INFO(NCCL_INIT, "Symmetric VA size=%ldGB", (long)devr-&gt;bigSize &gt;&gt; 30);</code></pre>
+
+<p>即 <b>bigSize = 全通信域中最大的 GPU 显存容量，向上取整到 4GB 边界</b>（B200 192GB → 192GB）。字段自带的注释已说明设计意图：</p>
+
+<pre><code>// src/include/dev_runtime.h:76-78
+size_t bigSize;      // size of our big logical space (128GB?)
+struct ncclSpace bigSpace;  // allocates our big VA space.
+void* lsaFlatBase;   // base ptr for all lsa ranks big VA's concatenated together: size = lsaRanks*bigSize</code></pre>
+
+<p>然后把 <code>lsaSize</code> 份 <code>bigSize</code> <b>首尾相接预留成一整条连续 VA</b>：</p>
+
+<pre><code>// src/dev_runtime.cc:360-365
+if (devr-&gt;lsaFlatBase == nullptr) {
+  // Create on first need.
+  CUdeviceptr addr;
+  CUCHECKGOTO(cuMemAddressReserve(&amp;addr, devr-&gt;lsaSize * devr-&gt;bigSize, NCCL_MAX_PAGE_SIZE, 0, 0), ret, fail);
+  devr-&gt;lsaFlatBase = reinterpret_cast&lt;void*&gt;(addr);
+}</code></pre>
+
+<pre><code>lsaFlatBase
+│
+├──────── bigSize ────────┬──────── bigSize ────────┬──────── bigSize ────────┬ ...
+│      rank 0 的槽位       │      rank 1 的槽位       │      rank 2 的槽位       │
+│                         │                         │                         │
+│      ┌─────┐            │      ┌─────┐            │      ┌─────┐            │
+└──────┤ win ├────────────┴──────┤ win ├────────────┴──────┤ win ├────────────┘
+       └─────┘                   └─────┘                   └─────┘
+   ↑                         ↑                         ↑
+   └─── bigOffset ───────────┴─── 同一个 bigOffset ─────┘        ← 这就是 "symmetric" 的含义</code></pre>
+
+<h4>3.2.2 bigOffset 从哪来，为什么全 rank 一致</h4>
+
+<p><code>bigSpace</code> 是一个跑在 <code>[0, bigSize)</code> 区间上的<b>确定性区间分配器</b>（<span class="fp">src/allocator.cc</span> 的 <code>ncclSpaceAlloc</code>，first-fit）：</p>
+
+<pre><code>// src/dev_runtime.cc:683-686
+// Grab offset in the big space. Use lsaMaxSize (max across LSA ranks) to support asymmetric sizes.
+NCCLCHECKGOTO(ncclSpaceAlloc(&amp;devr-&gt;bigSpace, devr-&gt;bigSize, mem-&gt;lsaMaxSize,
+                             devr-&gt;granularity, &amp;bigOffset), ret, fail_mem);
+mem-&gt;bigOffset = bigOffset;</code></pre>
+
+<p>三个输入在 LSA 域内<b>全 rank 一致</b>：<code>bigSize</code>（同一公式）、<code>lsaMaxSize</code>（来自 allgather 后取 max，见 <span class="fp">dev_runtime.cc:676-681</span>）、<code>granularity</code>（同型号 GPU 相同）。而 window 注册本身是集合操作，各 rank 调用序列一致 → 分配器状态同步演化 → <b>产出同一个 bigOffset</b>。</p>
+
+<div class="box g">
+<p><span class="lab key">代码本身就是铁证</span>算对端地址时，代码<b>用本地的 bigOffset 去算所有 peer</b>，全程从未交换过 bigOffset：</p>
+<pre><code>// src/dev_runtime.cc:321   ← 注意：r 在变，bigOffset 不变
+CUdeviceptr addr = reinterpret_cast&lt;uintptr_t&gt;((char*)devr-&gt;lsaFlatBase + r * devr-&gt;bigSize + bigOffset);</code></pre>
+<p>如果各 rank 的 bigOffset 不同，这一行就是错的。所以「全 rank 一致」不是推断，而是这套代码成立的<b>前提条件</b>。</p>
+</div>
+
+<p>window 级别的偏移再叠加用户指针在这块内存内的位置：</p>
+
+<pre><code>// src/dev_runtime.cc:866
+win-&gt;bigOffset = mem-&gt;bigOffset + memOffset;</code></pre>
+
+<h4>3.2.3 三处复用：同一个 bigOffset 服务三种硬件对象</h4>
+
+<p>这是本报告反复提到的「直接复用 big buffer 偏移」的实质。<b>bigOffset 在三个完全不同的对象上扮演同一个角色 —— 都是「对象内部偏移」</b>：</p>
+
+<table>
+<thead><tr><th style="width:16%">用途</th><th>代码</th><th style="width:22%">bigOffset 的角色</th></tr></thead>
+<tbody>
+<tr><td>UC 映射</td><td class="mono-sm">lsaFlatBase + r*bigSize + <b>mem-&gt;bigOffset</b><br><span style="color:var(--dim2)">dev_runtime.cc:321</span></td><td>扁平 VA 内偏移</td></tr>
+<tr><td><b>NVLS multicast</b></td><td class="mono-sm">cuMulticastBindAddr(tm-&gt;mcHandle, <b>mem-&gt;bigOffset</b>, primaryAddr, mem-&gt;lsaMinSize, 0)<br><span style="color:var(--dim2)">dev_runtime.cc:392</span></td><td>MC 对象内偏移</td></tr>
+<tr><td><b>CFT Logical Endpoint</b></td><td class="mono-sm">cuLogicalEndpointBindAddr(le, dev, <b>mem-&gt;bigOffset</b>, mem-&gt;primaryAddr, mem-&gt;lsaMinSize, 0)<br><span style="color:var(--dim2)">cft_dev_runtime.cc:54</span></td><td>LE 内偏移</td></tr>
+</tbody>
+</table>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>后两行的<b>参数形状逐字相同</b>：<code>(对象句柄, offsetInObject, localVA, size, flags)</code>。这说明 CUDA 13.3 的 LE 绑定接口是刻意按 multicast 对象的模式设计的，NCCL 因此几乎零成本地把 CFT 挂了进来 —— <b>没有引入任何新的地址空间概念</b>。</p>
+</div>
+
+<p>Device 侧复用得更彻底 —— <b>同一个字段 <code>mcOffset4K</code> 同时服务 multicast 指针和 LE offset</b>：</p>
+
+<pre><code>// 写入：src/dev_runtime.cc:881-883
+winDevHost-&gt;lsaFlatBase = (char*)devr-&gt;lsaFlatBase + win-&gt;bigOffset;
+winDevHost-&gt;mcOffset4K  = win-&gt;bigOffset &gt;&gt; 12;      // 4KB 粒度压进 32 位（可表达 16TB）
+winDevHost-&gt;stride4G    = devr-&gt;bigSize  &gt;&gt; 32;      // 4GB 粒度 → 这就是 alignUp(1&lt;&lt;32) 的原因
+
+// 读出：src/include/nccl_device/impl/core__funcs.h
+// (a) multimem 指针
+ptr = reinterpret_cast&lt;char (*)[4096]&gt;(mm.mcBasePtr) + loadConst(&amp;w-&gt;mcOffset4K);
+// (b) CFT LE offset —— 同一个字段
+*leOffset = (size_t(w-&gt;mcOffset4K) &lt;&lt; 12) + offset;</code></pre>
+
+<div class="box c">
+<p><span class="lab key">为什么这对 CFT 至关重要</span>它让 <code>leOffset</code> 成为<b>纯算术量</b>。配合 le_id 同样是算术推导（§4.3），CFT 的完整远端寻址 <code>(le_id, le_offset)</code> 在 device 上只需几条整数指令，<b>零查表、零通信、零 shared memory 占用</b>：</p>
+<pre><code>*leId     = comm.ucLeId + flatTeam.rank + (peerCft - cftTeam.rank) * cftTeam.stride;
+*leOffset = (size_t(w-&gt;mcOffset4K) &lt;&lt; 12) + offset;</code></pre>
+</div>
+
+<h4>3.2.4 两个容易读错的细节</h4>
+
+<table>
+<thead><tr><th style="width:30%">细节</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><b>bigSize 是 VA 预留，不是显存占用</b></td><td><code>lsaSize * bigSize</code>（8×192GB = 1.5TB）只是 <code>cuMemAddressReserve</code> 的<b>地址空间</b>，物理页按 window 实际注册量按需映射。可用 <code>NCCL_WIN_STRIDE</code> 覆盖。但注意 <code>prop.size = devr-&gt;bigSize</code> 会被送进 <code>checkLeSize()</code> 与 LE 硬件上限 <code>maxSize</code> 比对 —— 见 §3.3。</td></tr>
+<tr><td><b>槽位按 max 分配，绑定按 min</b></td><td><code>ncclSpaceAlloc</code> 用 <code>mem-&gt;lsaMaxSize</code> 占位（容纳各 rank 尺寸不一致的情况），但 <code>cuMulticastBindAddr</code> / <code>cuLogicalEndpointBindAddr</code> 只绑 <code>mem-&gt;lsaMinSize</code>，即<b>所有 rank 都有效的那段交集</b>。<span class="lab warn">警告</span>超出 min 的尾部<b>不能</b>通过 MC 或 CFT 访问，且无任何运行期检查。</td></tr>
+</tbody>
+</table>
+
+<h3>3.3 Window → LE 的绑定</h3>
+
+<pre><code>ncclResult_t symBindTeamLe(struct ncclComm* comm, struct ncclDevrMemory* mem, ncclCftLeId le) {
+  if (le != NCCL_LE_ID_INVALID &amp;&amp; !mem-&gt;globalHasSysmemSegment) {
+#if CUDA_VERSION &gt;= 13030
+    CUCHECK(cuLogicalEndpointBindAddr(le, (CUdevice)comm-&gt;cudaDev,
+                                      mem-&gt;bigOffset, mem-&gt;primaryAddr, mem-&gt;lsaMinSize, 0));
+#endif
+  }
+  return ncclSuccess;
+}</code></pre>
+
+<p>三个参数值得逐一看：</p>
+<ul>
+<li><code>mem-&gt;bigOffset</code> —— LE 内的偏移，<b>直接复用 NCCL symmetric window 的 "big buffer" 偏移</b>（来历与全 rank 一致性的证明见 §3.2）。</li>
+<li><code>mem-&gt;primaryAddr</code> —— 本地 VA。</li>
+<li><code>mem-&gt;lsaMinSize</code> —— 取所有 rank 的最小 size（symmetric 语义）。</li>
+<li><code>!mem-&gt;globalHasSysmemSegment</code> —— <b>含 host 内存段的 window 被跳过</b>，LE 只能绑显存。</li>
+</ul>
+
+<div class="box g">
+<p><span class="lab key">这是 CFT 寻址模型的地基</span>因为 LE 偏移 <em>直接等于</em> window 的 <code>bigOffset</code>，且该值全 rank 一致，所以 device 侧算远端地址时<b>完全不需要交换任何地址信息</b>——见 §4.3。</p>
+</div>
+
+<p>创建前还有一道 size 校验（防止 window 总量超过 LE 硬件上限）：</p>
+<pre><code>static ncclResult_t checkLeSize(CUlogicalEndpointProp prop, size_t bigSize) {
+  cuuint64_t bindAlignment = 0, maxSize = 0;
+  CUCHECK(cuLogicalEndpointGetLimits(&amp;bindAlignment, &amp;maxSize, &amp;prop));
+  // ... 校验 bigSize 不超过 maxSize
+}
+
+static ncclResult_t waitLeReady(ncclCftLeId le, uint32_t leCount) {
+  int query = 0;
+  do { CUCHECK(cuLogicalEndpointQuery(le, leCount, &amp;query)); } while (!query);   // busy poll
+  return ncclSuccess;
+}</code></pre>
+
+<h3>3.4 Unicast LE 的建立：连续 id 块 + 建自己 / 导入别人</h3>
+
+<p>这是全文件最关键的函数（<code>symTeamObtainUcLe</code>），逐字摘录核心段落：</p>
+
+<pre><code>ncclTeam_t flatTeam = ncclTeamCft(comm);
+if (cftUc-&gt;baseId == NCCL_LE_ID_INVALID) {          // 全 comm 只做一次
+  CUlogicalEndpointProp prop = {};
+  prop.type            = CU_LOGICAL_ENDPOINT_TYPE_UNICAST;
+  prop.flags           = CU_LOGICAL_ENDPOINT_FLAG_NONE;
+  prop.unicast.device  = (CUdevice)comm-&gt;cudaDev;
+  prop.ipcHandleTypes  = CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC;
+  prop.size            = devr-&gt;bigSize;              // 整个 window 大池
+  NCCLCHECK(checkLeSize(prop, devr-&gt;bigSize));
+
+  // ① 一次预留 nRanks 个【连续】 id
+  CUCHECKGOTO(cuLogicalEndpointIdReserve(&amp;cftUc-&gt;baseId, flatTeam.nRanks), ret, fail);
+
+  // ② 只创建【自己那一个】：baseId + 自己的 rank
+  CUCHECKGOTO(cuLogicalEndpointCreate(cftUc-&gt;baseId + flatTeam.rank, &amp;prop), ret, fail);
+  leUcSelf = cftUc-&gt;baseId + flatTeam.rank;
+  NCCLCHECKGOTO(waitLeReady(leUcSelf, /*count=*/1), ret, fail);
+
+  // ③ 把所有【已注册】的 window 绑进自己的 LE
+  for (struct ncclDevrMemory* mem = devr-&gt;memHead; mem != nullptr; mem = mem-&gt;next) {
+    NCCLCHECKGOTO(symBindTeamLe(comm, mem, leUcSelf), ret, fail);
+    bindCount++;
+  }
+
+  // ④ 导出自己的 handle，allGather 交换
+  CUCHECKGOTO(cuLogicalEndpointExport(&amp;leUcHandles[flatTeam.rank], leUcSelf,
+                                     CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC), ret, fail);
+  for (int r = 0; r &lt; flatTeam.nRanks; r++) cftRankList[r] = ncclTeamRankToWorld(comm, flatTeam, r);
+  NCCLCHECKGOTO(bootstrapIntraNodeAllGather(comm-&gt;bootstrap, cftRankList, flatTeam.rank,
+                  flatTeam.nRanks, leUcHandles, sizeof(CUlogicalEndpointFabricHandle)), ret, fail);
+
+  // ⑤ 把每个 peer 的 LE 导入到【baseId + peer 的 rank】这个精确位置
+  for (int r = 0; r &lt; flatTeam.nRanks; r++) {
+    if (r == flatTeam.rank) continue;
+    CUCHECKGOTO(cuLogicalEndpointImport(cftUc-&gt;baseId + r, &amp;leUcHandles[r],
+                                        CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC), ret, fail);
+    importedCount++;
+  }
+  // ⑥ 批量等整个连续区间 ready
+  NCCLCHECKGOTO(waitLeReady(cftUc-&gt;baseId, flatTeam.nRanks), ret, fail);
+}
+t-&gt;ucLeId = cftUc-&gt;baseId + flatTeam.rank - t-&gt;team.rank * t-&gt;team.stride;</code></pre>
+
+<p>源码原注释解释了为什么不需要 barrier：</p>
+<div class="box">
+<p><i>"No need to request a barrier: local completion of <code>waitLeReady</code> guarantees that the remote LE is ready. Remote completion of the binding is guaranteed by the <code>bootstrapAllGather</code>."</i></p>
+</div>
+
+<div class="box p">
+<p><span class="lab ana">解读：这段代码回答了三个实操问题</span></p>
+<ol>
+<li><b>每个 rank 只 Create 一个 LE，其余全靠 Import。</b>一个 rank 的 LE 描述的是"我的显存"，别人要访问我就得导入我的 handle。所以 N 个 rank 的 comm 里，每个 rank 本地持有 N 个 LE id：1 个自建 + N−1 个导入。</li>
+<li><b><code>t-&gt;ucLeId</code> 存的不是"我的 LE"，而是一个基准量。</b>看最后一行的减法：<code>baseId + flatRank − teamRank*stride</code>。这是把 base 平移到"该 team 内 rank 0 对应的 le_id"，好让 device 侧只做一次加法就能算出任意 peer（§4.3）。这也是为什么 §7 里绑定时要写 <code>t-&gt;ucLeId + t-&gt;team.rank * t-&gt;team.stride</code> 把它加回来。</li>
+<li><b>UC LE 是 per-comm 单例，不是 per-team。</b><code>cftUc-&gt;baseId</code> 挂在 <code>devr-&gt;le</code>（<code>ncclDevrStateCftUc</code>）上，被 <code>if (baseId == INVALID)</code> 守着。多个 team 共享同一块连续 id 区间。</li>
+</ol>
+</div>
+
+<h3>3.5 Multicast LE 的建立：rank 0 独建 + AddDevice 当 barrier</h3>
+
+<pre><code>if (!comm-&gt;nvlsSupport) {
+  WARN("CFT multicast support requested, but NVLS is disabled or unsupported.");
+  return ncclInvalidArgument;
+}
+prop.type                 = CU_LOGICAL_ENDPOINT_TYPE_MULTICAST;
+prop.multicast.numDevices = t-&gt;team.nRanks;
+prop.size                 = devr-&gt;bigSize;
+
+CUCHECKGOTO(cuLogicalEndpointIdReserve(&amp;leMcId, 1), ret, fail);     // 只要 1 个 id
+
+if (t-&gt;team.rank == 0) {
+  cuLogicalEndpointCreate(leMcId, &amp;prop);                          // 只有 rank 0 创建
+  t-&gt;mcLeId = leMcId;
+  cuLogicalEndpointExport(&amp;leMcHandle, leMcId, CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC);
+  bootstrapIntraNodeBroadcast(...);                                 // 广播出去
+} else {
+  bootstrapIntraNodeBroadcast(...);                                 // 收
+  cuLogicalEndpointImport(leMcId, &amp;leMcHandle, CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC);
+  t-&gt;mcLeId = leMcId;
+}
+
+// LE is ready when all devices have joined the LE, it acts as a barrier
+CUCHECKGOTO(cuLogicalEndpointAddDevice(leMcId, (CUdevice)comm-&gt;cudaDev), ret, fail);
+NCCLCHECKGOTO(waitLeReady(leMcId, /*count=*/1), ret, fail);
+
+for (struct ncclDevrMemory* mem = devr-&gt;memHead; mem != nullptr; mem = mem-&gt;next) {
+  NCCLCHECKGOTO(symBindTeamLe(comm, mem, leMcId), ret, fail);
+}
+if (needBarrier != nullptr) *needBarrier = true;   // 保证没有 peer 在 bind 完成前用 MC LE</code></pre>
+
+<div class="box g">
+<p><span class="lab key">MC 与 UC 的四个结构性差异</span></p>
+<table>
+<thead><tr><th style="width:20%"></th><th style="width:40%">Unicast</th><th>Multicast</th></tr></thead>
+<tbody>
+<tr><td>id 数量</td><td><code>IdReserve(nRanks)</code> 连续块</td><td><code>IdReserve(1)</code> 单个</td></tr>
+<tr><td>谁 Create</td><td>每个 rank 建自己那一个</td><td><b>仅 rank 0</b>，其余 Import</td></tr>
+<tr><td>成员注册</td><td>无（UC 本来就是单 device）</td><td>全员各自 <code>AddDevice(自己)</code></td></tr>
+<tr><td>生命周期</td><td>per-comm 单例（<code>devr-&gt;le.baseId</code>）</td><td><b>per-team</b>（<code>t-&gt;mcLeId</code>），每个 team 一份</td></tr>
+<tr><td>同步</td><td>allGather 天然同步，<code>needBarrier=false</code></td><td><code>AddDevice</code>+<code>Query</code> 充当隐式 barrier；bind 后仍要 <code>needBarrier=true</code></td></tr>
+</tbody>
+</table>
+<p>MC LE 依赖 NVLS（<code>comm-&gt;nvlsSupport</code>）——commit <code>764685dd</code> 明确加的门禁。这符合预期：multicast LE 底层就是 NVLink SHARP 的组播对象。</p>
+</div>
+
+<h3>3.6 Host 侧的三个查询 API</h3>
+
+<p>三个 <code>NCCL_API</code> 导出函数，把 (window, offset, peer) 翻译成 (le_id, le_offset)：</p>
+
+<pre><code>// ① 组播
+ncclResult_t ncclGetMultimemDeviceLeInfo(ncclWindow_t window, size_t offset,
+                                         ncclCftLeId* leId, size_t* leOffset) {
+  // symTeamObtain(..., mc=true, &amp;tm, &amp;needBarrier);
+  // if (needBarrier) bootstrapIntraNodeBarrier(..., 0xbeef);
+  *leId     = tm-&gt;mcLeId;
+  *leOffset = winHost-&gt;bigOffset + offset;
+}
+
+// ② CFT team 内 peer
+ncclResult_t ncclGetCftDeviceLeInfo(ncclWindow_t window, size_t offset, int peerCft,
+                                    ncclTeam_t cftTeam, ncclCftLeId* leId, size_t* leOffset) {
+  *leId = baseLeId + flatTeam.rank + (peerCft - cftTeam.rank) * cftTeam.stride;
+}
+
+// ③ world rank peer
+ncclResult_t ncclGetPeerDeviceLeInfo(ncclWindow_t window, size_t offset, int peerWorld,
+                                     ncclCftLeId* leId, size_t* leOffset) {
+  // 边界检查：peerWorld 必须落在 [flatStart, flatStart + flatTeam.nRanks)
+  *leId = baseLeId + flatTeam.rank + (peerWorld - comm-&gt;rank);
+}</code></pre>
+
+<p>两道防线：</p>
+<pre><code>if (comm-&gt;gpuCftSupport == 0) {
+  WARN("Using CFT query function without CFT support in the communicator.");
+  return ncclInvalidArgument;
+}
+if (baseLeId == NCCL_LE_ID_INVALID) {
+  WARN("Querying CFT LE before LE creation. "
+       "Create a CFT-enabled devComm first or enable hostCftMode.");
+  return ncclInvalidUsage;
+}</code></pre>
+
+<div class="box y">
+<p><span class="lab warn">最常见的踩坑</span>第二条 WARN 就是 <code>hostCftMode</code> 默认 Disable 的直接后果。想在 host 侧查 LE，必须二选一：(a) 先 <code>ncclDevCommCreate</code> 且 <code>reqs.cftCaps</code> 带上 <code>NCCL_CFT</code>；(b) <code>ncclCommInitRankConfig</code> 时把 <code>config.hostCftMode</code> 设为 <code>ncclHostCftEnable</code>。</p>
+</div>
+
+<h3>3.7 拆除路径</h3>
+
+<p><code>symTeamDestroyAll()</code>（在 <span class="fp">dev_runtime.cc:534-572</span>）分两段处理 CFT——先 per-team 的 MC，再全局的 UC：</p>
+
+<pre><code>while (devr-&gt;teamHead != nullptr) {
+  struct ncclDevrTeam* t = devr-&gt;teamHead;  devr-&gt;teamHead = t-&gt;next;
+  bool hasLe = t-&gt;mcLeId != NCCL_LE_ID_INVALID;
+  if (t-&gt;mcBasePtr != nullptr || hasLe) {
+    for (struct ncclDevrMemory* m = devr-&gt;memHead; m != nullptr; m = m-&gt;next) {
+      symUnbindTeamMemory(comm, t, m);
+      symUnbindTeamLe(comm, m, t-&gt;mcLeId);
+    }
+  }
+  ...
+  if (t-&gt;mcLeId != NCCL_LE_ID_INVALID) {
+    // Each rank owns its own local MC reference (created by rank 0, imported by others).
+    CUCHECKIGNORE(cuLogicalEndpointDestroy(t-&gt;mcLeId));
+    CUCHECKIGNORE(cuLogicalEndpointIdRelease(t-&gt;mcLeId, 1));
+  }
+  free(t);
+}
+
+struct ncclDevrStateCftUc* cftUc = &amp;devr-&gt;le;
+if (cftUc-&gt;baseId != NCCL_LE_ID_INVALID) {
+  ncclCftLeId leUcSelf = cftUc-&gt;baseId + devr-&gt;cftSelf;
+  for (struct ncclDevrMemory* m = devr-&gt;memHead; m != nullptr; m = m-&gt;next) {
+    symUnbindTeamLe(comm, m, leUcSelf);      // 只 unbind 自己的（只有自己 bind 过）
+  }
+  for (int flatRank = 0; flatRank &lt; devr-&gt;cftSize; flatRank++) {
+    CUCHECKIGNORE(cuLogicalEndpointDestroy(cftUc-&gt;baseId + flatRank));   // 自建+导入全 Destroy
+  }
+  CUCHECKIGNORE(cuLogicalEndpointIdRelease(cftUc-&gt;baseId, devr-&gt;cftSize));
+  cftUc-&gt;baseId = NCCL_LE_ID_INVALID;
+}</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>对称性很干净：<code>Unbind</code> <b>只对自己创建的那个 LE</b> 做（导入的 LE 不是本 rank 绑的），但 <code>Destroy</code> <b>对整个连续区间</b>做（导入也算本地引用，需要各自释放）。MC 侧注释明确写了 "Each rank owns its own local MC reference"——所以每个 rank 都要 Destroy + IdRelease 自己那份，即使 LE 只被 rank 0 创建过一次。</p>
+</div>
+
+<h2 id="s4">4. 第 3 层：devComm / team / le_id 寻址代数</h2>
+
+<h3>4.1 公开的类型与需求位</h3>
+
+<p><span class="fp">src/include/nccl_device/core.h</span> 新增：</p>
+
+<pre><code>// 前置声明与类型别名
+struct ncclCftBarrierHandle;
+typedef struct ncclCftBarrierHandle ncclCftBarrierHandle_t;
+typedef uint32_t   ncclCftLeId;
+typedef ncclCftLeId ncclCftLeId_t;
+
+// team 布局模式
+typedef enum {
+  NCCL_CFT_TEAM_FLAT           = 0,   // CFT unicast 组内所有 rank
+  NCCL_CFT_TEAM_HIER_MULTIMEM  = 1,   // 跨 multicast 组、同 index 的 rank
+  NCCL_CFT_TEAM_HIER_LSA       = 2,   // 跨 LSA 组、同 index 的 rank
+} ncclCftTeamMode_t;
+
+// 能力位掩码
+typedef enum {
+  NCCL_CFT_NONE     = 0x0,
+  NCCL_CFT          = 0x1,   // unicast LE
+  NCCL_CFT_MULTIMEM = 0x2,   // multicast LE
+} ncclCftCap_t;</code></pre>
+
+<p><code>ncclDevCommRequirements</code> 加了两个字段（第 153-154 行）：</p>
+<pre><code>int cftCaps;           // Bitmask of ncclCftCap_t values
+int cftBarrierCount;</code></pre>
+<p>并在 <code>NCCL_DEV_COMM_REQUIREMENTS_INITIALIZER</code> 里补了 <code>NCCL_CFT_NONE, /* cftCaps */</code> 和 <code>0, /* cftBarrierCount */</code>。</p>
+
+<p><code>ncclDevComm</code>（<span class="fp">impl/comm__types.h:70-77</span>）尾部追加：</p>
+<pre><code>// CFT
+int cftRank, cftSize;
+int cftMultimemRank, cftMultimemSize;
+uint32_t cftMultimemSize_rcp32;          // 倒数，供 device 侧免除法
+ncclCftLeId ucLeId;
+ncclCftLeId mcLeId;
+ncclCftBarrierHandle_t cftBarrier;
+ncclCftBarrierHandle_t cftMultimemBarrier;</code></pre>
+
+<p>以及 <span class="fp">impl/core__types.h</span>：</p>
+<pre><code>#define NCCL_LE_ID_INVALID ((ncclCftLeId_t) - 1)</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>注意 devComm 里存的只有 <b>两个标量 le_id</b>（<code>ucLeId</code>/<code>mcLeId</code>）和 <b>四个整数</b>（rank/size），<em>没有任何 per-peer 数组</em>。commit <code>0ec12627 "cft: remove CFT teams from devComm"</code> 就是把 team 结构体从 devComm 里挪走的那一步。整个 peer 寻址靠 §4.3 的算术在运行时算出来——这让 devComm 保持极小，可以直接按值传进 kernel（示例里就是 <code>__global__ void k(struct ncclDevComm comm)</code>）。</p>
+</div>
+
+<h3>4.2 team 抽象：host / device 两份对称实现</h3>
+
+<p>Host 侧（<span class="fp">src/nccl_device/core.cc:36-67</span>）：</p>
+<pre><code>ncclTeam_t ncclTeamCft(ncclComm_t comm, ncclCftTeamMode_t mode) {
+  // Ignoring errors as in ncclTeamLsa().
+  if (ncclSuccess != ncclDevrInitOnce(comm)) return ncclTeam_t{};
+  ncclTeam_t flatTeam;
+  flatTeam.nRanks = comm-&gt;devrState.cftSize;
+  flatTeam.rank   = comm-&gt;devrState.cftSelf;
+  flatTeam.stride = 1;
+  if (mode == NCCL_CFT_TEAM_FLAT) return flatTeam;
+  int innerSize;
+  if (mode == NCCL_CFT_TEAM_HIER_MULTIMEM) { innerSize = comm-&gt;devrState.cftMcSize; }
+  ...
+}
+
+ncclTeam_t ncclTeamCftMultimem(ncclComm_t comm) {
+  if (ncclSuccess != ncclDevrInitOnce(comm)) return ncclTeam_t{};
+  ncclTeam_t ans;
+  ans.nRanks = comm-&gt;devrState.cftMcSize;
+  ans.rank   = comm-&gt;devrState.cftMcSelf;
+  ans.stride = 1;
+  return ans;
+}</code></pre>
+
+<p>Device 侧（<span class="fp">impl/core__funcs.h:36-55</span>），同样语义但用倒数乘法代替整数除法：</p>
+<pre><code>NCCL_DEVICE_INLINE ncclTeam ncclTeamCft(ncclDevComm const&amp; comm, ncclCftTeamMode_t mode) {
+  ncclTeam flat;
+  flat.nRanks = comm.cftSize;
+  flat.rank   = comm.cftRank;
+  flat.stride = 1;
+  if (mode == NCCL_CFT_TEAM_FLAT) {
+    return flat;
+  } else if (mode == NCCL_CFT_TEAM_HIER_MULTIMEM) {
+    flat.nRanks  = idivFast32(flat.nRanks, comm.cftMultimemSize, comm.cftMultimemSize_rcp32);
+    flat.rank    = idivFast32(flat.rank,   comm.cftMultimemSize, comm.cftMultimemSize_rcp32);
+    flat.stride *= comm.cftMultimemSize;
+    return flat;
+  } else if (mode == NCCL_CFT_TEAM_HIER_LSA) {
+    /* 同上，换成 lsaSize / lsaSize_rcp32 */
+  }
+  return ncclTeam{};
+}</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>层次化模式的语义是「<b>取每个内层组里同一 index 的 rank</b>」：<code>nRanks/=inner; rank/=inner; stride*=inner</code>。这正好构造出跨组的 strided team——典型用法是先在 multicast 组内 NVLS 规约，再用 <code>HIER_MULTIMEM</code> team 在组之间 CFT put。<span class="lab warn">但</span>如 §3.1 所述，当前 <code>cftSize == cftMcSize</code>，所以 <code>HIER_MULTIMEM</code> 会退化为 <code>nRanks=1</code>。这是为未来多 multicast 组拓扑预留的骨架，而非当前可用能力。</p>
+</div>
+
+<h3>4.3 le_id 与 le_offset 的纯算术推导（CFT 最精巧的一处设计）</h3>
+
+<p><span class="fp">impl/core__funcs.h:190-215</span>，三个 device inline 函数，<b>零内存查表、零通信</b>：</p>
+
+<pre><code>NCCL_DEVICE_INLINE void ncclGetCftLeInfo(ncclWindow_t w, size_t offset, int peerCft,
+                                         ncclTeam cftTeam, ncclDevComm const&amp; comm,
+                                         ncclCftLeId* leId, size_t* leOffset) {
+  ncclTeam flatTeam = ncclTeamCft(comm);
+  *leId     = loadConst(&amp;comm.ucLeId) + flatTeam.rank + (peerCft - cftTeam.rank) * cftTeam.stride;
+  *leOffset = (size_t(w-&gt;mcOffset4K) &lt;&lt; 12) + offset;
+}
+
+NCCL_DEVICE_INLINE void ncclGetPeerLeInfo(ncclWindow_t w, size_t offset, int peerWorld,
+                                          ncclDevComm const&amp; comm,
+                                          ncclCftLeId* leId, size_t* leOffset) {
+  int worldRank = loadConst(&amp;w-&gt;worldRank);
+  ncclTeam cftTeam = ncclTeamCft(comm);
+  int i = cftTeam.rank * cftTeam.stride + (peerWorld - worldRank);
+  *leId     = loadConst(&amp;comm.ucLeId) + i;
+  *leOffset = (size_t(w-&gt;mcOffset4K) &lt;&lt; 12) + offset;
+}
+
+NCCL_DEVICE_INLINE void ncclGetMultimemLeInfo(ncclWindow_t w, size_t offset,
+                                              ncclDevComm const&amp; comm,
+                                              ncclCftLeId* leId, size_t* leOffset) {
+  *leId     = loadConst(&amp;comm.mcLeId);
+  *leOffset = (size_t(w-&gt;mcOffset4K) &lt;&lt; 12) + offset;
+}</code></pre>
+
+<div class="box g">
+<p><span class="lab key">两条恒等式支撑了整个设计</span></p>
+<ol>
+<li><b>id 侧</b>：<code>le_id(peer) = ucLeId + flatRank + (peer − teamRank)·stride</code>。因为 <code>IdReserve</code> 给的是连续区间、<code>Import</code> 又允许指定落点，peer 的 le_id 是<em>可计算的</em>。<code>ucLeId</code> 已在 host 侧被平移过（§3.4 末行的减法），所以这里的加法把它平移回来。</li>
+<li><b>offset 侧</b>：<code>le_offset = (mcOffset4K &lt;&lt; 12) + offset</code>。<code>mcOffset4K &lt;&lt; 12</code> <b>就是 host 侧 <code>bindAddr</code> 时传的 <code>bigOffset</code></b>（复用了 multicast 的 4KB 粒度偏移字段）。因为 window 是 symmetric 的、<code>bigOffset</code> 全 rank 一致，所以本地算出来的 offset 直接就是远端的正确 offset。</li>
+</ol>
+<p>结论：<b>CFT 的远端寻址完全不需要 exchange 任何 per-peer 地址表，device 侧零查表。</b></p>
+</div>
+
+<div class="box y">
+<p><span class="lab warn">勘误：原文的过度归因</span>本报告早期版本在上面这句后面还写了一句"<span class="strike">这是它相对 GIN（需要 rkey/地址表）在 device 侧开销上的根本优势</span>"。这个归因不成立，必须按三条通路分开讲。</p>
+
+<p>问题在于：<b>LSA 对称内存本来就已经是纯算术寻址</b>，而且它和 CFT 不只是"各自都能算"，而是<b>共用同一个字段 <code>mcOffset4K</code></b>。这一点在同一个头文件里相邻的两个函数上一眼可见（<span class="fp">impl/core__funcs.h:137-215</span>）：</p>
+
+<pre><code>// LSA：flat VA 上按 rank 平移高 32 位
+NCCL_DEVICE_INLINE void* ncclGetPeerPointer(ncclWindow_t w, size_t offset, int peer) {
+  ...
+  int i = lsaRank + (peer - worldRank);
+  return (void*)(nccl::utility::add4G(base, i * stride4G) + offset);
+}
+
+// CFT：le_offset 直接就是 mcOffset4K &lt;&lt; 12
+NCCL_DEVICE_INLINE void ncclGetCftLeInfo(...) {
+  *leId    = loadConst(&amp;comm.ucLeId) + flatTeam.rank + (peerCft - cftTeam.rank) * cftTeam.stride;
+  *leOffset = (size_t(w-&gt;mcOffset4K) &lt;&lt; 12) + offset;
+}</code></pre>
+
+<p>而 GIN 侧唯一真正的"查表"只发生在 <b>window handle</b> 一处，偏移侧同样是算术（<span class="fp">impl/gin__funcs.h:19-31</span>）：</p>
+
+<pre><code>NCCL_DEVICE_INLINE size_t windowOffsetToGinOffset(ncclWindow_t window, size_t offset) {
+  return 4096 * size_t(loadConst(&amp;window-&gt;ginOffset4K)) + offset;   // ← 也是算术
+}
+
+NCCL_DEVICE_INLINE ncclGinWindow_t getGinWindow(ncclWindow_t win, int backendIndex, int connectionId) {
+  if (backendIndex == 0) return loadConst(&amp;win-&gt;ginWinsDefaultBackend[connectionId]);   // ← 数组索引
+  size_t idx = (size_t)backendIndex * loadConst(&amp;win-&gt;numSegments);
+  return loadConst(&amp;win-&gt;ginMultiSegmentWins[idx].ginWins[connectionId]);               // ← 二级指针追逐
+}</code></pre>
+
+<table>
+<thead><tr><th style="width:19%"></th><th style="width:27%">LSA</th><th style="width:27%">CFT</th><th>GIN</th></tr></thead>
+<tbody>
+<tr><td>远端"对象"如何取得</td><td class="t-ok">不需要（同一段 flat VA）</td><td class="t-ok"><code>ucLeId + flatRank + (peer−rank)·stride</code>，<b>算术</b></td><td class="t-no"><code>getGinWindow()</code>：<b>数组索引</b>，多 backend 时还要追一次指针</td></tr>
+<tr><td>远端偏移如何取得</td><td class="t-ok"><code>add4G(base, i·stride4G) + offset</code></td><td class="t-ok"><code>(mcOffset4K&lt;&lt;12) + offset</code></td><td class="t-ok"><code>4096·ginOffset4K + offset</code></td></tr>
+<tr><td>device 侧是否查表</td><td class="t-ok">否</td><td class="t-ok">否</td><td class="t-mid">是，<b>仅</b> window handle 一处</td></tr>
+<tr><td>host 侧 per-peer 成本</td><td class="t-mid"><b>有</b>：逐 peer <code>Import</code> + <code>cuMemMap</code> + <code>cuMemSetAccess</code></td><td class="t-ok">仅 import LE handle，<b>不建 peer VA 映射</b></td><td class="t-no">QP / mkey 建连</td></tr>
+</tbody>
+</table>
+
+<p><span class="lab ana">解读</span>正确的表述是：<b>device 侧偏移计算上，LSA 与 CFT 并列第一且同源；GIN 的额外开销只在句柄侧，不在偏移侧。</b>把"零查表"记成 CFT 的独有优势，是把 symmetric window 体系的功劳算到了 CFT 头上——CFT 是<b>复用</b>了这套体系，不是发明了它。</p>
+
+<p><span class="lab ana">那 CFT 相对 LSA 的真实增量是什么</span>三条，且都不在 device 侧寻址上：</p>
+<ol>
+<li><b>host 侧不建 peer VA 映射</b>。LSA 必须为每个 peer 走一遍 import + map + setAccess（<span class="fp">dev_runtime.cc:316-329</span> 的双层循环，peer × segment），产生真实的 per-peer 页表项；CFT 只 import 一个 LE handle，远端可达性由 fabric 引擎在 le_id 命名空间里解析。<b>这是扩展性差异，不是指令数差异。</b></li>
+<li><b>语义不同</b>：LSA 是 SM LSU 的同步访存（失败即硬错误）；CFT 是异步、shared-memory 端点、带内错误上报（见 <a href="#s5-12">§5.12</a>）。</li>
+<li><b>不包括 reach</b>。<code>computeCftSize()</code> 直接 <code>return computeLsaSize(comm)</code>——2.31 里 CFT 的覆盖范围与 LSA <b>完全相同</b>，都是 NVLink 域。任何"CFT 能走更远"的推论都没有代码依据。</li>
+</ol>
+</div>
+
+<p>另有两个针对 <b>resource buffer</b>（而非 user window）的变体，供 barrier 等内部设施使用：</p>
+<pre><code>ncclGetResourceBufferCftLeInfo(comm, handle, peerCft, &amp;leId, &amp;leOffset);
+ncclGetResourceBufferMultimemLeInfo(comm, handle, &amp;leId, &amp;leOffset);</code></pre>
+
+<h2 id="s5">5. 第 4 层：Device API 与 fabric PTX 实现</h2>
+
+<p><span class="fp">impl/cft__funcs.h</span> 738 行是整个特性的核心。本节把它拆成 11 块（§5.1–5.5、§5.7–5.12）；另插入一节 <a href="#s5-6">§5.6</a>，讲一条 <b>NCCL 尚未使用、但 PTX/硬件已完整支持</b>的完成通道 <code>.counted::bytes</code>，它与 §5.5 的 <code>complete_tx::16B</code> 正好构成对照。</p>
+
+<h3>5.1 API 全貌（cft.h，88 行）</h3>
+
+<pre><code>enum class ncclMemProxyType : uint32_t { Generic = 1u &lt;&lt; 0, Fabric = 1u &lt;&lt; 1, };
+enum class ncclMemFenceScope : uint32_t { Cta = 1u &lt;&lt; 0, Sys = 1u &lt;&lt; 1, };
+
+template &lt;typename Coop&gt;
+NCCL_DEVICE_INLINE void ncclMemFence(Coop coop, cuda::memory_order order,
+                                     ncclMemProxyType producer, ncclMemProxyType consumer,
+                                     ncclMemFenceScope scope);
+
+template &lt;typename Coop&gt;
+struct ncclCft : ncclCft_internal&lt;Coop&gt; {
+  ncclCft(Coop coop, ncclCftSmem&amp; cftSmem);
+  ~ncclCft();
+
+  // —— 生命周期 / 完成 ——
+  template &lt;typename OpCoop&gt; void submit(OpCoop coop);
+  template &lt;typename OpCoop&gt; void flushSmem(OpCoop coop);
+  template &lt;typename OpCoop&gt; void flush(OpCoop coop, bool* hasReport = nullptr,
+                                        uint32_t* report = nullptr);
+
+  // —— Put 家族（smem → 远端）——
+  template &lt;typename OpCoop&gt; void put(OpCoop, ncclCftLeId, size_t, void* smemSource, uint32_t bytes);
+  template &lt;typename OpCoop&gt; void putCpMask(..., uint16_t cpMask);
+  template &lt;typename OpCoop&gt; void putMultimem(...);
+  template &lt;typename OpCoop&gt; void putMultimemCpMask(..., uint16_t cpMask);
+
+  // —— Get（远端 → smem）——
+  template &lt;typename OpCoop&gt; void get(OpCoop, ncclCftLeId, size_t, void* smemDestination, uint32_t bytes);
+
+  // —— Red 家族（smem 数据在远端做规约）——
+  template &lt;typename RedOp, typename OpCoop&gt; void red(OpCoop, ncclCftLeId, size_t,
+                                                      RedOp const&amp;, void* smemSource, uint32_t bytes);
+  template &lt;typename RedOp, typename OpCoop&gt; void redCpMask(..., uint16_t cpMask);
+  template &lt;typename RedOp, typename OpCoop&gt; void redMultimem(...);
+  template &lt;typename RedOp, typename OpCoop&gt; void redMultimemCpMask(..., uint16_t cpMask);
+
+  // —— PullRed（NVLS ld_reduce：从组播 LE 拉规约结果回 smem）——
+  template &lt;typename RedOp, typename OpCoop&gt; void pullRed(OpCoop, ncclCftLeId, size_t,
+                                                          RedOp const&amp;, void* smemDestination, uint32_t bytes);
+};</code></pre>
+
+<p>状态类型（<span class="fp">impl/cft__types.h</span>，41 行，全文几乎就这些）：</p>
+<pre><code>struct ncclCftSmem { alignas(16) uint64_t bar; };          // 就是一个 16B 对齐的 mbarrier
+
+template &lt;typename Coop&gt;
+struct ncclCft_internal {
+  Coop coop;
+  ncclCftSmem&amp; cftSmem;
+  uint32_t txCount;        // 累积待 expect_tx 的事务数
+  uint32_t phaseParity;    // mbarrier phase 奇偶
+};
+
+template &lt;typename T&gt; struct ncclCftOpSum {};   // 同理 OpAnd / OpXor / OpOr / OpMin / OpMax
+</code></pre>
+
+<div class="box g">
+<p><span class="lab key">API 形态的三个要点</span></p>
+<ul>
+<li><b>本地端一律是 shared memory</b>，参数名直接叫 <code>smemSource</code>/<code>smemDestination</code>。文档明确：指针必须 16B 对齐，<code>bytes</code> 必须是 16 的倍数。</li>
+<li><b>双层 Coop</b>：类模板参数 <code>Coop</code> 是"共享这个 CFT 对象/mbarrier 的线程集合"，方法模板参数 <code>OpCoop</code> 是"发起这一条操作的线程子集"。commit <code>1907af6f</code> 专门做了这个重构。文档原文：<i>"coop can include a subset of the threads in the cooperative group used to create the CFT object."</i></li>
+<li><b>RedOp 是 tag 类型</b>（空结构体 + 元素类型模板参数），编译期决定 PTX 里的 <code>.op.type</code> 后缀，零运行时开销。</li>
+</ul>
+</div>
+
+<h3>5.2 架构门禁与 unsupported 降级</h3>
+
+<pre><code>#if defined(__CUDA_ARCH__) &amp;&amp; __CUDA_ARCH__ &gt;= 1000 \
+    &amp;&amp; defined(CUDART_VERSION) &amp;&amp; CUDART_VERSION &gt;= 13030
+#define NCCL_CFT_ENABLE 1
+#endif
+
+// #define NCCL_DEVICE_CFT_ENABLE_DEBUG        // 打开后启用 16B 对齐断言（默认注释）</code></pre>
+
+<p>未启用时所有方法体退化为：</p>
+<pre><code>namespace nccl { namespace cft { namespace internal {
+  NCCL_DEVICE_INLINE void unsupported() {
+    assert(false &amp;&amp; "CFT device helpers require CUDA Toolkit support for fabric PTX instructions.");
+  }
+}}}</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span><code>__CUDA_ARCH__ &gt;= 1000</code> 就是 <b>sm_100（Blackwell）及以上</b>。注意这是<em>编译期</em>门禁：为 sm_90 编译的同一份代码会静默生成 assert 版本，不会有链接错误。<code>NCCL_DEVICE_CFT_ENABLE_DEBUG</code> 是给用户排查对齐问题的开关（commit <code>97f4bafe</code>），默认关掉是因为对齐检查在热路径上。</p>
+</div>
+
+<h3>5.3 Leader election：三个特化</h3>
+
+<pre><code>// 通用：靠 thread_rank
+template &lt;typename OpCoop&gt; NCCL_DEVICE_INLINE bool elected(OpCoop coop) {
+  return coop.thread_rank() == 0;
+}
+// 单线程：恒真
+template &lt;&gt; NCCL_DEVICE_INLINE bool elected&lt;ncclCoopThread&gt;(ncclCoopThread) { return true; }
+// warp：用硬件 elect.sync
+template &lt;&gt; NCCL_DEVICE_INLINE bool elected&lt;ncclCoopWarp&gt;(ncclCoopWarp) {
+  uint32_t pred = 0;
+  asm volatile("{\n\t.reg .pred p;\n\t"
+               "elect.sync _|p, %1;\n\t"
+               "selp.b32 %0, 1, 0, p;\n\t}"
+               : "=r"(pred) : "r"(0xFFFFFFFFu));
+  return pred != 0;
+}</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>为什么要 <code>elect.sync</code> 而不是 <code>laneid()==0</code>？<code>elect.sync</code> 是 Hopper 引入的指令，从活跃 mask 中选出<b>一个任意但唯一</b>的 leader，即使 lane 0 不活跃也能工作。这对 <code>fabric.*</code> 指令很重要——除了 <code>pullRed</code>，所有 CFT op 都<b>只由 leader 单线程发起</b>（下文可见每个方法开头都是 <code>if (elected(coop))</code>），因为 fabric 描述符本身就是整块 bulk 传输，不需要多线程协作。</p>
+</div>
+
+<h3>5.4 mbarrier：layout::v1 与带 report 的 try_wait</h3>
+
+<p>构造/析构：</p>
+<pre><code>// ctor
+asm volatile("mbarrier.init.shared.layout::v1.b64 [%0], %1;"
+             :: "r"(smemAddr(cftSmem)), "r"(1) : "memory");     // arrive count = 1
+coop.sync();
+
+// dtor
+coop.sync();
+asm volatile("mbarrier.inval.shared::cta.b64 [%0];" :: "r"(smemAddr(cftSmem)) : "memory");</code></pre>
+
+<p>等待循环——这是 CFT 相对普通 mbarrier 最特别的地方：</p>
+<pre><code>asm volatile("{\n\t"
+  ".reg .pred p;\n\t"
+  ".reg .pred hasReport;\n\t"
+  ".reg .u8   s8;\n\t"
+  "mbarrier.try_wait.parity.phase_type::primary.acquire.cta.shared::cta.b64 p|hasReport, s8, [%3], %4;\n\t"
+  "selp.b32 %0, 1, 0, p;\n\t"
+  "@p cvt.u32.u8 %2, s8;\n\t"
+  "@p selp.b32 %1, 1, 0, hasReport;\n\t"
+  "}"
+  : "=r"(ready), "+r"(*hasReport), "+r"(*report)
+  : "r"(smemAddr(cftSmem)), "r"(phaseParity)
+  : "memory");</code></pre>
+
+<div class="box g">
+<p><span class="lab key">这条 PTX 有三个非标准要素</span></p>
+<ul>
+<li><code>layout::v1</code> —— 一种新的 mbarrier 布局，与 fabric proxy 的完成通知机制配套。</li>
+<li><code>phase_type::primary</code> —— 指明查询的是主 phase。</li>
+<li><b>双目标 + 一个 u8 输出</b>：<code>p|hasReport, s8</code>。除了常规的"是否完成"谓词 <code>p</code>，还额外返回 <code>hasReport</code> 谓词和一个 8-bit 的 <code>s8</code> 错误码。这就是 fabric 操作的<b>带内错误上报通道</b>——fabric 传输可能失败（远端不可达、权限错误等），错误不是通过返回值而是通过 mbarrier 的 report 位带回来的。文档说这个 report 可用 <code>cudaFabricOpErrorStatusGet/Count</code> 解码。</li>
+<li><b>两行 <code>@p</code> 不是优化，是 UB 约束</b>：<code>@p cvt.u32.u8</code> 与 <code>@p selp.b32</code> 的谓词守卫是 PTX 强制要求的——<code>waitComplete</code> 为假时读 report 操作数属未定义行为。源码未加注释说明这点。</li>
+</ul>
+<p><span class="lab src">官方印证（CUDA Runtime API《Data types used by CUDA Runtime》）</span><code>s8</code> 的 1 字节宽度不是 NCCL 的选择，而是 ABI 规定：<code>cudaFabricOpStatusSourceMbarrierV1</code> 的官方注释为 <i>"1B-aligned 1B-wide status from an mbarrier.<code>layout::v1</code>"</i>。因此 NCCL 回填给调用者的 <code>uint32_t report</code> <b>高 24 位恒为 0</b>。这 8 位的结构、取值含义的公开状态、以及 NCCL 对它的处理，见 <a href="#s5-12">§5.12</a>。</p>
+</div>
+
+<h3>5.5 submit / flushSmem / flush 三段式完成模型</h3>
+
+<pre><code>template &lt;typename Coop&gt; template &lt;typename OpCoop&gt;
+NCCL_DEVICE_INLINE void ncclCft&lt;Coop&gt;::submit(OpCoop coop) {
+  asm volatile("fabric.submit;" ::: "memory");
+  if (elected(coop)) {
+    asm volatile("mbarrier.expect_tx.relaxed.cta.shared::cta.b64 [%0], %1;"
+                 :: "r"(smemAddr(this-&gt;cftSmem)), "r"(this-&gt;txCount) : "memory");
+  }
+  this-&gt;txCount = 0;
+}
+
+template &lt;typename Coop&gt; template &lt;typename OpCoop&gt;
+NCCL_DEVICE_INLINE void ncclCft&lt;Coop&gt;::flushSmem(OpCoop coop) {
+  asm volatile("fabric.wait.sync_restrict::reads;" ::: "memory");
+  coop.sync();
+}
+
+template &lt;typename Coop&gt; template &lt;typename OpCoop&gt;
+NCCL_DEVICE_INLINE void ncclCft&lt;Coop&gt;::flush(OpCoop coop, bool* hasReport, uint32_t* report) {
+  if (elected(coop)) {
+    asm volatile("mbarrier.arrive.relaxed.cta.shared::cta.b64 _, [%0], %1;"
+                 :: "r"(smemAddr(this-&gt;cftSmem)), "r"(1) : "memory");
+    // 循环 waitMbarrier(...) 直到 ready
+  }
+  this-&gt;phaseParity ^= 1;
+  // 把 hasReport / report 回填给调用者
+}</code></pre>
+
+<table>
+<thead><tr><th style="width:16%">调用</th><th style="width:30%">PTX</th><th>保证什么</th><th style="width:22%">何时用</th></tr></thead>
+<tbody>
+<tr><td><code>submit()</code></td><td><code>fabric.submit;</code> + <code>mbarrier.expect_tx</code></td><td>把已发起的描述符<b>交给 fabric 引擎推进</b>，并把累计事务数注册到 mbarrier</td><td>发完一批 op 后<b>必须</b>调，且每个发起过 op 的 OpCoop 都要调</td></tr>
+<tr><td><code>flushSmem()</code></td><td><code>fabric.wait.sync_restrict::reads;</code></td><td><b>只</b>保证 source smem 已被读走，可以复用；<em>不</em>保证远端已落地</td><td>流水线复用 smem staging buffer</td></tr>
+<tr><td><code>flush()</code></td><td><code>mbarrier.arrive</code> + <code>try_wait</code> 循环</td><td>全部 outstanding 操作<b>完成</b>，并取回错误 report</td><td>需要完成语义、或 smem 追踪配额将满时</td></tr>
+</tbody>
+</table>
+
+<div class="box g">
+<p><span class="lab key">txCount 的非对称计数（本报告最实用的一个发现）</span>看各方法末尾对 <code>txCount</code> 的累加：</p>
+<table>
+<thead><tr><th style="width:28%">操作</th><th style="width:26%">mbarrier 完成模式</th><th style="width:22%">txCount 累加</th><th>可追踪上限</th></tr></thead>
+<tbody>
+<tr><td>put / red / 及 multimem 变体</td><td><code>mbarrier::complete_tx::16B</code></td><td><code>txCount += bytes / 16</code></td><td class="t-ok">16 MB</td></tr>
+<tr><td>get / pullRed</td><td><code>mbarrier::complete_tx::bytes</code></td><td><code>txCount += bytes</code></td><td class="t-mid">1 MB</td></tr>
+</tbody>
+</table>
+<p>官方文档独立印证了这个数字：<i>"the object can track up to 16MB of non-fetching CFT operations (i.e., put, red and their multicast variants) and up to 1MB of fetching CFT operations (i.e., get, pullred)."</i></p>
+<p><span class="lab ana">解读</span>两者相差正好 16×，说明 mbarrier 的事务计数器宽度约为 2<sup>20</sup>；非取数操作按 16B 粒度计数所以能覆盖 16MB，取数操作按字节计数所以只有 1MB。<b>实践含义</b>：写 CFT kernel 时，<code>get</code>/<code>pullRed</code> 的在飞字节数必须控制在 1MB 以内，否则必须提前 <code>flush()</code>，否则 mbarrier 事务计数会溢出。这个约束在 API 上完全不可见，只在文档和这里的算术里。</p>
+<p><span class="lab src">官方印证（PTX ISA 9.3 §9.7.14.16.3, Table 37）</span>上面的反推已被官方表格证实。tx-count 的取值范围<b>与 layout 无关</b>：</p>
+<table>
+<thead><tr><th style="width:22%">Layout</th><th style="width:30%">Count name</th><th style="width:22%">Minimum</th><th>Maximum</th></tr></thead>
+<tbody>
+<tr><td rowspan="3"><code>.layout::v0</code></td><td>Expected arrival count</td><td>1</td><td>2<sup>20</sup> − 1</td></tr>
+<tr><td>Pending arrival count</td><td>0</td><td>2<sup>20</sup> − 1</td></tr>
+<tr><td>tx-count</td><td>−(2<sup>20</sup> − 1)</td><td>2<sup>20</sup> − 1</td></tr>
+<tr><td rowspan="3"><code>.layout::v1</code></td><td>Expected arrival count</td><td>1</td><td class="t-mid">2<sup>9</sup> − 1</td></tr>
+<tr><td>Pending arrival count</td><td>0</td><td class="t-mid">2<sup>9</sup> − 1</td></tr>
+<tr><td>tx-count</td><td>−(2<sup>20</sup> − 1)</td><td class="t-ok">2<sup>20</sup> − 1</td></tr>
+</tbody>
+</table>
+<p>于是两个上限可以精确算出来，与官方文档给的 1 MB / 16 MB 完全吻合：<code>complete_tx::bytes</code> → 2<sup>20</sup>−1 字节 ≈ <b>1 MiB</b>；<code>complete_tx::16B</code> → (2<sup>20</sup>−1)×16 B ≈ <b>16 MiB</b>。</p>
+<p><span class="lab ana">解读</span>同一张表还暴露了 <code>layout::v1</code> 的一个<b>代价</b>：arrival count 上限从 2<sup>20</sup>−1 骤降到 <b>2<sup>9</sup>−1 = 511</b>。也就是说，用 <code>layout::v1</code> 的 mbarrier <b>最多只能有 511 个参与者</b>。PTX 未说明原因，但合理推断是 payload report 的位域从 arrival count 字段里挖走了 11 bit（64 位 mbarrier 里腾不出别的地方）。<b>对 NCCL 无影响</b>——<code>mbarrier.init.layout::v1</code> 传的 arrive count 是 <b>1</b>（见上文 ctor），因为 CFT 的 mbarrier 只用于追踪 fabric 事务，不用于线程会合。但如果有人想拿 <code>layout::v1</code> 的 mbarrier 同步一个 &gt;511 线程的 cluster，会直接越界。</p>
+</div>
+
+<h3 id="s5-6">5.6 <code>.counted::bytes</code>：挂在同一条指令上的第二条完成通道</h3>
+
+<p>§5.5 的 <code>complete_tx::16B</code> 是 CFT <b>唯一被 NCCL 用到</b>的完成机制。但 PTX 还提供了第二条平行的完成通道 —— <code>.counted::bytes</code>：接收端有一个 8 字节计数器，每落地一个字节就加一。NCCL master 里 <b>没有任何一处</b>用到它（<code>CU_LOGICAL_ENDPOINT_FLAG_COUNTED_OPS</code> 在 host 侧从未被置位，见 §3.3），所以本节的证据<b>不来自 NCCL 源码</b>，而来自 <span class="fp">fabric_instruction/</span> 下自建的四组 plain/counted 对照探针的 SASS 差分。之所以放在这里，是因为它回答了一个 §5.5 没法回答的问题：<b>除了 mbarrier，硬件还能用什么方式告诉对端"数据到了"</b>。</p>
+
+<p>本节聚焦两个具体问题：<b>counter 地址是怎么从 SM 传出去的</b>，以及 <b>按字节的累加究竟发生在哪一级</b>。逐位编码证据与四组对照实验的完整数据在 <a href="#s11-5">§11.5</a>。</p>
+
+<h4>5.6.1 PTX 层：destination 从二元组变成三元组</h4>
+
+<p>两个探针只差一个修饰符。plain 版（<span class="fp">fabric_try_red_multimem_add_f32.ptx</span>）：</p>
+
+<pre><code>fabric.try_red.async.multimem.shared::cta.mbarrier::complete_tx::16B.mbarrier::report::fabric<b>.relaxed.sys.add.f32</b>
+    [%r1, %rd1], [%rd5], %r2, [%r3];</code></pre>
+
+<p>counted 版（<span class="fp">fabric_try_red_multimem_add_f32_counted_bytes.ptx</span>）多了一个 <code>.param .u64 dst_counter_off</code>（载入 <code>%rd6</code>），destination handle 从二元组变成<b>三元组</b>：</p>
+
+<pre><code>fabric.try_red.async.multimem.shared::cta.mbarrier::complete_tx::16B.mbarrier::report::fabric<b>.counted::bytes</b>.relaxed.sys.add.f32
+    [%r1, %rd1, <b>%rd6</b>], [%rd5], %r2, [%r3];
+//   └ leId  └ dataOff  └ <b>counterOff（新增）</b></code></pre>
+
+<div class="box">
+<p><span class="lab src">PTX ISA 9.3 §9.7.10.5.3 — counted 的四条硬约束</span></p>
+<ul>
+<li>counter offset 必须 <b>256 字节对齐</b>，counter 本身 <b>8 字节宽</b>；</li>
+<li><code>[dstCounterOff, dstCounterOff+7]</code> 必须落在 window 内；</li>
+<li>且<b>不得与</b> <code>[dstDataOff, dstDataOff+size−1]</code> <b>重叠</b>；</li>
+<li><code>.counted::bytes</code> 与 <code>.cp_mask</code> <b>互斥</b>（§5.7 的 cp_mask 变体不能带 counted）。</li>
+</ul>
+<p><span class="lab ana">解读</span>注意 PTX <b>只给了一个 <code>dstLeId</code></b> —— counter 和 data 共用同一个 le_id，因此 counter 必须住在<b>同一个 logical endpoint</b> 里。这一点会在 5.6.3 被 SASS 直接证实（两个地址由同一条 <code>ULEA</code> 派生）。</p>
+</div>
+
+<h4>5.6.2 SASS 差分：只多 2 条指令，且都在发起之前</h4>
+
+<p>剥掉 padding NOP 后统计助记符，plain <b>34 条</b>、counted <b>36 条</b> —— <code>.counted::bytes</code> 的全部代价就是下面这 2 条：</p>
+
+<pre class="out"><code> LDCU.64 UR8,  c[0x0][0x388] ;              <i>// dst_offset</i>
+ USHF.R.U32.HI UR13, URZ, 0x4, UR13 ;       <i>// byte_count &gt;&gt; 4</i>
+<b>+LDCU.64 UR10, c[0x0][0x398] ;              </b><i>// 新增 ①：dst_counter_off</i>
+   ...
+ ULEA UR7, UR15, 0x200000, 0xa ;            <i>// LE 地址高字（见 §11.4.2）</i>
+ UMOV UR6, URZ ;
+ SYNCS.ARRIVE.TRANS64.RED.A0TX RZ, [UR4], R0 ;   <i>// mbarrier expect_tx —— 两版<b>完全一致</b></i>
+<u>-UIADD3.64 UR6,  UPT, UPT, UR6, UR8,  URZ ;</u>
+<b>+UIADD3.64 UR8,  UPT, UPT, UR6, UR8,  URZ ; </b><i>// data 地址</i>
+<b>+UIADD3.64 UR10, UPT, UPT, UR6, UR10, URZ ; </b><i>// 新增 ②：counter 地址</i>
+ @P0 ELECT P1, URZ, PT ;
+<u>-UBLKRED.G.S.ADD.F32.RN.STRONG.SYS         [UR6], [UR4], UR11 ;</u>
+<b>+UBLKRED.G.S.ADD.COUNTED.F32.RN.STRONG.SYS [UR8], [UR4], UR13 ;</b></code></pre>
+
+<table>
+<thead><tr><th style="width:28%">观察</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td>指令条数</td><td>34 → 36，<b>+2</b>：一条 <code>LDCU.64</code> 取新 param，一条 <code>UIADD3.64</code> 算 counter 地址</td></tr>
+<tr><td>发起指令数量</td><td><b>仍然只有 1 条</b> <code>UBLKRED</code>。没有第二条 <code>UBLK*</code>，也没有任何 <code>ATOM</code>/<code>RED</code>/<code>ATOMG</code></td></tr>
+<tr><td>opcode 差异</td><td>助记符多一个 <code>.COUNTED</code>；<b>逐位看只有 word1 的 bit 21 翻转</b>（<a href="#s11-5">§11.5</a>）</td></tr>
+<tr><td>size 操作数</td><td>两版都传 <code>byte_count &gt;&gt; 4</code>（16B 粒度），<b>单位没变</b> —— 见 5.6.4 的推论</td></tr>
+<tr><td>mbarrier 路径</td><td><code>SYNCS.ARRIVE.TRANS64.RED.A0TX</code> <b>逐位相同</b>，<code>R0</code> 也仍是 <code>byte_count&gt;&gt;4</code></td></tr>
+</tbody>
+</table>
+
+<h4>5.6.3 counter 地址怎么传出去：隐式 UR 四元组，共享同一个 LE base</h4>
+
+<p>关键在于两条 <code>UIADD3.64</code> 的<b>加数是同一个 <code>UR6:UR7</code></b>。而 <code>UR7</code> 正是 §11.4.2 那条 <code>ULEA UR7, UR15, 0x200000, 0xa</code> 的结果，即 <code>base = 2<sup>53</sup> + le_id·2<sup>42</sup></code>：</p>
+
+<pre><code>base        = 2^53 + le_id · 2^42            // ULEA，两个地址共用
+UR8 :UR9    = base + dst_offset              // data 地址    → 写进 UBLKRED 的 [UR8]
+UR10:UR11   = base + dst_counter_off         // counter 地址 → <b>指令里没有任何字段引用它</b></code></pre>
+
+<p>指令的 destination 只写了 <code>[UR8]</code>。<code>UR10:UR11</code> 靠<b>紧邻 <code>UR8</code> 的连续寄存器位置</b>被读取 —— <code>.COUNTED</code> 把 destination 操作数从"2 个 uniform 寄存器（一个 64 位地址）"<b>隐式加宽为 4 个</b>，高半部分就是 counter 地址。</p>
+
+<div class="box g">
+<p><span class="lab key">两个问题的答案</span><b>① 地址怎么传出去</b>：不是编码进指令字，而是<b>放在寄存器组里随指令一起被硬件取走</b>。整条指令的编码差异只有 bit 21 这一个语义位（外加 size 寄存器号从 UR11 变 UR13 的 2 位寄存器字段），没有任何位域用来描述 counter 寄存器在哪 —— 所以只能是<b>位置约定</b>。<b>② 一条指令同时承载 dst addr 与 counter addr</b>：是的，SM 侧只发出一条 <code>UBLKRED</code>，data 地址与 counter 地址作为同一个描述符的两个字段一起下发。</p>
+<p><span class="lab ana">一处容易说错的措辞</span>"SM 生成一条记 counter 的指令发给接收端"是不准确的。准确的说法是：<b>SM 把 counter 地址当作描述符的一个字段交出去，累加动作由接收端的 fabric-proxy 自己完成</b>（见 5.6.4）。</p>
+</div>
+
+<div class="box y">
+<p><span class="lab warn">一个我原本想用、但自己验证后推翻的论据</span>我曾推测 ptxas 把 destination 从 <code>UR6</code>（2 对齐）挪到 <code>UR8</code>（4 对齐）是为了满足四元组的对齐要求 —— 那会是"隐式四元组"的强力旁证。但查 <span class="fp">fabric_try_put.sm_100a.cuobjdump.sass</span> 发现 plain 版本<b>本来就</b>是 <code>UBLKCP.G.S.STRONG.SYS [UR8], [UR6], UR14</code>，dest 已经在 <code>UR8</code>。所以 <code>UR8</code>/<code>UR10</code> 只是"就地累加到已载入的 param 上"的自然结果，<b>对齐论据不成立</b>。「隐式连续四元组」是四组样本一致支持的<b>读法</b>，不是已被证明的硬件约束。</p>
+</div>
+
+<h4>5.6.4 按字节的累加发生在哪里：SM 侧一条指令都没有</h4>
+
+<p>直接答案：<b>SASS 里找不到累加</b>。没有第二条访存指令，没有原子指令，<code>.COUNTED</code> 只是把一个额外地址递给硬件。累加发生在<b>接收端</b>，由 fabric-proxy 执行。三段官方文字把这件事钉死：</p>
+
+<div class="box">
+<p><span class="lab src">PTX ISA 9.3 §9.7.10.5.3</span></p>
+<p><i>"This instruction accesses the data <b>and the counter</b> at the locations specified by the handle operands <b>through the fabric-proxy</b>, reads from the source <code>.shared::cta</code> through the async-proxy, and updates the mbarrier object in <code>.shared::cta</code> through the generic-proxy."</i></p>
+<p><span class="lab src">PTX ISA 9.3 §9.7.10.4.3 Counted completion mechanism</span></p>
+<p><i>"This mechanism increments a counter by one <b>for each byte</b> of data accessed. The granularity at which counter updates occur is <b>unspecified</b>; updates may happen once per byte, once collectively at the end of the operation, or any granularity in between. The 8B-wide counter must be 256B aligned, and the counter increment is a <b>system-scope atomic operation</b>."</i></p>
+<p><i>"For <code>.multimem</code> fabric operations with counted completion, counters <b>only track accesses at their destination device</b>."</i></p>
+</div>
+
+<p><span class="lab ana">解读</span>"granularity is unspecified"这句话<b>反过来解释了</b>为什么 SM 侧不可能有累加指令：累加次数是运行期引擎的决策（可以一字节一次、也可以整笔一次），编译期无法展开成固定数量的指令。这也解释了 size 操作数的<b>单位不对称</b>：SM 传下去的是 <code>byte_count &gt;&gt; 4</code>（16B 粒度），而 counter 按<b>字节</b>递增 —— 那个 ×16 的展开同样发生在 proxy 内部，SM 完全不参与。</p>
+
+<h4>5.6.5 两条完成通道并行，互不相干</h4>
+
+<p>因为 <code>SYNCS.ARRIVE.TRANS64.RED.A0TX</code> 在两版里逐位相同（<code>R0</code> 都是 <code>byte_count&gt;&gt;4</code>），可以确定 counted counter <b>不参与</b> mbarrier 的 expect-tx 账本。它们是两套独立记账：</p>
+
+<table>
+<thead><tr><th style="width:16%">通道</th><th style="width:22%">记账位置</th><th style="width:16%">粒度</th><th style="width:18%">谁来更新</th><th>PTX 分类</th></tr></thead>
+<tbody>
+<tr><td><code>mbarrier::complete_tx::16B</code></td><td><b>发起端</b> smem 的 mbarrier</td><td>16 B</td><td>generic-proxy</td><td class="t-ok">完整完成（§5.5）</td></tr>
+<tr><td><code>.counted::bytes</code></td><td><b>接收端</b> window 内的 8B counter</td><td>1 B（粒度 unspecified）</td><td>fabric-proxy（system-scope atomic）</td><td class="t-mid"><b>partial</b> 完成</td></tr>
+</tbody>
+</table>
+
+<p><span class="lab ana">解读</span>分工很清楚：mbarrier 让<b>发起方</b>知道"我可以复用 staging buffer / 我的操作完成了"；counted counter 让<b>接收方</b>在没有任何显式同步消息的情况下自己轮询"我收到多少字节了"。后者正是 one-sided 通信里做 receiver-side 完成检测的标准手法（对比 NVSHMEM 的 signal）。PTX 把它归为 <b>partial</b> 完成机制 —— 计数器涨到目标值只说明<b>字节已落地</b>，不构成"整笔操作已完成"的排序保证。</p>
+
+<div class="box y">
+<p><span class="lab warn">对 NCCL 的现实意义</span>counted 在 device 侧 ABI 上<b>已经完备</b>，但 NCCL master 用不了 —— host 侧建 LE 时没有传 <code>COUNTED_OPS</code> flag（§3.3），而 §11.2 实测显示<b>一旦带上该 flag，LE 的 <code>maxSize</code> 从 2<sup>42</sup> 降到 2<sup>38</sup>（小 16×）</b>。两者是否有因果关系<b>无法确认</b>，不做推断。这也意味着缺口 <b>G6</b>（counted LE 的设计未知）只被<b>部分</b>关闭：device 侧指令语义已查清，host 侧的使用方式仍未在 master 出现。</p>
+</div>
+
+<h3>5.7 Put 家族的 PTX</h3>
+
+<pre><code>// put：基础版
+template &lt;typename Coop&gt; template &lt;typename OpCoop&gt;
+NCCL_DEVICE_INLINE void ncclCft&lt;Coop&gt;::put(OpCoop coop, ncclCftLeId leId, size_t leOffset,
+                                           void* smemSource, uint32_t bytes) {
+  coop.sync();
+  if (elected(coop)) {
+    asm volatile("fabric.try_put.async.shared::cta"
+                 ".mbarrier::complete_tx::16B.mbarrier::report::fabric"
+                 ".relaxed.sys.b128 [%0, %1], [%2], %3, [%4];"
+                 :: "r"(leId), "l"(leOffset), "r"(srcSmemPtr), "r"(bytes), "r"(mbarPtr)
+                 : "memory");
+    this-&gt;txCount += bytes / 16;
+  }
+}</code></pre>
+
+<p>四个变体的 PTX 差异只体现在指令后缀上，正交组合非常规整：</p>
+
+<table>
+<thead><tr><th style="width:26%">方法</th><th>PTX 指令（省略公共部分）</th></tr></thead>
+<tbody>
+<tr><td><code>put</code></td><td class="mono-sm">fabric.try_put.async.shared::cta.…16B.…report::fabric<b>.relaxed.sys.b128</b> [le,off],[src],bytes,[mbar];</td></tr>
+<tr><td><code>putCpMask</code></td><td class="mono-sm">fabric.try_put.async.shared::cta.…16B.…report::fabric<b>.cp_mask</b>.relaxed.sys.b128 [le,off],[src],bytes,[mbar],<b>mask</b>;</td></tr>
+<tr><td><code>putMultimem</code></td><td class="mono-sm">fabric.try_put.async<b>.multimem</b>.shared::cta.…16B.…report::fabric.relaxed.sys.b128 …</td></tr>
+<tr><td><code>putMultimemCpMask</code></td><td class="mono-sm">fabric.try_put.async<b>.multimem</b>.shared::cta.…16B.…report::fabric<b>.cp_mask</b>.relaxed.sys.b128 …</td></tr>
+</tbody>
+</table>
+
+<p>Get 的操作数顺序<b>相反</b>（目标在前）：</p>
+<pre><code>asm volatile("fabric.try_get.async.shared::cta"
+             ".mbarrier::complete_tx::bytes.mbarrier::report::fabric"
+             ".relaxed.sys.b128 [%0], [%1, %2], %3, [%4];"
+             :: "r"(dstSmemPtr), "r"(leId), "l"(leOffset), "r"(bytes), "r"(mbarPtr)
+             : "memory");
+this-&gt;txCount += bytes;                 // 注意：按字节，不是 /16</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读 cp_mask</span>文档解释得很清楚：<i>"a 16-bit integer where bits correspond to the bytes of every 16-byte word being copied. A bit is set to 1 if the corresponding byte ought to be copied."</i> 即一个 16-bit mask 作用于<b>每一个</b> 16B word 内的 16 个字节，是一种周期性的字节级选择性写。<span class="lab warn">注意</span>§1.2 提到 <code>adeae9a2</code> 已在上游删除 <code>redCpMask</code>/<code>redMultimemCpMask</code>，所以 cp_mask 实际只对 <b>put</b> 有效。</p>
+</div>
+
+<h3>5.8 Red 家族：四个宏 × 24 组 op/type</h3>
+
+<p>规约不可能手写，全部由宏生成。四个宏对应四种指令形态：</p>
+
+<pre><code>NCCL_CFT_DEFINE_RED(...)                    // fabric.try_red.async
+NCCL_CFT_DEFINE_RED_CP_MASK(...)            // fabric.try_red.async.…cp_mask
+NCCL_CFT_DEFINE_RED_MULTIMEM_CP_MASK(...)   // fabric.try_red.async.multimem.…cp_mask
+NCCL_CFT_DEFINE_PULLRED(...)                // fabric.try_pullred.async.multimem</code></pre>
+
+<p>Red 的通用 PTX 形态：</p>
+<pre><code>fabric.try_red.async[.multimem].shared::cta
+  .mbarrier::complete_tx::16B.mbarrier::report::fabric[.cp_mask]
+  .relaxed.sys.&lt;OP&gt;.&lt;TYPE&gt; [%0, %1], [%2], %3, [%4][, %5];</code></pre>
+
+<p>PullRed 的形态（注意 <code>.sync</code> 和末尾的全 warp mask）：</p>
+<pre><code>fabric.try_pullred.async.multimem.shared::cta
+  .mbarrier::complete_tx::bytes.mbarrier::report::fabric
+  .&lt;TYPE&gt;.&lt;OP&gt;.sync.relaxed.sys [%0], [%1, %2], %3, [%4], 0xffffffff;</code></pre>
+
+<p>实例化的 24 组 op/type 组合：</p>
+
+<table>
+<thead><tr><th style="width:14%">op</th><th style="width:44%">类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>and</code> / <code>xor</code> / <code>or</code></td><td><code>b32</code>, <code>b64</code></td><td>位运算：signed/unsigned 经 <code>NCCL_CFT_LOGICAL_TRAITS</code> 映射到同一 <code>b32</code>/<code>b64</code></td></tr>
+<tr><td><code>min</code> / <code>max</code></td><td><code>u32 s32 u64 s64 bf16 f16</code></td><td>整数 + 半精度</td></tr>
+<tr><td><code>add</code></td><td><code>u32 u64 bf16 f16 f32</code></td><td>主力路径</td></tr>
+<tr><td><code>add</code>（特例）</td><td><code>f64</code></td><td class="t-mid">只走 <code>NCCL_CFT_DEFINE_RED_FAMILY</code>，<b>没有 pullred 版本</b></td></tr>
+</tbody>
+</table>
+
+<p>trait 分发机制：</p>
+<pre><code>NCCL_CFT_RED_TRAIT(op, type, ptxOp, ptxType)          // 生成含 pullred 的完整 trait
+NCCL_CFT_RED_TRAIT_NO_PULL(op, type, ptxOp, ptxType)  // f64 用这个
+NCCL_CFT_LOGICAL_TRAITS(op, ptxOp)                    // 把 s32/u32 都映到 b32
+
+// 用法：编译期由 RedOp tag 选出对应的 PTX 字符串
+Red&lt;ncclCftOpSum&lt;float&gt;&gt;::...</code></pre>
+
+<div class="box y">
+<p><span class="lab warn">f64 无 pullRed</span>这不是遗漏而是硬件事实：<code>pullRed</code> 对应 NVLS 的 <code>multimem.ld_reduce</code> 路径，Blackwell 的 NVLink SHARP 规约单元不支持 fp64 的组播 ld_reduce。代码用 <code>NCCL_CFT_RED_TRAIT_NO_PULL</code> 在编译期把它挡住——用户写 <code>pullRed&lt;ncclCftOpSum&lt;double&gt;&gt;</code> 会得到编译错误而非运行时错误。</p>
+</div>
+
+<h3>5.9 ncclMemFence：跨 proxy 内存序的完整矩阵</h3>
+
+<p>这是 CFT 里概念负担最重的部分。因为现在有<b>两个</b>访存代理（SM 的 LSU = Generic，fabric 引擎 = Fabric），普通 <code>__threadfence()</code> 不足以描述二者之间的可见性。<code>ncclMemFence</code> 按 (producer, consumer, order, scope) 四元组选择 PTX：</p>
+
+<table>
+<thead><tr><th style="width:20%">producer → consumer</th><th>PTX</th></tr></thead>
+<tbody>
+<tr><td>Generic → Fabric</td><td class="mono-sm">fence.proxy.fabric::generic.alias.{acquire,release}.sys</td></tr>
+<tr><td>Fabric → Fabric</td><td class="mono-sm">fence.proxy.fabric::fabric.alias.{acquire,release}.sys</td></tr>
+<tr><td>Fabric → Generic</td><td class="mono-sm">fence.proxy.generic::fabric.alias.{acquire,release}.sys</td></tr>
+<tr><td>Generic → Generic</td><td class="mono-sm">fence.{acquire,release}.sys / membar.sys</td></tr>
+<tr><td colspan="2" style="background:var(--bg3)"><code>scope == Cta</code> 且 release 序 → <span class="mono-sm">fence.proxy.async.shared::cta</span></td></tr>
+</tbody>
+</table>
+
+<p>额外的 coop 同步规则：</p>
+<pre><code>if (order == cuda::memory_order_relaxed) return;          // relaxed 直接返回
+// release 语义：先 coop.sync() 再发 fence
+// acquire 语义：先发 fence 再 coop.sync()</code></pre>
+
+<p><code>ncclMemFenceScope</code> 的语义由文档定义得非常具体：</p>
+<ul>
+<li><code>Cta</code> —— <i>"the point of consistency for memory accesses is the SM <b>shared memory</b>"</i></li>
+<li><code>Sys</code> —— <i>"the point of consistency for memory accesses is the <b>L2 cache</b>"</i></li>
+</ul>
+
+<div class="box g">
+<p><span class="lab key">这是理解 CFT 数据流的关键</span>把两条定义连起来看：<b>fabric proxy 读 shared memory 时的一致点在 SMEM，写远端时的一致点在 L2</b>。所以一次 <code>put</code> 的完整可见性链是：</p>
+<pre style="margin:8px 0">SM store → [fence.proxy.async.shared::cta / Cta scope] → SMEM 可被 fabric 读
+         → fabric.try_put → 远端 L2 → [fence …alias.…sys / Sys scope] → 远端 SM 可见</pre>
+<p>这解释了为什么 barrier 的 <code>arrive()</code>（§6.3）在发 put 之前要<b>连发两个 fence</b>：一个 Sys scope 的用户语义 fence，再补一个 Cta scope 的 Generic→Fabric fence 把刚写的 payload 从 SM 推到 SMEM 一致点。</p>
+</div>
+
+<h3>5.10 pullRed 的三处反常</h3>
+
+<pre><code>template &lt;typename Coop&gt; template &lt;typename RedOp, typename OpCoop&gt;
+NCCL_DEVICE_INLINE void ncclCft&lt;Coop&gt;::pullRed(OpCoop coop, ncclCftLeId leId, size_t leOffset,
+                                               RedOp const&amp;, void* smemDestination, uint32_t bytes) {
+  static_assert(std::is_same&lt;OpCoop, ncclCoopWarp&gt;::value,
+                "ncclCft::pullRed requires ncclCoopWarp");
+  coop.sync();
+  // ① 没有 if (elected(coop))：全 warp 32 线程都发这条指令
+  asm volatile("fabric.try_pullred.async.multimem.shared::cta"
+               ".mbarrier::complete_tx::bytes.mbarrier::report::fabric"
+               ".&lt;TYPE&gt;.&lt;OP&gt;.sync.relaxed.sys [%0], [%1, %2], %3, [%4], 0xffffffff;" ...);
+  // ② 专用的 submit 变体
+  asm volatile("fabric.submit.op_restrict::fetching;" ::: "memory");
+  // ③ 只有 leader 记账，避免 32 倍计数
+  this-&gt;txCount += elected(coop) ? bytes : 0;
+}</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>三点都源自同一个硬件事实——<code>pullred</code> 是<b>warp 协同指令</b>（PTX 后缀里有 <code>.sync</code>，末尾操作数 <code>0xffffffff</code> 是 warp member mask）：</p>
+<ol>
+<li><b>必须全 warp 发起</b>：所以有 <code>static_assert(OpCoop == ncclCoopWarp)</code>，且刻意<em>不</em>加 <code>elected()</code> 守卫。commit <code>fa7e81d4 "cft: don't elect(coop) thread for ncclCft::pullRed"</code> 就是修这个 bug 的——早期版本错误地只让 leader 发，导致 warp 内其它 lane 不参与、指令死锁。</li>
+<li><code>fabric.submit.op_restrict::fetching</code> —— fetching 类操作（get/pullred）有独立的提交通道，与非 fetching 的 <code>fabric.submit</code> 分开。这与 §5.5 里两类操作追踪配额不同（1MB vs 16MB）是同一件事的两面。</li>
+<li><code>txCount += elected(coop) ? bytes : 0</code> —— 指令发了 32 次但只算一次事务，因为硬件上这是<b>一条</b> warp 级操作。</li>
+</ol>
+<p>另外，<code>49d96e24 "cft: make mbarrier 16B aligned to meet pullred requirements"</code> 说明 <code>ncclCftSmem</code> 的 <code>alignas(16)</code> 也是 pullRed 逼出来的——尽管里面只有一个 <code>uint64_t</code>。</p>
+</div>
+
+<h3>5.11 每个操作的统一骨架</h3>
+
+<p>把上面拆散的东西合起来，每个非 pullRed 的 CFT 操作长这样：</p>
+
+<pre><code>coop.sync();                        // ① 参与线程会合（保证 smem 数据已就绪）
+if (elected(coop)) {                // ② 选一个 leader
+  #ifdef NCCL_DEVICE_CFT_ENABLE_DEBUG
+    assert(ptr % 16 == 0 &amp;&amp; bytes % 16 == 0);
+  #endif
+  asm volatile("fabric.try_xxx.async…" …);   // ③ 单线程发描述符
+  this-&gt;txCount += (fetching ? bytes : bytes / 16);   // ④ 记账
+}
+// 注意：这里【不】做 coop.sync()，也不 submit —— 由调用者显式 submit()</code></pre>
+
+<p>文件末尾以 <code>#undef NCCL_CFT_ENABLE</code> 收尾，避免污染后续 TU。</p>
+
+<h3 id="s5-12">5.12 错误 report 通道：从 PTX 取值点到"无人消费"</h3>
+
+<p>§5.4 已经指出 <code>try_wait</code> 会额外吐出一个 8-bit report，§5.5 指出 <code>flush()</code> 把它回填给调用者。本节把这条链路走到底，回答两个问题：<b>这 8 位到底是什么</b>，以及 <b>NCCL 拿到它之后做了什么</b>。</p>
+
+<h4>5.12.1 全链路：三个环节，两处断裂</h4>
+
+<table>
+<thead><tr><th style="width:5%">#</th><th style="width:22%">环节</th><th style="width:38%">实现</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>①</td><td>硬件 → mbarrier</td><td><code>fabric.try_*</code> 的 <code>.mbarrier::report::fabric</code> 修饰符；失败时置 report 谓词 + 写不透明 report 值</td><td class="t-ok">PTX ISA 9.3 已公开定义</td></tr>
+<tr><td>②</td><td>mbarrier → 寄存器</td><td><code>try_wait.parity.phase_type::primary</code> 的 <code>p|hasReport, s8</code>（<span class="fp">cft__funcs.h:68-88</span>）</td><td class="t-ok">NCCL 已实现且正确</td></tr>
+<tr><td>③</td><td>寄存器 → 调用者</td><td><code>flush(coop, bool* hasReport, uint32_t* report)</code> 的可选出参</td><td class="t-ok">接口存在</td></tr>
+<tr><td>④</td><td>report → 语义</td><td><code>cudaFabricOpErrorStatusCount/Get</code></td><td class="t-no"><b>断裂：上游枚举为空</b>（§5.12.4）</td></tr>
+<tr><td>⑤</td><td>语义 → 动作</td><td>—</td><td class="t-no"><b>断裂：NCCL 无任何消费者</b>（§5.12.5）</td></tr>
+</tbody>
+</table>
+
+<h4>5.12.2 官方语义（PTX ISA 9.3）</h4>
+
+<div class="box">
+<p><span class="lab src">PTX ISA 9.3 §9.7.10.4.1 Fabric Reporting Mechanism</span></p>
+<p><i>"Fabric operations tracked by mbarrier use the <code>report::fabric</code> reporting mechanism with the following semantics:</i></p>
+<ul>
+<li><i>If the operation succeeds, the payload report (contents of the mbarrier object) is not modified. In other words, report predicate and report value both remain unchanged.</i></li>
+<li><i>Otherwise, the operation fails, the mbarrier report predicate is set, and the opaque report value may contain more information, which may be decoded via the <code>cudaFabricOpErrorStatusGet/Count</code> APIs.</i></li>
+</ul>
+<p><i>The behavior of a program that combines fabric operations specifying <code>report::fabric</code> with other operations specifying different reporting mechanism is <b>undefined</b>."</i></p>
+</div>
+
+<div class="box">
+<p><span class="lab src">PTX ISA 9.3 §9.7.10.3.4（失败模型）</span><i>"Multiple different fabric operations may also be tracked by the same mbarrier object and fail for different reasons. The <code>mbarrier.try_wait.phase_type::primary</code> operation that notifies the program of completion sets the report predicate if there were any errors; the opaque report value may contain more information. <b>The application can then decide how to handle the errors based on their severity nature.</b>"</i></p>
+</div>
+
+<div class="box">
+<p><span class="lab src">PTX ISA 9.3 §9.7.14.16.7（report 与 conditional phase 的关系）</span><i>"The payload report consists of a report predicate (<code>reportPredicate</code>) and a report value (<code>reportValue</code>). <b>For the conditional phase to advance, the entire payload report must be zero.</b> If the predicate i.e. <code>reportPredicate</code> is zero, the value <code>reportValue</code> is guaranteed to be zero and therefore the conditional phase has advanced."</i></p>
+<p><span class="lab ana">解读</span>这解释了 <code>layout::v1</code> 为什么要引入"双 phase"这个看起来多余的概念：<b>primary phase 表示"操作都结束了"，conditional phase 表示"操作都成功了"</b>。硬件把"完成"和"成功"拆成两个可独立观测的事件。NCCL 只用 <code>phase_type::primary</code>——它选择了"只关心是否结束"。</p>
+</div>
+
+<div class="box r">
+<p><span class="lab gap">一条 NCCL 遵守了但没写注释的 UB 约束</span>PTX ISA 9.3 <code>mbarrier.test_wait/try_wait</code> 条目原文：<i>"<code>.phase_type::primary</code> checks completion of the primary phase and sets the <code>reportPredicate</code> and <code>reportValue</code>. <b>Note that inspecting <code>reportPredicate</code>, <code>reportValue</code> operand when <code>waitComplete</code> is False results in undefined behavior.</b>"</i></p>
+<p>回看 §5.4 的内联汇编：<code>@p cvt.u32.u8 %2, s8;</code> 和 <code>@p selp.b32 %1, 1, 0, hasReport;</code> —— 两行都带谓词守卫 <code>@p</code>，只有 <code>waitComplete</code> 为真时才读 report。<b>NCCL 这里写对了</b>，但源码中没有任何注释说明这个 <code>@p</code> 是 UB 约束的强制要求，而非优化。任何照抄这段汇编却省掉 <code>@p</code> 的代码都会踩 UB。</p>
+</div>
+
+<h4>5.12.3 官方确认的宽度与结构</h4>
+
+<p><b>宽度是 1 字节，且是 ABI 规定，不是 NCCL 的选择。</b>CUDA Runtime API《Data types used by CUDA Runtime》中 <code>cudaFabricOpStatusSource</code> 枚举唯一的有效值，其官方注释写死了这一点：</p>
+
+<pre><code>enum cudaFabricOpStatusSource {
+  cudaFabricOpStatusSourceMbarrierV1 = 0,          // "1B-aligned 1B-wide status from an mbarrier.layout::v1"
+  cudaFabricOpStatusSourceMax        = 2147483647
+};</code></pre>
+
+<p><span class="lab ana">解读</span>这正面印证了 §5.4 从 <code>.reg .u8 s8</code> / <code>cvt.u32.u8</code> 反推出的 8 位宽度。同时得到一个实用推论：<b>NCCL 回填给调用者的 <code>uint32_t* report</code>，高 24 位恒为 0</b>。</p>
+
+<p><b>结构上它不是"错误码"，而是一个打包的多错误集合。</b>解码 API 的形状说明了这一点：</p>
+
+<pre><code>__device__ cudaError_t cudaFabricOpErrorStatusCount(
+    void* status, cudaFabricOpStatusSource statusSource, unsigned int* count);
+
+__device__ cudaError_t cudaFabricOpErrorStatusGet(
+    void* status, cudaFabricOpStatusSource statusSource,
+    unsigned int statusIndex, cudaFabricOpStatusInfo* statusInfo);
+// statusIndex 必须落在 [0, statusCount)</code></pre>
+
+<p><span class="lab ana">解读</span><code>Count</code> 返回个数、<code>Get</code> 按下标迭代 —— 一个 1 字节的 status 里能解出 <b>N 条</b> info。这与 §5.12.2 引用的 <i>"may issue many requests, and each of the requests may fail for a different reason"</i> 完全吻合：<b>这 8 位是位集（bit-set）语义，不是序号编码</b>。正确的消费方式是 <code>for (i = 0; i &lt; count; i++) Get(i)</code>，而不是 <code>switch (report)</code>。</p>
+
+<h4>5.12.4 取值含义：上游 NVIDIA 也没有公开</h4>
+
+<p>顺着官方文档指的路走到尽头，承载"错误原因"语义的类型是 <code>cudaFabricOpStatusInfo</code>。它的完整定义如下（Runtime API HTML、cuda-python bindings 两处一致）：</p>
+
+<pre><code>enum cudaFabricOpStatusInfo {
+  cudaFabricOpStatusInfoSuccess = 0,
+  cudaFabricOpStatusInfoLast    = 0,            // ← 注意：等于 Success
+  cudaFabricOpStatusInfoMax     = 2147483647
+};</code></pre>
+
+<div class="box r">
+<p><span class="lab gap">关键发现</span><b><code>Last == Success == 0</code>。</b>按 CUDA 的枚举惯例，<code>...Last</code> 是"最后一个有效值"的哨兵。它等于 <code>Success</code>，意味着 <b>CUDA 13.4 developer preview 中已定义的错误原因数量为 0</b>。</p>
+<p>NVIDIA 公开了解码 API、公开了 source 类型、公开了宽度与对齐约束，<b>但错误分类表本身是空的</b> —— 解码 API 是对着一个空枚举发布的。</p>
+<p><span class="lab ana">解读</span>因此"report 的取值含义无枚举、无映射表"这一缺口，<b>归属不在 NCCL 而在上游</b>。NCCL 文档 <span class="fp">device_cft.rst:241</span> 指向 <code>cudaFabricOpErrorStatusGet/Count</code> 这条线索是有效的，但线索的终点是空的。三份独立文档（Runtime API HTML、cuda-python bindings、PTX ISA）表述一致，且 PTX 全程只用 <b>"opaque"</b> 一词描述 report value、从不列举取值 —— 这不是某一页漏排，是刻意留白，与 CFT 整体的 developer-preview 状态一致。</p>
+</div>
+
+<h4>5.12.5 NCCL 拿到 report 之后做什么：什么都不做</h4>
+
+<p>这是本节最需要明确的结论。<b>NCCL 2.31 全仓库对 fabric report 没有任何消费逻辑。</b>四条相互独立的证据：</p>
+
+<table>
+<thead><tr><th style="width:5%">#</th><th style="width:30%">证据</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>NCCL 自己唯一的 CFT 消费者直接丢弃</td><td><span class="fp">cft_barrier__funcs.h:72</span> 与 <code>:82</code> 两处调用都是裸的 <code>cft.flush(coop);</code> —— 走默认实参，即 <code>hasReport = nullptr, report = nullptr</code>。report 在寄存器里被算出来，然后被扔掉。</td></tr>
+<tr><td>2</td><td>barrier 的等待路径没有 fabric 错误分支</td><td><code>waitInternal</code>（<span class="fp">cft_barrier__funcs.h:90-143</span>）的<b>全部</b>错误来源只有两个：超时 <code>ret = ncclTimeout</code> 和 <code>testAbort(this-&gt;comm.abortFlag, steps)</code>。没有任何一条路径的返回值来自 fabric report。</td></tr>
+<tr><td>3</td><td>全仓库零个非空调用者</td><td>grep <code>FabricOpErrorStatus</code> / <code>fabricOpError</code> / <code>ncclCftError</code> / <code>NCCL_CFT_.*ERR</code>：<b>源码命中 0 次</b>。<code>cudaFabricOpErrorStatusGet/Count</code> 在整个 NCCL 仓库只出现在一个地方 —— 文档 <span class="fp">docs/userguide/source/api/device_cft.rst:241</span> 的一句话里。</td></tr>
+<tr><td>4</td><td>官方示例也不检查</td><td><span class="fp">docs/userguide/source/usage/cft.rst</span> 的四个 <code>flush</code> 示例（第 107、172、178、199 行）全部是裸调用。<span class="fp">docs/examples/06_device_api/04_cft_barrier</span> 同样不检查。</td></tr>
+</tbody>
+</table>
+
+<p>还有一个接口层面的旁证：<b><code>flush()</code> 的返回类型是 <code>void</code></b>。</p>
+
+<pre><code>// CFT：无返回值，错误只能从可选出参取，且无人取
+template &lt;typename OpCoop&gt; void flush(OpCoop coop, bool* hasReport = nullptr, uint32_t* report = nullptr);
+
+// GIN：有 ncclResult_t 重载（impl/gin__funcs.h:816）
+ncclResult_t flush(...);</code></pre>
+
+<div class="box r">
+<p><span class="lab gap">后果</span>CFT 的招牌能力之一是"带内错误上报 / 传输可失败可恢复"，而 <b>NCCL 自己唯一的 CFT 设施（CFT Barrier）完全没有从这个能力中获得任何收益</b>。一次 <code>put</code> 因远端不可达而失败时，barrier 的表现是：<code>flush</code> 正常返回（primary phase 确实推进了），对端的 inbox 值永远不到，<code>waitInternal</code> 最终以 <b>超时或 abort</b> 结束 —— 退化成了和 LSA barrier 相同的失败模式，而<b>本可以立即拿到确定的错误原因</b>。</p>
+<p><span class="lab ana">解读</span>这与 §7 观察到的"CFT 默认关闭"是一致的：2.31 的 CFT 是<b>把能力铺进来</b>，而不是<b>把能力用起来</b>。report 通道属于"接口已开、语义未定、消费者未写"的三重未完成状态。</p>
+</div>
+
+<h4>5.12.6 一个真实的接口形状不匹配</h4>
+
+<p>解码 API 收的是 <code>void* status</code> —— 指向那个 1 字节字段的<b>指针</b>；而 NCCL 的 <code>flush</code> 把 report <b>按值</b>装在 <code>uint32_t</code> 里还给你。要真正解码，调用者必须先把它落回一个字节再取址：</p>
+
+<pre><code>uint32_t rep; bool has;
+cft.flush(coop, &amp;has, &amp;rep);
+if (has) {
+  uint8_t st = (uint8_t)rep;                    // ← 必须先截回 1 字节
+  unsigned n;
+  cudaFabricOpErrorStatusCount(&amp;st, cudaFabricOpStatusSourceMbarrierV1, &amp;n);
+  for (unsigned i = 0; i &lt; n; i++) {
+    cudaFabricOpStatusInfo info;
+    cudaFabricOpErrorStatusGet(&amp;st, cudaFabricOpStatusSourceMbarrierV1, i, &amp;info);
+    // ...而 info 目前只可能是 cudaFabricOpStatusInfoSuccess
+  }
+}</code></pre>
+
+<p><span class="lab ana">解读</span>直接把 <code>&amp;rep</code>（<code>uint32_t*</code>）传进去在小端机器上"看起来能工作"，因为低字节在前 —— 但这是在赌端序 + 未文档化的读取宽度。规范做法是显式截断。这是 NCCL 接口设计上一个真实的粗糙点：<b>出参类型（<code>uint32_t</code> 按值）与解码 API 的期望（1 字节按址）不匹配</b>。而由于 §5.12.4 的结论，目前没有人能真正跑通这段代码来发现这个问题。</p>
+
+<h4>5.12.7 三条通路的错误上报对比</h4>
+
+<table>
+<thead><tr><th style="width:14%"></th><th style="width:22%">LSA</th><th style="width:22%">GIN</th><th>CFT</th></tr></thead>
+<tbody>
+<tr><td>错误通道</td><td class="t-no">无 —— 非法访问即硬错误（XID / kernel abort）</td><td class="t-ok"><code>ncclResult_t</code> 返回码</td><td class="t-mid">mbarrier 带内 1 字节 report</td></tr>
+<tr><td>粒度</td><td>整个 kernel</td><td>单次操作</td><td class="t-ok">一次 flush 覆盖一批操作，可解出多条原因</td></tr>
+<tr><td>可否局部恢复</td><td class="t-no">否</td><td class="t-ok">可以（返回码驱动重试）</td><td class="t-mid"><b>理论可以，实际未知</b>：重试安全性未文档化</td></tr>
+<tr><td>NCCL 内部是否消费</td><td>N/A</td><td class="t-ok">是</td><td class="t-no"><b>否</b></td></tr>
+</tbody>
+</table>
+
+<p><span class="lab ana">解读</span>CFT 的 report 机制在<b>设计上</b>比 GIN 的返回码更先进 —— 它是带内的（不占额外状态字）、批量的（一次 flush 覆盖多个 op）、且不阻塞快路径（成功时 mbarrier 内容根本不被修改，零开销）。但在 2.31 这个时间点，它的<b>可用性</b>低于 GIN 的返回码：既没有取值表，也没有参考消费者，还缺一条最关键的信息 —— <b>拿到 <code>hasReport</code> 之后，那批操作是否可以安全重试</b>。PTX 只说"由应用按严重性决定"，但既没定义严重性等级，也没定义可重试性。</p>
+
+<h2 id="s6">6. 第 5 层：CFT Barrier（第一个内部消费者）</h2>
+
+<p>CFT Barrier 是 NCCL 自己用 CFT device API 写的<b>唯一一个完整设施</b>。它同时是最好的用法示范和对 API 完备性的检验。</p>
+
+<h3>6.1 资源需求：一个精确到 16B 的内存布局</h3>
+
+<p><span class="fp">src/nccl_device/cft_barrier.cc</span> 全文只有一个函数：</p>
+
+<pre><code>ncclResult_t ncclCftBarrierCreateRequirement(ncclTeam_t team, int nBarriers,
+                                             ncclCftBarrierHandle_t* outHandle,
+                                             ncclDevResourceRequirements_t* outReq) {
+  memset(outReq, 0, sizeof(*outReq));
+  outHandle-&gt;nBarriers   = nBarriers;
+  outReq-&gt;bufferSize     = (3 * nBarriers + nBarriers * team.nRanks) * NCCL_CFT_BARRIER_GRAN;
+  outReq-&gt;bufferAlign    = NCCL_CFT_BARRIER_ALIGN;
+  outReq-&gt;outBufferHandle = &amp;outHandle-&gt;bufHandle;
+  return ncclSuccess;
+}</code></pre>
+
+<p><span class="fp">impl/cft_barrier__types.h</span> 定义粒度与寻址：</p>
+<pre><code>#define NCCL_CFT_BARRIER_ALIGN 16
+#define NCCL_CFT_BARRIER_GRAN  NCCL_CFT_BARRIER_ALIGN     // 16 字节
+
+struct ncclCftBarrierHandle { ncclDevResourceHandle_t bufHandle; int nBarriers; };
+
+template &lt;typename Coop&gt;
+struct ncclCftBarrierSession_internal {
+  Coop coop;  ncclDevComm const&amp; comm;  ncclTeam team;
+  ncclCftBarrierHandle handle;
+  uint32_t index;  bool multimem;  uint32_t epoch;
+
+  void mcInbox(ncclCftLeId* leId, size_t* leOffset) {
+    ncclGetResourceBufferMultimemLeInfo(comm, handle.bufHandle, leId, leOffset);
+    *leOffset += (2 * handle.nBarriers + index) * NCCL_CFT_BARRIER_GRAN;
+  }
+  void ucInbox(int owner, int peer, ncclCftLeId* leId, size_t* leOffset) {
+    ncclGetResourceBufferCftLeInfo(comm, handle.bufHandle, owner, leId, leOffset);
+    *leOffset += (3 * handle.nBarriers + index * team.nRanks + peer) * NCCL_CFT_BARRIER_GRAN;
+  }
+  // 还有两个返回本地指针的同名重载（gated on CUDART_VERSION >= 13000），供 wait 侧轮询用
+  template &lt;bool EnableTimeout&gt;
+  ncclResult_t waitInternal(Coop, cuda::memory_order, ncclMemProxyType, ncclMemProxyType,
+                            uint64_t timeoutCycles);
+};</code></pre>
+
+<p>把两个偏移公式翻译成布局图（单位 = 16B slot）：</p>
+
+<pre><code>slot 索引                                内容
+────────────────────────────────────────────────────────────────────────────
+[0,        nBarriers)                    multimem 的 epoch 持久化状态
+[nBarriers, 2·nBarriers)                 unicast 的 epoch 持久化状态
+[2·nBarriers, 3·nBarriers)               MC inbox         ← redMultimem 的目标
+[3·nBarriers, 3·nBarriers + nBarriers·nRanks)   UC inbox 矩阵（每 barrier × 每 peer 一格）
+────────────────────────────────────────────────────────────────────────────
+总计 = (3·nBarriers + nBarriers·nRanks) · 16B     ← 与 bufferSize 公式吻合</code></pre>
+
+<div class="box g">
+<p><span class="lab key">为什么是 16B 一格而不是 4B</span>因为 CFT 的最小传输粒度就是 16B（<code>bytes % 16 == 0</code>）。barrier 实际只需要一个 <code>uint32_t</code> 计数，但必须按 16B 对齐、16B 传输。所以代码里 payload 是 <code>uint32_t payload[4]</code>，只有 <code>payload[0]</code> 有意义，剩下 3 个字清零。<b>这是 CFT 粒度约束在最小消息场景下的直接成本：4× 带宽放大。</b></p>
+</div>
+
+<h3>6.2 构造与析构：epoch 的持久化</h3>
+
+<pre><code>constexpr uint32_t ncclCftOpElemGran = 4;
+constexpr uint32_t ncclCftOpByteGran = ncclCftOpElemGran * sizeof(uint32_t);   // = 16
+
+// ctor
+: ncclCftBarrierSession_internal&lt;Coop&gt;{coop, comm,
+    multimem ? ncclTeamCftMultimem(comm) : ncclTeamCft(comm),
+    multimem ? comm.cftMultimemBarrier : comm.cftBarrier,
+    index, multimem, /*epoch*/ 0} {
+  void* state = ncclGetResourceBufferLocalPointer(comm, this-&gt;handle.bufHandle);
+  this-&gt;epoch = *(uint32_t*)(reinterpret_cast&lt;char (*)[NCCL_CFT_BARRIER_GRAN]&gt;(state) +
+                             (this-&gt;useMultimem() ? 0 : 1) * this-&gt;handle.nBarriers + this-&gt;index);
+}
+
+// dtor
+~ncclCftBarrierSession() {
+  void* state = ncclGetResourceBufferLocalPointer(this-&gt;comm, this-&gt;handle.bufHandle);
+  if (this-&gt;coop.thread_rank() == 0) {
+    *(uint32_t*)(... 同一个地址 ...) = this-&gt;epoch;      // 写回
+  }
+  this-&gt;coop.sync();
+}</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>epoch 在<b>构造时从全局 buffer 读入寄存器、析构时写回</b>。这样跨 kernel launch、跨多次 session 的 barrier 计数是连续的，不会因为 kernel 退出而丢失。<code>useMultimem() ? 0 : 1</code> 选择状态区——MC 和 UC 各有独立的 epoch 序列，因为它们的推进步长不同（见 §6.4）。构造函数里还顺手用三元表达式选好了 team 和 handle，所以同一份 barrier 代码同时服务 UC 和 MC 两条路径。</p>
+</div>
+
+<h3>6.3 arrive()：两种截然不同的通知方式</h3>
+
+<pre><code>this-&gt;coop.sync();
+if (this-&gt;coop.thread_rank() == 0) {
+  alignas(NCCL_CFT_BARRIER_ALIGN) __shared__ uint32_t payload[ncclCftOpElemGran];
+  payload[0] = this-&gt;useMultimem() ? 1 : this-&gt;epoch + 1;      // ← 语义完全不同
+  for (int i = 1; i &lt; ncclCftOpElemGran; i++) payload[i] = 0;
+
+  ncclCoopThread coop;
+  __shared__ ncclCftSmem cftSmem;
+  ncclCft&lt;ncclCoopThread&gt; cft{coop, cftSmem};
+
+  // ① 用户语义 fence
+  ncclMemFence(coop, nccl::utility::releaseOrderOf(order), producer, consumer,
+               ncclMemFenceScope::Sys);
+
+  // ② 补一个 Cta scope 的 Generic→Fabric fence，把 payload 推到 SMEM 一致点
+  //    （若 ① 恰好已经是这个组合就不重复发）
+  if (!(order == cuda::memory_order_release &amp;&amp; producer == ncclMemProxyType::Generic &amp;&amp;
+        consumer == ncclMemProxyType::Fabric)) {
+    ncclMemFence(coop, cuda::memory_order_release, ncclMemProxyType::Generic,
+                 ncclMemProxyType::Fabric, ncclMemFenceScope::Cta);
+  }
+
+  ncclCftLeId leId;  size_t leOffset;
+  if (this-&gt;useMultimem()) {
+    // —— MC 路径：一条组播原子加 ——
+    this-&gt;mcInbox(&amp;leId, &amp;leOffset);
+    cft.redMultimem(coop, leId, leOffset, ncclCftOpSum&lt;uint32_t&gt;{}, payload, ncclCftOpByteGran);
+    cft.submit(coop);
+    cft.flush(coop);
+  } else {
+    // —— UC 路径：N-1 条 put ——
+    int nPeers = this-&gt;team.nRanks - 1;
+    for (int i = 0; i &lt; nPeers; i++) {
+      int peer = i + (i &lt; this-&gt;team.rank ? 0 : 1);      // 跳过自己
+      this-&gt;ucInbox(peer, this-&gt;team.rank, &amp;leId, &amp;leOffset);
+      cft.put(coop, leId, leOffset, payload, ncclCftOpByteGran);
+    }
+    if (nPeers &gt; 0) { cft.submit(coop); cft.flush(coop); }
+  }
+}</code></pre>
+
+<table>
+<thead><tr><th style="width:16%"></th><th style="width:40%">Multimem 路径</th><th>Unicast 路径</th></tr></thead>
+<tbody>
+<tr><td>payload 值</td><td><code>1</code>（每人贡献 1）</td><td><code>epoch + 1</code>（绝对序号）</td></tr>
+<tr><td>发出的操作</td><td><b>1 条</b> <code>redMultimem&lt;Sum, u32&gt;</code></td><td><b>N−1 条</b> <code>put</code></td></tr>
+<tr><td>目标</td><td>MC inbox（一格，组播原子累加）</td><td>每个 peer 的 UC inbox 里"属于我"的那一格</td></tr>
+<tr><td>完成判据</td><td><code>inbox &gt;= epoch + nRanks</code></td><td>逐 peer <code>inbox &gt;= epoch + 1</code></td></tr>
+<tr><td>epoch 推进</td><td><code>epoch += nRanks</code></td><td><code>epoch = epoch + 1</code></td></tr>
+<tr><td>指令数复杂度</td><td class="t-ok">O(1)</td><td class="t-mid">O(N)</td></tr>
+</tbody>
+</table>
+
+<div class="box g">
+<p><span class="lab key">这就是 CFT 的 "NVLS operation" 在实践中的样子</span>MC 路径把一次 all-to-all 通知压缩成<b>单条指令</b>——<code>redMultimem</code> 让 NVLink SHARP 硬件在组播树上做 <code>uint32</code> 求和，每个成员的 inbox 都收到 +N。UC 路径必须发 N−1 条 put。这是 <code>NCCL_CFT_MULTIMEM</code> 能力位存在的全部价值所在，示例代码里也正是分别演示了这两个 kernel。</p>
+</div>
+
+<h3>6.4 waitInternal()：回绕安全的比较</h3>
+
+<pre><code>if (this-&gt;useMultimem()) {
+  if (this-&gt;coop.thread_rank() == 0) {                       // MC：单线程轮询一格
+    cuda::atomic_ref&lt;uint32_t&gt; inbox(*this-&gt;mcInbox());
+    NVCC_PRAGMA_UNROLL_DISABLED
+    while (true) {
+      uint32_t got = inbox.load(cuda::memory_order_relaxed);
+      if (got - (this-&gt;epoch + this-&gt;team.nRanks) &lt;= uint32_t(-1) &gt;&gt; 1) break;
+      if NCCL_IF_CONSTEXPR (EnableTimeout) {
+        if (clock64() - startCycle &gt;= timeoutCycles) { ret = ncclTimeout; goto exit; }
+      } else {
+        if (testAbort(this-&gt;comm.abortFlag, steps)) goto exit;
+      }
+    }
+    this-&gt;epoch += this-&gt;team.nRanks;
+  }
+} else {
+  uint32_t expected = this-&gt;epoch + 1;
+  // UC：把 peers 分摊给 coop 里的所有线程并行轮询
+  for (int i = this-&gt;coop.thread_rank(); i &lt; this-&gt;team.nRanks - 1; i += this-&gt;coop.size()) {
+    int peer = i + (i &lt; this-&gt;team.rank ? 0 : 1);
+    cuda::atomic_ref&lt;uint32_t&gt; inbox(*this-&gt;ucInbox(peer));
+    while (true) {
+      uint32_t got = inbox.load(cuda::memory_order_relaxed);
+      if (got - expected &lt;= uint32_t(-1) &gt;&gt; 1) break;
+      ...
+    }
+  }
+  this-&gt;epoch = expected;
+}
+exit:
+  this-&gt;coop.sync();
+  ncclMemFence(this-&gt;coop, nccl::utility::acquireOrderOf(order), producer, consumer,
+               ncclMemFenceScope::Sys);
+  return ret;</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读三个细节</span></p>
+<ol>
+<li><b><code>got - expected &lt;= uint32_t(-1) &gt;&gt; 1</code></b> 是标准的<b>回绕安全 ≥ 比较</b>：用无符号减法后判断是否落在半个值域内，等价于"在模 2<sup>32</sup> 圆环上 got 不落后于 expected"。这样 epoch 累加到溢出也不会误判。对 MC 路径尤其重要——每次 barrier epoch 跳 <code>nRanks</code>，比 UC 快 N 倍到达溢出。</li>
+<li><b>轮询用 <code>cuda::atomic_ref</code> + <code>memory_order_relaxed</code></b>，不带任何 acquire。所有 acquire 语义集中在退出时那一次 <code>ncclMemFence(acquireOrderOf(order), …, Sys)</code>——这是正确且高效的做法：轮询循环里不该有 fence。</li>
+<li><b>UC 的等待是并行的，MC 的等待是串行的</b>。UC 有 N−1 个 inbox 要查，所以用 <code>for (i = thread_rank(); i &lt; N-1; i += size())</code> 分摊；MC 只有一格，只能单线程查。有意思的是这让 UC 的 wait 比 arrive 更便宜（arrive 是单线程发 N−1 条 put）。</li>
+</ol>
+</div>
+
+<p><code>wait</code>/<code>sync</code> 各有带/不带 timeout 的两个重载，靠 <code>EnableTimeout</code> 模板参数在编译期把 <code>clock64()</code> 检查完全消掉：</p>
+<pre><code>void        wait(Coop, order, producer, consumer)                 { waitInternal&lt;false&gt;(..., 0ULL); }
+ncclResult_t wait(Coop, order, producer, consumer, timeoutCycles) { return waitInternal&lt;true&gt;(...); }
+void        sync(...)  { arrive(...); wait(...); }
+ncclResult_t sync(..., timeoutCycles) { arrive(...); return wait(..., timeoutCycles); }</code></pre>
+
+<h2 id="s7">7. 集成点、配置项与失败语义</h2>
+
+<h3>7.1 devrState 的扩展</h3>
+
+<p><span class="fp">src/include/dev_runtime.h</span>：</p>
+<pre><code>struct ncclDevrStateCftUc { ncclCftLeId baseId; };     // per-comm 的 UC LE 连续区间基址
+
+struct ncclDevrState {
+  int lsaSelf; int lsaSize; int* lsaRankList; int nLsaTeams;
+  int cftSelf;   int cftSize;                          // CFT flat team
+  int cftMcSelf; int cftMcSize;                        // CFT multicast team
+  struct ncclDevrStateCftUc le;
+  ...
+};</code></pre>
+
+<p><code>ncclDevrTeam</code> 每个 team 加了两个 le_id 字段，初始化在 <span class="fp">dev_runtime.cc:421-429</span>：</p>
+<pre><code>t = (struct ncclDevrTeam*)malloc(sizeof(struct ncclDevrTeam) + team.nRanks * sizeof(int));
+t-&gt;team = team;
+t-&gt;mcHandle  = 0x0;
+t-&gt;mcBasePtr = nullptr;
+t-&gt;ucLeId    = NCCL_LE_ID_INVALID;
+t-&gt;mcLeId    = NCCL_LE_ID_INVALID;</code></pre>
+
+<p><code>devrState</code> 初始化（<span class="fp">dev_runtime.cc:154-158</span>）：</p>
+<pre><code>devr-&gt;cftSize   = computeCftSize(comm);
+devr-&gt;cftSelf   = comm-&gt;rank % devr-&gt;cftSize;
+devr-&gt;cftMcSize = computeCftMcSize(comm);
+devr-&gt;cftMcSelf = comm-&gt;rank % devr-&gt;cftMcSize;</code></pre>
+
+<h3>7.2 symTeamObtain：把 CFT 挂进既有的 team 复用机制</h3>
+
+<p>NCCL 原本的 <code>symTeamObtain(comm, team, multimem, outTeam, needBarrier)</code> 被扩成 6 参：</p>
+
+<pre><code>// Caller must barrier the team afterward unless *needBarrier == false on return.
+ncclResult_t symTeamObtain(struct ncclComm* comm, struct ncclTeam team, bool multimem,
+                           bool cftUc, bool cftMc,
+                           struct ncclDevrTeam** outTeam, bool* needBarrier) {
+  ...
+  } else if (t-&gt;team.rank == team.rank &amp;&amp; t-&gt;team.nRanks == team.nRanks
+             &amp;&amp; t-&gt;team.stride == team.stride) {
+    bool needsMultimem = multimem &amp;&amp; t-&gt;mcBasePtr == nullptr;
+    bool needsCft = (cftUc &amp;&amp; t-&gt;ucLeId == NCCL_LE_ID_INVALID)
+                 || (cftMc &amp;&amp; t-&gt;mcLeId == NCCL_LE_ID_INVALID);
+    if (!needsMultimem &amp;&amp; !needsCft) { if (outTeam) *outTeam = t; return ncclSuccess; }
+    break;   // Need to enable multimem and/or LEs
+  }
+  ...
+  if (cftUc &amp;&amp; t-&gt;ucLeId == NCCL_LE_ID_INVALID) {
+    NCCLCHECKGOTO(symTeamObtainUcLe(comm, t, devr, needBarrier), ret, fail);
+  }
+  if (cftMc &amp;&amp; t-&gt;mcLeId == NCCL_LE_ID_INVALID) {
+    NCCLCHECKGOTO(symTeamObtainMcLe(comm, t, devr, needBarrier), ret, fail);
+  }
+  if (teamIsNew) { t-&gt;next = devr-&gt;teamHead; devr-&gt;teamHead = t; }
+  ...
+}</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>这是很省事的复用：CFT 的 UC/MC 资源被当成 team 的"可增量启用的能力"，和原有的 NVLS multimem 完全同构。同一个 team 可以先被以 <code>multimem=true</code> 创建，之后再被以 <code>cftMc=true</code> 请求，第二次调用会命中已有 team 并只补 MC LE。<code>needsCft</code> 那个布尔表达式就是在做这个增量判断。</p>
+</div>
+
+<h3>7.3 Window 注册路径上的 CFT 钩子（eager registration）</h3>
+
+<p><span class="fp">dev_runtime.cc:696-736</span>，这是 §1.2 里反复 revert 了三次的那段：</p>
+
+<pre><code>if (comm-&gt;gpuCftSupport &gt; 0) {
+  ncclTeam_t ucTeam = ncclTeamCft(comm), mcTeam = ncclTeamCftMultimem(comm);
+  if (comm-&gt;config.hostCftMode != ncclHostCftDisable) {
+    // Add the UC and MC team to the teamHead list, and create the corresponding LEs.
+    // In case of failure, "enable" will report the error, fallback will skip it.
+    NOWARN(ret = symTeamObtain(comm, ucTeam, /*multimem=*/false, /*uc=*/true, /*mc=*/false,
+                               nullptr, nullptr), NCCL_INIT);
+    if (ret != ncclSuccess &amp;&amp; comm-&gt;config.hostCftMode == ncclHostCftEnable) {
+      WARN("Failed to obtain the UC team");
+      goto fail_mem_space_teams;
+    }
+    ret = ncclSuccess;                     // ← Fallback / Default 时吞掉错误
+
+    if (comm-&gt;nvlsSupport) {
+      NOWARN(ret = symTeamObtain(comm, mcTeam, /*multimem=*/false, /*uc=*/false, /*mc=*/true,
+                                 nullptr, nullptr), NCCL_INIT);
+      if (ret != ncclSuccess &amp;&amp; comm-&gt;config.hostCftMode == ncclHostCftEnable) {
+        WARN("Failed to obtain the MC team");
+        goto fail_mem_space_teams;
+      }
+      ret = ncclSuccess;
+    }
+  }
+}
+
+// Bind new memory with each existing team.
+for (struct ncclDevrTeam* t = devr-&gt;teamHead; t != nullptr; t = t-&gt;next) {
+  NCCLCHECKGOTO(symBindTeamMemory(comm, t, mem), ret, fail_mem_space_teams);
+  if (comm-&gt;gpuCftSupport) {
+    // Only bind to the UC once, all teams share the same UC LE.
+    if (t-&gt;ucLeId != NCCL_LE_ID_INVALID &amp;&amp; !ucBound) {
+      ncclCftLeId_t le = t-&gt;ucLeId + t-&gt;team.rank * t-&gt;team.stride;    // ← 把 §3.4 的平移加回来
+      NCCLCHECKGOTO(symBindTeamLe(comm, mem, le), ret, fail_mem_space_teams);
+      ucBound = true;
+    }
+    // Each team has a different MC LE, bind to all of them.
+    if (t-&gt;mcLeId != NCCL_LE_ID_INVALID) {
+      NCCLCHECKGOTO(symBindTeamLe(comm, mem, t-&gt;mcLeId), ret, fail_mem_space_teams);
+    }
+  }
+}</code></pre>
+
+<div class="box g">
+<p><span class="lab key">三条重要语义</span></p>
+<ol>
+<li><b><code>NOWARN(...)</code> + 条件 goto</b>：只有 <code>hostCftMode == Enable</code> 才把 LE 创建失败视为致命错误。<code>Fallback</code>（和被显式设置的其它非 Disable 值）都会静默继续，用户拿到一个可用但无 CFT 的 comm。<code>NOWARN</code> 宏本身也抑制了内层的 WARN 输出，避免污染日志。</li>
+<li><b>UC 只绑一次</b>（<code>ucBound</code> 标志）——所有 team 共享同一个 UC LE，重复 <code>bindAddr</code> 会失败。<b>MC 每个 team 都要绑</b>——每个 team 有自己的 MC LE。</li>
+<li><b><code>t-&gt;ucLeId + t-&gt;team.rank * t-&gt;team.stride</code></b> 与 §3.4 末尾的减法、§4.3 的加法构成三处一致的平移代数。这套 offset 编码是 CFT 里最容易读错的地方，三处必须同时对才不出错。</li>
+</ol>
+</div>
+
+<p>此外还有一处跨 rank 一致性检查（<span class="fp">dev_runtime.cc:632-667</span>）：<code>hostCftMode</code> 被放进 <code>globalSegmentInfo[]</code> 一起 allGather，若各 rank 不一致则报</p>
+<pre><code>WARN("Communicator ranks have mismatched hostCftMode configuration.");</code></pre>
+
+<h3>7.4 devComm 创建路径</h3>
+
+<p><span class="fp">dev_runtime.cc:1327-1366</span>：</p>
+<pre><code>memset(outDevComm, 0, sizeof(*outDevComm));
+outDevComm-&gt;ucLeId = NCCL_LE_ID_INVALID;
+outDevComm-&gt;mcLeId = NCCL_LE_ID_INVALID;
+...
+ucTeam = ncclTeamCft(comm);
+mcTeam = ncclTeamCftMultimem(comm);
+outDevComm-&gt;cftRank              = ucTeam.rank;
+outDevComm-&gt;cftSize              = ucTeam.nRanks;
+outDevComm-&gt;cftMultimemRank      = mcTeam.rank;
+outDevComm-&gt;cftMultimemSize      = mcTeam.nRanks;
+outDevComm-&gt;cftMultimemSize_rcp32 = idivRcp32(devr-&gt;cftMcSize);
+
+if (comm-&gt;gpuCftSupport &amp;&amp; (reqs-&gt;cftCaps &amp; NCCL_CFT)) {
+  // needBarrier = nullptr, the bootstrapBarrier below will barrier regardless
+  struct ncclDevrTeam* tmCft = nullptr;
+  NCCLCHECKGOTO(symTeamObtain(comm, ucTeam, false, /*uc=*/true, /*mc=*/false, &amp;tmCft, nullptr), ret, fail);
+  if (tmCft != nullptr) outDevComm-&gt;ucLeId = tmCft-&gt;ucLeId;
+}
+
+if (comm-&gt;gpuCftSupport &amp;&amp; comm-&gt;nvlsSupport &amp;&amp; (reqs-&gt;cftCaps &amp; NCCL_CFT_MULTIMEM)) {
+  struct ncclDevrTeam* tmCft = nullptr;
+  NCCLCHECKGOTO(symTeamObtain(comm, mcTeam, false, /*uc=*/false, /*mc=*/true, &amp;tmCft, nullptr), ret, fail);
+  if (tmCft != nullptr) outDevComm-&gt;mcLeId = tmCft-&gt;mcLeId;
+}</code></pre>
+
+<p>barrier 资源挂进资源链表（<span class="fp">dev_runtime.cc:1413-1423</span>）：</p>
+<pre><code>if (reqs-&gt;cftBarrierCount &amp;&amp; (reqs-&gt;cftCaps &amp; NCCL_CFT)) {
+  ncclCftBarrierCreateRequirement(ucTeam, reqs-&gt;cftBarrierCount, &amp;outDevComm-&gt;cftBarrier, &amp;cftBarReq);
+  cftBarReq.next = resReqsHead;  resReqsHead = &amp;cftBarReq;
+}
+if (reqs-&gt;cftBarrierCount &amp;&amp; (reqs-&gt;cftCaps &amp; NCCL_CFT_MULTIMEM)) {
+  ncclCftBarrierCreateRequirement(mcTeam, reqs-&gt;cftBarrierCount, &amp;outDevComm-&gt;cftMultimemBarrier, &amp;cftMcBarReq);
+  cftMcBarReq.next = resReqsHead;  resReqsHead = &amp;cftMcBarReq;
+}</code></pre>
+
+<div class="box y">
+<p><span class="lab warn">注意这里与 §7.3 的失败语义相反</span>devComm 路径用的是 <code>NCCLCHECKGOTO</code> —— <b>硬失败</b>。文档也明确说：<i>"If a communicator cannot provide the requested CFT capability on all ranks, ncclDevCommCreate fails."</i> 所以 <code>hostCftMode=Fallback</code> 的宽容只作用于 window 注册路径；一旦你在 <code>reqs.cftCaps</code> 里显式要 CFT，就没有 fallback。</p>
+</div>
+
+<p>调试输出（<span class="fp">dev_runtime.cc:1204</span>）与 window 字段（<span class="fp">:885</span>）：</p>
+<pre><code>INFO(..., " CFT Rank %d/%d, CFT-MM Rank %d/%d\n", ...);
+winDevHost-&gt;cftFlatRank = devr-&gt;cftSelf;</code></pre>
+
+<h3>7.5 配置项 hostCftMode</h3>
+
+<p><span class="fp">src/nccl.h.in</span>：</p>
+<pre><code>typedef enum {
+  ncclHostCftDefault  = NCCL_CONFIG_UNDEF_INT,
+  ncclHostCftEnable   = 1,
+  ncclHostCftDisable  = 2,
+  ncclHostCftFallback = 3
+} ncclHostCftMode_t;
+
+typedef struct ncclConfig_v22700 {
+  ...
+  int hostCftMode;
+} ncclConfig_t;
+
+#define NCCL_CONFIG_INITIALIZER { ..., NCCL_CONFIG_UNDEF_INT, /* hostCftMode */ }</code></pre>
+
+<p><span class="fp">src/init.cc</span> 的校验与默认值：</p>
+<pre><code>if (internalConfigPtr-&gt;hostCftMode != NCCL_CONFIG_UNDEF_INT &amp;&amp;
+    (internalConfigPtr-&gt;hostCftMode &lt; ncclHostCftEnable ||
+     internalConfigPtr-&gt;hostCftMode &gt; ncclHostCftFallback)) {
+  WARN("Invalid config hostCftMode attribute value %d", internalConfigPtr-&gt;hostCftMode);
+  ret = ncclInvalidArgument;  goto fail;
+}
+NCCL_CONFIG_DEFAULT(internalConfigPtr, hostCftMode, NCCL_CONFIG_UNDEF_INT,
+                    (ncclHostCftMode_t)NCCL_CONFIG_UNDEF_INT, "hostCftMode", "%d");
+comm-&gt;config.hostCftMode = internalConfigPtr-&gt;hostCftMode;
+
+// In NCCL 2.31, the default host CFT mode is "Disable".
+if (comm-&gt;config.hostCftMode == NCCL_CONFIG_UNDEF_INT) {
+  comm-&gt;config.hostCftMode = ncclHostCftDisable;
+}</code></pre>
+
+<table>
+<thead><tr><th style="width:15%">取值</th><th style="width:26%">window 注册时是否建 LE</th><th>建 LE 失败时</th></tr></thead>
+<tbody>
+<tr><td><code>Disable</code>（<b>2.31 默认</b>）</td><td class="t-no">不建</td><td>—</td></tr>
+<tr><td><code>Enable</code> = 1</td><td class="t-ok">建</td><td class="t-no">整个 window 注册失败</td></tr>
+<tr><td><code>Fallback</code> = 3</td><td class="t-ok">尝试建</td><td class="t-mid">静默跳过，comm 仍可用</td></tr>
+<tr><td><code>Default</code> = UNDEF</td><td>→ 被 init.cc 改写成 <code>Disable</code></td><td>—</td></tr>
+</tbody>
+</table>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>那行注释 <code>// In NCCL 2.31, the default host CFT mode is "Disable".</code> 明确把 Disable 标为<b>该版本的</b>选择，暗示未来版本会翻转默认值。当前默认关掉的理由很直白：eager 建 LE 会在每次 window 注册时引入一次 <code>bootstrapIntraNodeAllGather</code> + N 次 <code>cuLogicalEndpointImport</code> + busy-poll <code>Query</code>，对不用 CFT 的应用是纯粹的启动开销。</p>
+</div>
+
+<h2 id="s8">8. 公开 API、语言绑定与官方示例</h2>
+
+<h3>8.1 C API 新增面</h3>
+
+<table>
+<thead><tr><th style="width:38%">符号</th><th style="width:12%">host/dev</th><th>用途</th></tr></thead>
+<tbody>
+<tr><td><code>ncclHostCftMode_t</code> + <code>config.hostCftMode</code></td><td>host</td><td>eager LE 创建策略</td></tr>
+<tr><td><code>ncclCftLeId</code> / <code>_t</code>, <code>NCCL_LE_ID_INVALID</code></td><td>both</td><td>LE 句柄类型</td></tr>
+<tr><td><code>ncclCftCap_t</code>: <code>NCCL_CFT_NONE/NCCL_CFT/NCCL_CFT_MULTIMEM</code></td><td>host</td><td><code>reqs.cftCaps</code> 位掩码</td></tr>
+<tr><td><code>ncclCftTeamMode_t</code> ×3</td><td>both</td><td>team 布局</td></tr>
+<tr><td><code>reqs.cftCaps</code>, <code>reqs.cftBarrierCount</code></td><td>host</td><td>devComm 需求</td></tr>
+<tr><td><code>ncclTeamCft</code>, <code>ncclTeamCftMultimem</code></td><td>both（各一份重载）</td><td>team 构造</td></tr>
+<tr><td><code>ncclGetCftDeviceLeInfo</code>, <code>ncclGetPeerDeviceLeInfo</code>, <code>ncclGetMultimemDeviceLeInfo</code></td><td>host</td><td>LE 查询</td></tr>
+<tr><td><code>ncclGetCftLeInfo</code>, <code>ncclGetPeerLeInfo</code>, <code>ncclGetMultimemLeInfo</code></td><td>device</td><td>LE 查询</td></tr>
+<tr><td><code>ncclGetResourceBufferCftLeInfo</code>, <code>…MultimemLeInfo</code></td><td>device</td><td>resource buffer 版</td></tr>
+<tr><td><code>ncclCft&lt;Coop&gt;</code> + 15 个方法</td><td>device (C++)</td><td><b>数据面</b></td></tr>
+<tr><td><code>ncclCftSmem</code>, <code>ncclCftOp{Sum,And,Xor,Or,Min,Max}</code></td><td>device (C++)</td><td>状态与 RedOp tag</td></tr>
+<tr><td><code>ncclMemProxyType</code>, <code>ncclMemFenceScope</code>, <code>ncclMemFence</code></td><td>device (C++)</td><td>跨 proxy 内存序</td></tr>
+<tr><td><code>ncclCftBarrierSession&lt;Coop&gt;</code>, <code>ncclCftBarrierCreateRequirement</code></td><td>both</td><td>barrier</td></tr>
+</tbody>
+</table>
+
+<h3>8.2 nccl4py 绑定：只覆盖控制面</h3>
+
+<p>commit <code>70911486</code>，共 16 个文件。分三层：</p>
+
+<pre><code># ① Cython 底层（nccl/bindings/_internal/nccl.pxd + nccl_linux.pyx）
+#    dlsym 五个 host 函数
+cdef ncclResult_t _ncclGetMultimemDeviceLeInfo(ncclWindow_t, size_t, ncclCftLeId*, size_t*) ...
+cdef ncclResult_t _ncclGetCftDeviceLeInfo(ncclWindow_t, size_t, int, ncclTeam_t, ncclCftLeId*, size_t*) ...
+cdef ncclResult_t _ncclGetPeerDeviceLeInfo(ncclWindow_t, size_t, int, ncclCftLeId*, size_t*) ...
+cdef ncclTeam_t   _ncclTeamCft(ncclComm_t, ncclCftTeamMode_t) ...
+cdef ncclTeam_t   _ncclTeamCftMultimem(ncclComm_t) ...
+
+# ② Pythonic 层
+#    nccl/core/typing.py        : NcclHostCftMode / NcclCftTeamMode / NcclCftCap (IntEnum)
+#    nccl/core/communicator.py  : NCCLConfig.host_cft_mode
+#                                 DevCommRequirements.cft_caps / .cft_barrier_count
+#                                 Communicator.team_cft(mode) / .team_cft_multimem()
+#    nccl/core/resources.py     : @dataclass CftLeInfo
+#                                 Window.get_multimem_le_info(offset)
+#                                 Window.get_cft_le_info(peer_cft, cft_team, offset)
+#                                 Window.get_peer_le_info(peer, offset)
+
+# ③ CuTe DSL device 层（nccl/core/device/cute/）
+#    window.py : Window.cft_le_info(offset, peer_cft, cft_team, dev_comm) -> CftLeInfo
+#                Window.peer_le_info(...)
+#    comm.py   : DevComm.team_cft(mode) / .team_cft_multimem()
+#                DevComm.resource_buffer_cft_le_info(handle, peer_cft)
+#                DevComm.resource_buffer_{peer,multimem}_le_info(...)
+#    types.py  : CftLeInfo / CftTeamMode</code></pre>
+
+<div class="box y">
+<p><span class="lab warn">重要缺口</span>把 <code>nccl_cft|ncclCft</code> 在 CuTe 绑定里 grep 一遍，只有两处<b>注释</b>提到，没有任何实际绑定。也就是说 —— <b>nccl4py 完全没有暴露 <code>ncclCft</code> 的 put/get/red/pullRed，也没有暴露 <code>ncclCftBarrierSession</code></b>。Python 侧能拿到的只是：配置、能力请求、team、<code>(le_id, le_offset)</code> 查询。</p>
+<p><span class="lab ana">解读</span>这是技术必然而非疏漏：<code>ncclCft&lt;Coop&gt;</code> 是一个 C++ 模板类，方法体全是 <code>asm volatile</code> inline PTX，既没有 C ABI 符号可 dlsym，也无法在 CuTe DSL 的 tracing 模型里表达。要在 Python 里真正发 CFT 操作，需要 CuTe DSL 侧独立实现对应的 PTX intrinsic —— 这在当前代码里还不存在。所以 <b>2.31 的 CFT 数据面是 C++/CUDA 独占的</b>。</p>
+</div>
+
+<p>Rust 侧同理，<span class="fp">contrib/nccl4rust/crates/nccl/src/device.rs</span> 也只有类型与查询。</p>
+
+<h3>8.3 官方示例：04_cft_barrier</h3>
+
+<p><span class="fp">docs/examples/06_device_api/04_cft_barrier/c/main.cu</span>，167 行。两个 kernel 一共 4 行有效代码，把最小可用形态展示得很干净：</p>
+
+<pre><code>#define NCCL_DEVICE_CTA_COUNT      16
+#define NCCL_DEVICE_THREADS_PER_CTA 512
+
+__global__ void simpleCftBarrierKernel(struct ncclDevComm comm) {
+  ncclCftBarrierSession&lt;ncclCoopCta&gt; bar { ncclCoopCta(), comm, blockIdx.x };
+  bar.sync(ncclCoopCta(), cuda::memory_order_relaxed,
+           ncclMemProxyType::Fabric, ncclMemProxyType::Fabric);
+}
+
+__global__ void multimemCftBarrierKernel(struct ncclDevComm comm) {
+  ncclCftBarrierSession&lt;ncclCoopCta&gt; bar { ncclCoopCta(), comm, blockIdx.x, /*multimem=*/true };
+  bar.sync(ncclCoopCta(), cuda::memory_order_relaxed,
+           ncclMemProxyType::Fabric, ncclMemProxyType::Fabric);
+}</code></pre>
+
+<p>host 侧关键三行：</p>
+<pre><code>ncclDevCommRequirements reqs = NCCL_DEV_COMM_REQUIREMENTS_INITIALIZER;
+reqs.cftCaps         = NCCL_CFT | NCCL_CFT_MULTIMEM;
+reqs.cftBarrierCount = NCCL_DEVICE_CTA_COUNT;          // 一个 CTA 一个 barrier
+NCCLCHECK(ncclDevCommCreate(comm, &amp;reqs, &amp;devComm));</code></pre>
+
+<p>示例里有一条注释值得单独引出：</p>
+<div class="box">
+<p><i>// CTA count must match cftBarrierCount for proper barrier synchronization</i></p>
+</div>
+
+<div class="box p">
+<p><span class="lab ana">解读</span><code>blockIdx.x</code> 当 barrier index 是官方推荐范式（文档也这么写）。这里的约束是<b>硬</b>的：<code>cftBarrierCount</code> 决定了 §6.1 那块 buffer 里有几组 inbox slot，若 CTA 数超过 barrier 数，多出来的 CTA 会越界访问别人的 slot。这是一个<b>没有运行时检查</b>的约束——API 上没有任何断言，只有文档和注释在提醒。</p>
+</div>
+
+<p>值得注意示例用的是 <code>memory_order_relaxed</code> + <code>Fabric→Fabric</code>，即纯同步不带数据可见性；而文档 <span class="fp">usage/cft.rst</span> 里给的范式是 <code>memory_order_acq_rel</code> + <code>Generic→Fabric</code>，即"SM 写的数据要被 fabric 看到"。后者才是实际数据传输场景需要的。</p>
+
+<h2 id="s9">9. 设计要点解读与横向对比</h2>
+
+<div class="box y">
+<p><span class="lab warn">本节声明</span>§0–§8 的每一条陈述都有源码或官方文档逐字支撑。本节是笔者基于这些源码的<b>分析与推断</b>，虽力求保守，但不具备与前文相同的证据强度。</p>
+</div>
+
+<h3>9.1 CFT 在 NCCL 四条通路中的位置</h3>
+
+<table>
+<thead><tr><th style="width:11%"></th><th style="width:20%">LSA</th><th style="width:20%">NVLS multimem</th><th style="width:20%">GIN</th><th>CFT</th></tr></thead>
+<tbody>
+<tr><td>访存代理</td><td>SM LSU（Generic）</td><td>SM LSU + SHARP</td><td>NIC / proxy thread</td><td class="t-ok"><b>fabric 引擎</b></td></tr>
+<tr><td>本地端</td><td>global（VA 映射）</td><td>global（MC VA）</td><td>global</td><td class="t-ok"><b>shared memory</b></td></tr>
+<tr><td>寻址</td><td>本地 VA 指针</td><td>MC base + offset</td><td>(window, peer, offset)</td><td>(le_id, le_offset)</td></tr>
+<tr><td>作用域</td><td>NVLink 域</td><td>NVLink 域</td><td>跨节点</td><td>NVLink 域（= LSA）</td></tr>
+<tr><td>粒度</td><td>任意</td><td>16B 向量</td><td>任意</td><td class="t-mid"><b>16B 强制对齐+倍数</b></td></tr>
+<tr><td>完成通知</td><td>指令级（同步）</td><td>指令级</td><td>signal / counter</td><td>mbarrier（<code>layout::v1</code>）+ report</td></tr>
+<tr><td>错误上报</td><td>无（硬错误）</td><td>无</td><td>返回码</td><td class="t-mid"><b>mbarrier 带内 1B report</b><br><span class="mono-sm">（取值表上游未公开、NCCL 未消费，见 §5.12）</span></td></tr>
+<tr><td>驱动对象</td><td><code>cuMemMap</code> + <code>cuMemSetAccess</code></td><td><code>cuMulticast*</code></td><td>IB QP / mkey</td><td><code>cuLogicalEndpoint*</code></td></tr>
+</tbody>
+</table>
+
+<h3>9.2 三个真正新颖的设计点</h3>
+
+<div class="three">
+  <div class="card">
+    <div class="h">① le_id 是算术量，不是句柄</div>
+    <div class="b"><code>IdReserve(count)</code> 返回<b>连续</b>区间 + <code>Import(id, handle)</code> 允许<b>指定落点</b>，两者结合让 <code>le_id(peer) = base + rank</code> 成立——这是一个跨进程共享的<b>可计算命名空间</b>，而不是一堆不透明句柄。配合 <code>le_offset = bigOffset + offset</code>（symmetric window 保证全 rank 一致），CFT 的远端寻址<b>零查表、零地址交换</b>。<br><br><span class="lab ana">边界</span>但"零查表"<b>不是 CFT 独有</b>：LSA 对称内存同样纯算术，且与 CFT <b>共用 <code>mcOffset4K</code> 字段</b>；GIN 的查表也只在 window handle 一处，偏移侧仍是算术。真正的 CFT 增量在 <b>host 侧</b>——无需为每个 peer 建 VA 映射。详见 <a href="#s4">§4 勘误</a>。</div>
+  </div>
+  <div class="card">
+    <div class="h">② proxy 类型进入内存模型</div>
+    <div class="b"><code>ncclMemFence(order, producer, consumer, scope)</code> 把"谁写的、谁读的"提升为一等参数，展开成 9 种 <code>fence.proxy.*::*.alias.*</code> PTX。这是 <code>__threadfence()</code> 时代不存在的抽象——一旦有独立搬运引擎，单一 fence 就无法描述可见性了。</div>
+  </div>
+  <div class="card">
+    <div class="h">③ 完成与错误合并进 mbarrier</div>
+    <div class="b"><code>try_wait.parity.phase_type::primary</code> 一条指令同时返回"完成谓词 + report 谓词 + 1 字节错误集合"。fabric 传输可能失败（远端不可达等），错误走带内通道回来，无需额外状态字；成功时 mbarrier 内容<b>根本不被修改</b>，快路径零开销。三段式 <code>submit/flushSmem/flush</code> 则把"提交 / smem 可复用 / 真正完成"解耦为三个独立的等待点。<br><br><span class="lab ana">边界</span>设计先进，但 2.31 里这条通道<b>两头都断</b>：取值表 NVIDIA 未公开，消费者 NCCL 也没写。详见 <a href="#s5-12">§5.12</a>。</div>
+  </div>
+</div>
+
+<h3>9.3 用 CFT 写 kernel 时最容易踩的六个坑</h3>
+
+<table>
+<thead><tr><th style="width:5%">#</th><th style="width:26%">约束</th><th style="width:20%">是否有编译/运行检查</th><th>依据</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>smem 指针 16B 对齐、<code>bytes % 16 == 0</code></td><td class="t-mid">仅在 <code>NCCL_DEVICE_CFT_ENABLE_DEBUG</code> 下 assert（默认关）</td><td>§5.10</td></tr>
+<tr><td>2</td><td><code>get</code>/<code>pullRed</code> 在飞字节 ≤ <b>1 MB</b>；put/red ≤ 16 MB</td><td class="t-no"><b>无</b>，溢出即静默错误</td><td>§5.5</td></tr>
+<tr><td>3</td><td>每个发起过 op 的 <code>OpCoop</code> 都必须 <code>submit()</code></td><td class="t-no"><b>无</b></td><td>文档 + §5.5</td></tr>
+<tr><td>4</td><td><code>pullRed</code> 必须整 warp 调用</td><td class="t-ok"><code>static_assert</code></td><td>§5.9</td></tr>
+<tr><td>5</td><td>CTA 数 ≤ <code>cftBarrierCount</code></td><td class="t-no"><b>无</b>，越界写别人的 slot</td><td>§8.3</td></tr>
+<tr><td>6</td><td><code>flush()</code> 的 coop 必须覆盖所有发起过 op 的线程</td><td class="t-no"><b>无</b></td><td>文档原文</td></tr>
+</tbody>
+</table>
+
+<div class="box r">
+<p><span class="lab gap">风险提示</span>6 条约束里有 4 条<b>完全没有任何检查</b>。CFT 是典型的"低层、高性能、易误用"API。#2 尤其隐蔽——它既不在函数签名里、也不在头文件注释里，只能从 <code>complete_tx::bytes</code> vs <code>complete_tx::16B</code> 的 PTX 差异或官方文档的一句话里推出来。建议自建 wrapper 强制记账。</p>
+</div>
+
+<h3>9.4 与用户既有 fabric PTX 实验的对照</h3>
+
+<p>本工作区 <span class="fp">fabric_instruction/</span> 目录下已有大量手写 fabric PTX 探针（<code>fabric_try_put.ptx</code>、<code>fabric_try_pullred_add_f32.ptx</code>、<code>fabric_le_id_encoding_8gpu_host.cu</code> 等）。把 NCCL 的做法与之对照，有几点可以直接印证或修正：</p>
+
+<table>
+<thead><tr><th style="width:32%">问题</th><th>NCCL 源码给出的答案</th></tr></thead>
+<tbody>
+<tr><td><code>le_id</code> 到底怎么编码？</td><td>不需要"编码"。<code>IdReserve(nRanks)</code> 拿连续块，<code>le_id = base + flatRank</code>。<b>peer 的 LE 必须先 <code>Import</code> 到那个精确 id 上</b>，否则该 id 无效。</td></tr>
+<tr><td>为什么 <code>cuLogicalEndpointCreate</code> 会失败？</td><td>常见三因：(a) 未先 <code>IdReserve</code> 该 id；(b) <code>prop.size</code> 超过 <code>cuLogicalEndpointGetLimits</code> 返回的 <code>maxSize</code>（NCCL 专门写了 <code>checkLeSize</code>）；(c) MC 类型时未 <code>AddDevice</code> 就用。</td></tr>
+<tr><td>MC LE 该谁创建？</td><td><b>只有 rank 0 <code>Create</code></b>，其余 <code>Import</code>；然后<b>全员各自 <code>AddDevice(自己)</code></b>。<code>Query</code> 变 ready 就意味着全员到齐，可当 barrier 用。若每个 rank 都 <code>Create</code>，必然失败。</td></tr>
+<tr><td><code>bindAddr</code> 的 offset 语义？</td><td>是 <b>LE 内部偏移</b>，NCCL 用全 rank 一致的 <code>bigOffset</code>。要求 <code>bindAlignment</code> 对齐（由 <code>GetLimits</code> 查）。host 内存<b>不能</b>绑。</td></tr>
+<tr><td>为什么 <code>fabric.try_put</code> 发了却没数据？</td><td>必须 <code>fabric.submit;</code> 才会推进；且 mbarrier 必须先 <code>mbarrier.init.shared.layout::v1.b64</code>（普通 layout 不行）并 <code>expect_tx</code> 正确的事务数。</td></tr>
+<tr><td>counted vs uncounted？</td><td>master 里<b>只有 uncounted</b>。counted 变体在未合入的 <code>a554c8bd</code> / <code>0daf6ddc</code> 上（见 §1.2）。不过 <b>PTX/硬件侧已完整支持</b>，指令级差异已实测清楚：<a href="#s5-6">§5.6</a>（机制）、<a href="#s11-5">§11.5</a>（bit 21 编码与四组对照）。</td></tr>
+</tbody>
+</table>
+
+<h3>9.5 一条可用的最小 CFT put 骨架</h3>
+
+<p>综合全部源码约束，整理如下（结构取自官方文档 <span class="fp">usage/cft.rst</span> 的范式，补齐了 §9.3 的约束）：</p>
+
+<pre><code>__global__ void cftPutKernel(ncclDevComm devComm, ncclWindow_t win) {
+  __shared__ ncclCftSmem cftSmem;                 // 16B 对齐的 mbarrier
+  __shared__ alignas(16) char smem[128];          // ① 16B 对齐，size 是 16 的倍数
+
+  ncclCoopCta coop;
+  ncclCft&lt;ncclCoopCta&gt; cft{coop, cftSmem};        // ctor 里做 mbarrier.init + coop.sync
+
+  ncclTeam cftTeam = ncclTeamCft(devComm);
+  int peer = (cftTeam.rank + 1) % cftTeam.nRanks;
+
+  ncclCftLeId leId;  size_t leOffset;
+  ncclGetCftLeInfo(win, /*offset=*/0, peer, cftTeam, devComm, &amp;leId, &amp;leOffset);   // ② 纯算术
+
+  /* … 往 smem[] 里填数据 … */
+
+  // ③ 把 SM 写的数据推到 fabric 能读到的一致点（Cta scope = SMEM）
+  ncclMemFence(coop, cuda::memory_order_release,
+               ncclMemProxyType::Generic, ncclMemProxyType::Fabric, ncclMemFenceScope::Cta);
+
+  cft.put(coop, leId, leOffset, smem, sizeof(smem));   // ④ 内部只有 leader 真的发指令
+  cft.submit(coop);                                    // ⑤ 必须调，否则不推进
+  cft.flush(coop);                                     // ⑥ 等完成（或用 flushSmem 只等 smem 可复用）
+  // ⑦ dtor 自动 coop.sync() + mbarrier.inval
+}</code></pre>
+
+<h2 id="s10">10. 取证说明与遗留问题</h2>
+
+<h3>10.1 证据来源与层级</h3>
+
+<table>
+<thead><tr><th style="width:22%">来源</th><th style="width:14%">强度</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>NCCL master @ <code>fd168324</code> 源码</td><td class="t-ok">一手 · 高</td><td>§1–§8 的全部代码块均为逐字摘录，读取范围覆盖 CFT 相关全部新增文件（共 1,396 行新代码）+ <span class="fp">dev_runtime.cc</span> 的 66 处命中点</td></tr>
+<tr><td><code>git log</code> commit 标题</td><td class="t-ok">一手 · 高</td><td>§1.2 的 24 个 master commit + 3 个未合入 commit，标题原文引用</td></tr>
+<tr><td>官方文档 <span class="fp">docs/userguide/source/{usage/cft.rst, api/device_cft.rst}</span></td><td class="t-ok">一手 · 高</td><td>536 行，NVIDIA 官方撰写。§5.5 的 16MB/1MB 数字、§5.9 的 scope 定义、§5.7 的 cp_mask 语义均出自此处并已与源码交叉验证</td></tr>
+<tr><td>官方示例 <span class="fp">04_cft_barrier/c/main.cu</span></td><td class="t-ok">一手 · 高</td><td>167 行，含 NVIDIA 自己写的约束注释</td></tr>
+<tr><td>NVIDIA 官方 <b>PTX ISA 9.3</b>（docs.nvidia.com/cuda/parallel-thread-execution）</td><td class="t-ok">一手 · 高</td><td>§5.12、§5.5 的引用出自 §1.3 新特性清单、§9.7.10.3.4、§9.7.10.4.1、§9.7.14.16.3 (Table 37)、§9.7.14.16.5.2、§9.7.14.16.7、§9.7.14.16.8、§9.7.14.16.10 及 <code>mbarrier.test_wait/try_wait</code> 与 <code>fabric.*</code> 各指令条目。全部逐字引用（英文原文），闭合了 G1</td></tr>
+<tr><td>NVIDIA 官方 <b>CUDA Runtime API</b>（§6.36 Logical Endpoint、§6.38 Data types）+ cuda-python bindings</td><td class="t-ok">一手 · 高</td><td>§5.12.3 / §5.12.4 的两个函数签名与两个枚举（含整数值）出自此处。HTML 文档与 Python bindings 两处独立一致。部分闭合了 G4</td></tr>
+<tr><td>§9 的分析与推断</td><td class="t-mid">二手 · 中</td><td>已在 §9 开头显式声明</td></tr>
+</tbody>
+</table>
+
+<h3>10.2 已闭合的疑问</h3>
+
+<ul>
+<li><b>CFT 的作用域</b>——曾疑为跨节点。<code>computeCftSize()</code> 直接返回 <code>computeLsaSize()</code>，确认为 NVLink 域内。</li>
+<li><b>le_id 是否可计算</b>——是。三处平移代数（host 存基准、bind 时加回、device 查询时加 peer 偏移）已全部核实一致。</li>
+<li><b>MC LE 的创建协议</b>——rank 0 独建 + 全员 AddDevice，已逐字核实。</li>
+<li><b>2.31 是否默认开启</b>——不。<code>hostCftMode</code> 默认 <code>Disable</code>，源码注释明确。</li>
+<li><b>Python 能否发 CFT 数据操作</b>——不能。已 grep 确认 CuTe 绑定中无任何 <code>ncclCft</code> 操作。</li>
+<li><b>f64 是否支持 pullRed</b>——不支持，用 <code>NCCL_CFT_RED_TRAIT_NO_PULL</code> 在编译期挡住。</li>
+<li><b><code>fabric.*</code> 指令族是否已进入公开 PTX ISA</b>——<b>已进入</b>。PTX ISA 9.3 §1.3 明确列出 <code>fabric.try_get/try_put/try_red/try_pullred/wait/submit</code> 六条指令，均要求 sm_100+。<code>.op_restrict::fetching</code>、<code>.sync_restrict::reads</code>、<code>.mbarrier::complete_tx::16B</code> vs <code>::bytes</code>、<code>.layout::v1</code>、<code>report::fabric</code> 全部有正式条目。见 <a href="#s5-12">§5.12</a>。</li>
+<li><b>mbarrier 事务计数器宽度</b>——原为反推，现已由 PTX ISA §9.7.14.16.3 Table 37 官方证实：tx-count ∈ [−(2<sup>20</sup>−1), 2<sup>20</sup>−1]，与 layout 无关。见 §5.5。</li>
+<li><b>report 的宽度与结构</b>——1 字节、1 字节对齐（<code>cudaFabricOpStatusSourceMbarrierV1</code> 官方注释），且是<b>多错误集合</b>而非标量码（<code>Count</code>/<code>Get</code> 的迭代器形状）。见 §5.12.3。</li>
+<li><b>NCCL 对 report 做什么</b>——<b>什么都不做</b>。四条独立证据见 §5.12.5。</li>
+</ul>
+
+<h3>10.3 遗留缺口</h3>
+
+<table>
+<thead><tr><th style="width:6%">ID</th><th style="width:30%">缺口</th><th>影响与建议</th></tr></thead>
+<tbody>
+<tr class="closed"><td><b>G1</b> <span class="lab done">CLOSED</span></td><td><span class="strike"><code>fabric.*</code> PTX 指令的<b>官方 ISA 语义</b>未核实</span><br><b>已对照 PTX ISA 9.3 闭合</b>，见 <a href="#s5-12">§5.12</a> 与 §5.5。</td><td>该指令族<b>已收录于公开 PTX ISA 9.3</b>（§1.3 新特性清单）。逐项核实结果：<code>complete_tx::16B</code> / <code>::bytes</code> 的区分成立；<code>fabric.submit.op_restrict::fetching</code> 官方定义为"只提交本线程先前的 <code>try_get</code>/<code>try_pullred</code>"；<code>fabric.wait.sync_restrict::reads</code> 官方定义为"等待已提交 fabric 操作对本地 <code>.shared::cta</code> 的读取完成，从而允许覆写"——与本报告 §5.5 的表述一致。§5.5 关于"事务计数器约 2<sup>20</sup>"的反推亦被 Table 37 精确证实。<b>唯一新增发现</b>：<code>layout::v1</code> 的 arrival count 上限被收窄至 2<sup>9</sup>−1 = 511。</td></tr>
+<tr class="closed"><td><b>G2</b> <span class="lab done">CLOSED</span></td><td><span class="strike">未在真实 Blackwell + CUDA 13.3 上<b>编译运行</b></span><br><b>已实测闭合</b>，见 <a href="#s11">§11</a>。</td><td>已在 8×B200 + CUDA 13.3 上编译运行 host 探针：<code>UNICAST_SUPPORTED=1</code>；<code>GetLimits</code> 的 UNICAST <code>maxSize=2<sup>42</sup></code>(4 TiB)、<code>bindAlignment=2 MiB</code>，MULTICAST <code>maxSize=2<sup>40</sup></code>、COUNTED_OPS <code>2<sup>38</sup></code>；单进程 le_id 命名空间上限 = <b>256</b>（8 bit，按进程虚拟化）；并抓到 driver 在首次 <code>IdReserve</code> 时于 <code>[2<sup>53</sup>, 2<sup>53</sup>+2<sup>50</sup>)</code> 建立的 PROT_NONE CFT aperture。</td></tr>
+<tr><td><b>G3</b></td><td><code>cuLogicalEndpoint*</code> 的<b>官方 CUDA 驱动文档</b>未核实</td><td>§2 的 12 个函数签名来自 NCCL 的 shim 定义（CUDA&lt;13.3 分支），这是 NCCL 自己写的，与真实 <code>cudaTypedefs.h</code> 可能存在字段差异（尤其 <code>flags</code> 的取值集合、<code>Query</code> 的 status 编码）。</td></tr>
+<tr><td><b>G4</b><br><span class="lab done">部分闭合</span></td><td><code>cudaFabricOpErrorStatusGet/Count</code> 的<b>取值语义</b>未核实<br><b>已查官方文档</b>，见 <a href="#s5-12">§5.12</a></td><td><b>已闭合部分</b>：函数签名（CUDA Runtime API §6.36 Logical Endpoint）、report 宽度（1B 对齐 1B 宽）、report 是多错误集合而非标量码、NCCL 对其零消费——均已取证。<br><b>仍开放部分（且归属在上游）</b>：<code>cudaFabricOpStatusInfo</code> 枚举里 <code>Last == Success == 0</code>，即 <b>NVIDIA 目前公开的错误原因数量为 0</b>——解码 API 是对着空枚举发布的，各 bit 含义无从获得。另一条同样未公开的关键信息：<code>hasReport</code> 为真后，<b>那批操作能否安全重试</b>；PTX 只说"由应用按严重性决定"，却既未定义严重性等级也未定义可重试性。<b>建议</b>：等待 CUDA 13.4 正式版或后续 <code>cuda_runtime_api.h</code> 头文件补全该枚举，届时重新核对。</td></tr>
+<tr><td><b>G5</b></td><td><b>性能特征完全未知</b></td><td>没有任何 benchmark。CFT put vs LSA store、CFT barrier vs LSA barrier 的延迟/带宽对比无数据。仓库里 <span class="fp">docs/perf/v2.31.2-1.md</span> 是否含 CFT 数据未检查。</td></tr>
+<tr><td><b>G6</b></td><td>"counted LE" 的 <b>host 侧</b>设计未知<br><span class="lab meas">已部分关闭</span></td><td>§1.2 已定位到三个未合入 commit，但未读其 diff（不在 master，需 fetch 对应分支）。这是下一版最重要的 CFT 变更。<br><b>已关闭的部分</b>：<b>device 侧</b> ABI 已由自建 SASS 探针查清 —— 三元组 handle、<code>.COUNTED</code> = bit 21、counter 地址走隐式 UR 四元组、累加在接收端 fabric-proxy（见 <a href="#s5-6">§5.6</a> / <a href="#s11-5">§11.5</a>）。仍未知的只剩 NCCL 打算怎么在 host 侧创建与管理 counted LE。</td></tr>
+<tr><td><b>G7</b></td><td><code>NCCL_CFT_TEAM_HIER_*</code> 的实际用途未验证</td><td>当前 <code>cftSize == cftMcSize</code> 使 <code>HIER_MULTIMEM</code> 退化。这是"为未来预留"还是"当前配置下的 bug"，无法从代码单独判断。</td></tr>
+</tbody>
+</table>
+
+<h3>10.4 复现方式</h3>
+
+<pre><code>cd nccl &amp;&amp; git fetch --all --prune &amp;&amp; git checkout fd168324
+
+# 全部 CFT 文件
+git ls-files | grep -i cft
+# 全部 CFT 标识符命中
+git grep -l -iE 'cft|LogicalEndpoint'
+# CFT 开发时间线
+git log --oneline --grep=cft -i --reverse HEAD
+# 尚未合入 master 的 CFT commit
+git log --oneline --all --grep=cft -i | while read c _; do
+  git merge-base --is-ancestor $c HEAD || echo "NOT IN MASTER: $c"; done</code></pre>
+
+<h3>10.5 结论</h3>
+
+<div class="box g">
+<p><span class="lab key">一句话总结</span>CFT 在代码层面做的是：<b>把 CUDA 13.3 的 Logical Endpoint 对象接进 NCCL symmetric window 体系，使 le_id 与 le_offset 都成为可纯算术推导的量；再用 Blackwell 的 <code>fabric.*</code> PTX 族在 device 侧提供一套「shared memory ↔ 远端 window」的异步 put/get/red/NVLS-pullred 接口，以 <code>layout::v1</code> mbarrier 承载完成通知与带内错误上报；并把访存代理类型（Generic/Fabric）提升为内存序模型的一等参数。</b>全部实现集中在 5 个新文件（1,396 行）+ 一处 window 注册钩子，对既有代码侵入极小。</p>
+<p>当前状态：<b>能力完整但默认关闭、只有 C++/CUDA 可用数据面、内部唯一消费者是 CFT Barrier、缺乏运行时约束检查</b>。它更像是为下一代 device-initiated 通信库准备的地基，而非 2.31 用户可以直接受益的优化。</p>
+</div>
+
+<h2 id="s11">11. 实测（B200 + CUDA 13.3）：G2 闭合证据</h2>
+
+<p>§10 之前的全部结论均为静态代码分析（缺口 <b>G2</b>）。本章把 CFT 相关的可实测量放到真实硬件上验证：三个 host 侧可查询量（§11.2–11.4）加一组 device 侧指令编码对照（§11.5），并把 driver 在用户态留下的地址空间痕迹直接抓出来。<b>所有数据均在 8×NVIDIA B200 + CUDA 13.3 上由下方 host 探针与 <span class="fp">fabric_instruction/</span> 下的 SASS 探针复现产生</b>，本节结论一律以 <span class="lab meas">实测</span> 标记。</p>
+
+<div class="box c">
+<p><span class="lab meas">TL;DR</span>四件事被硬件证据钉死：
+<b>①</b> <code>cuLogicalEndpointGetLimits</code> 的 UNICAST <code>maxSize</code> 精确等于 <b>2<sup>42</sup> = 4 TiB</b>，与开源驱动 <code>knvlinkValidateFabricBaseAddress_GB100</code> 要求的 <code>NVBIT64(42)</code> mapslot 对齐吻合；
+<b>②</b> 单进程 le_id 命名空间上限 = <b>256</b>（8 bit，从 0 密集分配、按进程虚拟化），因此 SASS 里 bit 53 是<b>固定 aperture tag</b> 而非 le_id 进位；
+<b>③</b> driver 在首次 <code>cuLogicalEndpointIdReserve</code> 时于 <code>/proc/self/maps</code> 建立一段 <code>[2<sup>53</sup>, 2<sup>53</sup>+2<sup>50</sup>)</code> 的 <code>PROT_NONE</code> 保留 —— <b>2<sup>50</sup> = 256 × 2<sup>42</sup></b>，即「le_id 数 × 单 LE maxSize」，CFT aperture 真实存在且被排除在普通 VA 分配之外；
+<b>④</b> <code>.counted::bytes</code> 在指令编码里<b>只占 word1 的 bit 21</b> 这一个语义位（四组 plain/counted 探针一致），counter 地址不进编码而靠<b>连续 UR 位置</b>隐式传递，且 SM 侧<b>不存在任何累加指令</b> —— 按字节的累加只能发生在接收端 fabric-proxy（机制见 <a href="#s5-6">§5.6</a>）。</p>
+</div>
+
+<h3>11.1 实测环境与运行方式</h3>
+
+<div class="kv">
+  <div class="i"><div class="n">8 × B200</div><div class="l">sm_100a，UNICAST/MULTICAST/COUNTED_OPS 全部 =1</div></div>
+  <div class="i"><div class="n">CUDA 13.3</div><div class="l"><code>CUDART_VERSION=13030</code>，Driver 13030</div></div>
+  <div class="i"><div class="n">5-level paging</div><div class="l">Linux <code>MAP_FIXED_NOREPLACE</code> 到 2<sup>54</sup> 都成功</div></div>
+</div>
+
+<pre><code># host 探针：纯 Driver/Runtime API，无需 kernel 侧 fabric.* 指令
+nvcc -std=c++17 -arch=sm_100a -lcuda \
+     fabric_le_va_limits_probe_host.cu -o probe.run
+
+./probe.run                 # 完整跑：mmap 对照 / map 测试(子进程隔离) / limits / le_id / VA / aperture 扫描
+./probe.run --maps-stages   # 逐 API 定位 aperture 建立时机
+./probe.run --le-count-only # 单进程 le_id 容量（并发跑多个可验证 per-process 虚拟化）</code></pre>
+
+<div class="box y">
+<p><span class="lab warn">环境噪音</span>本机 <b>GPU0 处于 busy/unavailable 状态</b>，<code>cudaSetDevice(0)</code> 必失败（既有的 <code>fabric_put_4cft_multicast</code> 二进制同样在此挂掉）。探针因此自动跳过 GPU0、选第一块可用卡（实测为 GPU1）建立 primary context。这不影响任何结论 —— <code>GetLimits</code>/<code>IdReserve</code> 是全局查询，aperture 是进程级地址空间事件。</p>
+</div>
+
+<h3>11.2 Q1 — <code>cuLogicalEndpointGetLimits</code>：<code>maxSize</code> 精确等于 2<sup>42</sup></h3>
+
+<p>§3.3 的 <code>checkLeSize()</code> 会用 <code>GetLimits</code> 返回的 <code>maxSize</code> 卡住 window 总量，但那个上限的真实值 NCCL 源码里查不到。实测扫遍所有 <code>size</code>（4 KiB → 2<sup>45</sup> → 0）与两种 <code>ipcHandleTypes</code>：</p>
+
+<table>
+<thead><tr><th>prop</th><th><code>bindAlignment</code></th><th><code>maxSize</code></th></tr></thead>
+<tbody>
+<tr class="closed"><td>UNICAST（size 从 4 KiB 到 2<sup>45</sup> 到 0，全部；ipc=FABRIC/NONE 均同）</td><td><code>0x200000</code> = 2 MiB = 2<sup>21</sup></td><td><b><code>0x40000000000</code> = 4 TiB = 2<sup>42</sup></b></td></tr>
+<tr><td>UNICAST + <code>COUNTED_OPS</code></td><td>2 MiB</td><td><code>2<sup>38</sup></code> = 256 GiB（小 16×）</td></tr>
+<tr><td>MULTICAST（numDevices ∈ {2,3,4,8,16,64}，size 任意）</td><td>2 MiB</td><td><code>2<sup>40</sup></code> = 1 TiB（与 numDevices 无关）</td></tr>
+</tbody>
+</table>
+
+<pre class="out"><code>[limits] UNICAST dev0 size=0x1000     ipc=FABRIC flags=0          -> bindAlignment=0x200000 (2 MiB)  <b>maxSize=0x40000000000 (4 TiB = 2^42)</b>
+[limits] UNICAST dev0 size=0x40000000000 ipc=FABRIC flags=0       -> bindAlignment=0x200000 (2 MiB)  <b>maxSize=0x40000000000 (4 TiB = 2^42)</b>
+[limits] UNICAST dev0 size=0x0        ipc=FABRIC flags=0          -> bindAlignment=0x200000 (2 MiB)  <b>maxSize=0x40000000000 (4 TiB = 2^42)</b>
+[limits] UNICAST dev0 size=2MiB       ipc=FABRIC flags=COUNTED_OPS-> bindAlignment=0x200000 (2 MiB)  <i>maxSize=0x4000000000 (256 GiB = 2^38)</i>
+[limits] MULTICAST numDevices=64 size=0x40000000000 ipc=FABRIC    -> bindAlignment=0x200000 (2 MiB)  <i>maxSize=0x10000000000 (1 TiB = 2^40)</i></code></pre>
+
+<div class="box g">
+<p><span class="lab meas">交叉印证</span>UNICAST <code>maxSize = 2<sup>42</sup></code> 与三条独立线索严丝合缝：（a）SASS <code>ULEA UR7, UR13, 0x200000, 0xa</code> 的 shift 10（高 32-bit 字）= 全地址 shift 42；（b）开源驱动 <code>knvlinkValidateFabricBaseAddress_GB100</code> 要求 fabric base <code>NVBIT64(42)</code> 对齐（GB100 NVLink mapslot 粒度）；（c）§11.4 抓到的 aperture 宽度 2<sup>50</sup> = 256 × 2<sup>42</sup>。三者互为验证。</p>
+</div>
+
+<h3>11.3 Q2 — le_id 命名空间上限 = 256（8 bit，按进程虚拟化）</h3>
+
+<p>§4.3 的 le_id 寻址代数成立的前提是 le_id 是一个小整数字段。它到底多大？两个候选假设是 2048（11 bit，恰在 2<sup>53</sup> 进位处）或 4096（remap table V2）。实测结论是<b>两个都不是</b>：</p>
+
+<pre class="out"><code>[le_id] 40x reserve(count=1) -> 0x0 0x1 0x2 ... 0x27          <i># 从 0 密集、步长 1</i>
+[le_id] reserve(count=2^8 = 256) OK   base=0x0
+[le_id] reserve(count=2^9 = 512) <u>FAIL CUDA_ERROR_INVALID_VALUE (1)</u>
+[le_id] >>> 单次最大 reserve count = <b>256</b>
+[le_id] >>> 耗尽结果: 总共预留 <b>256</b> 个 le_id, 分 1 段
+[le_id] >>> id 数值范围: [0x0, 0xff] = [0, 255]  ->  需要 <b>8 bit</b></code></pre>
+
+<div class="kv">
+  <div class="i"><div class="n">256</div><div class="l">单进程 le_id 上限（count=512 直接 INVALID_VALUE）</div></div>
+  <div class="i"><div class="n">8 bit</div><div class="l">id 范围 [0x0, 0xff]，占 fabric 地址 bit [49:42]</div></div>
+  <div class="i"><div class="n">per-process</div><div class="l">3 个进程并发各自都拿到 [0x0,0xff]</div></div>
+</div>
+
+<div class="box g">
+<p><span class="lab meas">对 bit 53 的判定</span>le_id 只有 8 bit（bit [49:42]），<code>255 × 2<sup>42</sup> &lt; 2<sup>50</sup></code>，<b>永远进不了 bit 53</b>。所以 SASS <code>ULEA</code> 里那个 <code>0x200000</code>（= bit 53）是驱动写死的 <b>固定 aperture tag</b>，不是 le_id 字段溢出的进位（逐指令拆解见 §11.4.2）。这直接排除了「le_id 撑满会碰到 2<sup>53</sup>」这一假设。此外，三个进程并发跑 <code>--le-count-only</code> 各自都独立拿到全部 256 个且都是 <code>[0x0,0xff]</code>，说明 <b>le_id 命名空间是按进程虚拟化的</b>（与 §4.3 里「host 存基准、全 rank 平移」的用法一致：每个进程从 0 起分配，跨进程一致性由上层的 bigOffset 保证，而非由全局唯一 id 保证）。</p>
+</div>
+
+<h3>11.4 Q3 — CFT aperture 真实存在：<code>/proc/self/maps</code> 铁证</h3>
+
+<p>最关键的问题：地址 <code>fabric_addr = le_id·2<sup>42</sup> + 2<sup>53</sup> + offset</code> 里那个 2<sup>53</sup> 基址，到底是不是 driver 从普通 VA 空间划走的一段 aperture？直接读 <code>/proc/self/maps</code>：</p>
+
+<pre class="out"><code>[maps] <b>20000000000000-24000000000000 ---p 00000000 00:00 0</b>
+[maps] ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0   [vsyscall]</code></pre>
+
+<p>一段 <code>PROT_NONE</code>（<code>---p</code>）匿名保留，起止<b>恰好 <code>[2<sup>53</sup>, 2<sup>53</sup>+2<sup>50</sup>)</code></b>。用 2<sup>42</sup> 步长逐 mapslot 探测 <code>cuMemAddressReserve</code> 的 fixed hint 是否被采纳（R=refused / H=honored）：</p>
+
+<pre class="out"><code>[apert] slot   0: <u>RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR</u>
+[apert] slot  64: <u>RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR</u>
+[apert] slot 128: <u>RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR</u>
+[apert] slot 192: <u>RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR</u>
+[apert] slot 256: <b>HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH</b>
+[apert] >>> 第一个可用 slot = <b>256</b>，aperture = [2^53, 2^53 + 256*2^42)  =  <b>2^50</b></code></pre>
+
+<div class="box g">
+<p><span class="lab meas">三个数字闭环</span>aperture 宽度 = <b>2<sup>50</sup> = 256 × 2<sup>42</sup> =（le_id 命名空间容量）×（单 endpoint maxSize）</b>。§11.2 的 maxSize、§11.3 的 le_id 数、§11.4 的 aperture 宽度三者自洽 —— aperture 正好被切成 256 个 4 TiB 的 mapslot，每个 slot 对应一个 le_id。</p>
+</div>
+
+<p>配套的边界与可用性证据：</p>
+<ul>
+<li><b>allocator 主动跨过 aperture</b>：<code>cuMemAddressReserve(size=2<sup>53</sup>, 无 hint)</code> 返回 <code>0x0024000000000000</code> = 2<sup>53</sup> + 2<sup>50</sup>，正好落在 aperture 之上。</li>
+<li><b>只有 2<sup>53</sup> 窗口被拒</b>：fixed hint 在 2<sup>47</sup>/2<sup>48</sup>/…/2<sup>52</sup>、2<sup>54</sup>、2<sup>55</sup> <b>全部 HONORED</b>，唯独 2<sup>53</sup> 被改写。2<sup>53</sup> 下方 <code>2<sup>53</sup>−k·2<sup>42</sup></code> 也 HONORED。</li>
+<li><b>CFT 形态 hint</b>：<code>le_id·2<sup>42</sup>+2<sup>53</sup></code> 对 le_id=0/1/101 被拒，le_id=2047（落在 2<sup>53</sup>+2<sup>50</sup> 之外）被 HONORED —— 与「有效 le_id ≤ 255 全在 aperture 内」一致。</li>
+<li><b>高位 VA 本身没问题</b>：子进程隔离的 map 测试证明 2<sup>47</sup>/2<sup>48</sup>/2<sup>52</sup>/2<sup>54</sup> 都能 <code>reserve + cuMemMap + cuMemSetAccess + kernel 写 + D2H 校验</code> 全通过（<code>FULLY USABLE</code>）。被划走的只有 2<sup>53</sup> 那一个窗口。</li>
+<li><b>静态预留</b>：持有全部 256 个 le_id 后重扫，aperture 不变 —— 它是一次性建立、不随 endpoint 增减。</li>
+</ul>
+
+<h4>11.4.1 aperture 由首次 <code>cuLogicalEndpointIdReserve</code> 触发</h4>
+
+<p><code>--maps-stages</code> 逐调用 dump <code>/proc/self/maps</code>，精确定位建立时机：</p>
+
+<pre class="out"><code>stage1  after cuInit                          -> (无高位保留)
+stage2  after primary context ×1/×2/×3        -> (无高位保留)
+stage3  after cuLogicalEndpointGetLimits      -> (无高位保留)
+stage4  after cuLogicalEndpointIdReserve(1)   -> <b>20000000000000-24000000000000 ---p</b>   &lt;== 出现
+stage5  after cuLogicalEndpointIdRelease      -> 仍在
+stage6  after cuMemAddressReserve             -> 仍在
+stage7  after cudaMalloc                      -> 仍在（普通分配落在 0x7f.. 低区）</code></pre>
+
+<div class="box p">
+<p><span class="lab ana">解读</span>aperture <b>不是</b> <code>cuInit</code>、<b>不是</b> primary context、<b>不是</b> <code>cuMemAddressReserve</code>/<code>cudaMalloc</code> 建立的，而是 <b>第一次 <code>cuLogicalEndpointIdReserve</code> 懒建立、且 release 后不回收</b>。对 §3.4 的 <code>symTeamObtainUcLe</code> 而言，这意味着一旦 NCCL 走到「全 comm 第一次 <code>IdReserve</code> 连续 id 块」那一步，driver 就已经把整段 CFT aperture 从进程 VA 空间里锁定了。</p>
+</div>
+
+<h4>11.4.2 SASS 侧独立佐证：<code>ULEA … 0x200000, 0xa</code> 把 le_id 放到 bit 42、把 tag 放到 bit 53</h4>
+
+<p><code>/proc/self/maps</code> 是从<b>驱动行为</b>侧证明 aperture；而编译器生成的 SASS 则从<b>指令编码</b>侧给出一条完全独立的第二重证据。此前抓取的 <span class="fp">fabric_try_red_add_f32.sm_100a.cuobjdump.sass</span>（<code>fabric.try_red</code> 探针，与 <code>fabric.try_put</code> 走同一条 CFT 地址构造路径）里，合成 fabric 目标地址<b>高 32 位字</b>的正是这条 <code>ULEA</code>：</p>
+
+<pre class="out"><code>/*0120*/  SYNCS.EXCH.64 URZ, [UR4], UR6 ;
+/*0130*/  <b>ULEA UR7, UR13, 0x200000, 0xa ;</b>                          <i>/* 0x002000000d077891 */</i>
+/*0140*/  UMOV UR6, URZ ;
+   ...
+/*0160*/  ULEA UR4, UR12, UR10, 0x18 ;
+/*01a0*/  <b>UBLKRED.G.S.ADD.F32.RN.STRONG.SYS [UR6], [UR4], UR11 ;</b>    <i>// fabric 目标地址 = 高字 UR7 : 低字 UR6</i></code></pre>
+
+<p><code>ULEA Rd, Ra, imm, sh</code> 的语义是 <code>Rd = (Ra &lt;&lt; sh) + imm</code>。这条指令算出的 <code>UR7</code> 被当作 64 位 fabric 地址的<b>高 32 位字</b>（即整体再左移 32 位）：</p>
+
+<pre><code>UR7      = (UR13 &lt;&lt; 0xa) + 0x200000                    // 高 32 位字
+fabric_addr(高字部分) = UR7 &lt;&lt; 32
+         = ((UR13 &lt;&lt; 0xa) &lt;&lt; 32) + (0x200000 &lt;&lt; 32)
+         = (UR13 &lt;&lt; 42)               + (2^21 &lt;&lt; 32)
+         = <b>le_id · 2^42</b>              + <b>2^53</b>
+=> fabric_addr = le_id · 2^42 + 2^53 + offset</code></pre>
+
+<p>两个魔数逐一落位到 §11.4 实测的两条边界上：</p>
+
+<table class="bits">
+<thead><tr><th>bit 63..54</th><th>bit 53</th><th>bit 52..50</th><th>bit 49..42</th><th>bit 41..0</th></tr></thead>
+<tbody>
+<tr><td>0</td><td class="f-tag">1</td><td>0</td><td class="f-le">le_id (8 bit)</td><td class="f-off">offset</td></tr>
+<tr><td colspan="2">← <code>0x200000&lt;&lt;32 = 2<sup>53</sup></code>（固定 tag）</td><td></td><td>← <code>UR13&lt;&lt;0xa&lt;&lt;32 = ·2<sup>42</sup></code></td><td>← ≤ maxSize 2<sup>42</sup></td></tr>
+</tbody>
+</table>
+
+<div class="box c">
+<p><span class="lab meas">编译期 ⨯ 运行期双向对齐</span>SASS 里写死的两个常量——<code>imm=0x200000</code>（左移 32 后 = <b>2<sup>53</sup></b>）与移位 <code>sh=0xa</code>（叠加高字的 32 位后 = le_id 落在 <b>bit 42</b>，步长 2<sup>42</sup>）——和 §11.2 <code>GetLimits</code> 实测的 <code>maxSize=2<sup>42</sup></code>、§11.4 <code>/proc/self/maps</code> 实测的 aperture 基址 <code>2<sup>53</sup></code>／mapslot 步长 <code>2<sup>42</sup></code> <b>逐位一致</b>。又因 le_id 只有 8 bit（§11.3，最多 <code>255×2<sup>42</sup> &lt; 2<sup>50</sup></code>），le_id 字段<b>永远碰不到 bit 53</b>，于是 aperture 宽度必然恰为 <code>[2<sup>53</sup>, 2<sup>53</sup>+2<sup>50</sup>)</code>。<b>编译器指令编码</b>与<b>驱动 VA 保留</b>这两条互不相关的证据链，在同一组常量（tag=2<sup>53</sup>、stride=2<sup>42</sup>、宽度=2<sup>50</sup>）上完全交汇 —— <code>[2<sup>53</sup>, 2<sup>53</sup>+2<sup>50</sup>)</code> 是 CFT aperture 这一结论由此双向坐实。</p>
+</div>
+
+<h3 id="s11-5">11.5 Q4 — <code>.COUNTED</code> = 指令编码的 bit 21：四组对照实验</h3>
+
+<p><a href="#s5-6">§5.6</a> 从机制层讲清了 <code>.counted::bytes</code> 怎么工作；本节给出支撑它的<b>逐位编码证据</b>，以及把结论从"一个样本"推广到"四组样本"的对照实验。所有 <code>.ptx</code>/<code>.cubin</code>/<code>.cuobjdump.sass</code> 均在 <span class="fp">fabric_instruction/</span> 下，由 <span class="fp">build_fabric_sass.sh</span> 以 <code>-arch=sm_100a</code> 生成，可逐字复现。</p>
+
+<h4>11.5.1 四组 plain/counted 对照：原始编码</h4>
+
+<p>从 <code>.cuobjdump.sass</code> 里取每条 <code>UBLK*</code> 指令的两个 64 位字：</p>
+
+<table>
+<thead><tr><th style="width:30%">探针</th><th>word0</th><th>word1</th><th style="width:14%"><code>word1 &amp; 0x200000</code></th></tr></thead>
+<tbody>
+<tr><td><code>try_red_add_f32</code></td><td class="mono-sm"><code>0x00000006040073bb</code></td><td class="mono-sm"><code>0x0045d800080b440b</code></td><td>0</td></tr>
+<tr><td><code>try_red_add_f32<b>_counted_bytes</b></code></td><td class="mono-sm"><code>0x00000008040073bb</code></td><td class="mono-sm"><code>0x0045d800082b440d</code></td><td class="t-ok"><b>0x200000</b></td></tr>
+<tr><td><code>try_put</code></td><td class="mono-sm"><code>0x00000008060073ba</code></td><td class="mono-sm"><code>0x0003e2000801440e</code></td><td>0</td></tr>
+<tr><td><code>try_put<b>_counted_bytes</b></code></td><td class="mono-sm"><code>0x00000008040073ba</code></td><td class="mono-sm"><code>0x0045d8000821440d</code></td><td class="t-ok"><b>0x200000</b></td></tr>
+</tbody>
+</table>
+
+<p>对 <code>try_red</code> 那一对做 XOR：</p>
+
+<pre class="out"><code>0x0045d800080b440b  XOR  0x0045d800082b440d  =  <b>0x0000000000200006</b>
+                                                 → 置位 bit {1, 2, <b>21</b>}</code></pre>
+
+<table class="bits">
+<thead><tr><th>差异位</th><th>含义</th><th>是否语义位</th></tr></thead>
+<tbody>
+<tr><td>bit 1–2</td><td>size 操作数的寄存器号字段：<code>0x0b</code>（UR11）→ <code>0x0d</code>（UR13）</td><td>否，寄存器分配副作用</td></tr>
+<tr><td class="f-tag">bit 21</td><td><b><code>.COUNTED</code> 标志位</b></td><td class="t-ok">是，唯一的语义差异</td></tr>
+</tbody>
+</table>
+
+<div class="box c">
+<p><span class="lab meas">bit 21 是唯一语义差异</span>四个样本一致：带 <code>.counted::bytes</code> 时 word1 的 bit 21 恒为 1，不带时恒为 0。<b>没有任何位域用来指示 counter 地址寄存器</b> —— 这就把 §5.6.3 的结论逼成唯一可能：counter 地址只能靠<b>紧邻 destination 的连续 UR 位置</b>隐式传递，指令编码本身不描述它。</p>
+</div>
+
+<h4>11.5.2 对照实验 A：<code>.multimem</code> 完全不进 opcode</h4>
+
+<p>把 <code>try_red_add_f32_counted_bytes</code> 与 <code>try_red_multimem_add_f32_counted_bytes</code> 的 <code>UBLK*</code> 编码逐字节比对：</p>
+
+<pre class="out"><code>try_red_add_f32_counted_bytes           : 0x00000008040073bb / 0x0045d800082b440d
+try_red_multimem_add_f32_counted_bytes  : 0x00000008040073bb / 0x0045d800082b440d
+                                          <b>→ 完全相同（byte-identical）</b></code></pre>
+
+<p><span class="lab ana">解读</span>unicast 与 multicast 的区别<b>整个装在 <code>le_id</code> 里</b>，指令编码零差异。这与 §7 的推断一致（multicast 由 MULTICAST 属性的 LE 承载），并进一步说明 PTX 的 <code>.multimem</code> 修饰符是<b>纯编译期类型检查</b>：它约束你只能把这条指令配给 multicast LE，但在指令层面<b>没有任何强制手段</b>。把 unicast le_id 传给 <code>.multimem</code> 变体，编译器不会拦、SASS 也看不出来。</p>
+
+<h4>11.5.3 对照实验 B：counted 的成本恒为 +2 条指令</h4>
+
+<p>剥掉 padding NOP 后统计助记符数（<code>sed</code> 提取 + <code>diff</code>，避免被 NOP 填充误导 —— 直接数 <code>/*addr*/</code> 行会得到"48 vs 48"这种毫无意义的结果）：</p>
+
+<table>
+<thead><tr><th style="width:34%">对照组</th><th>plain</th><th>counted</th><th>差</th><th style="width:34%">新增的两条</th></tr></thead>
+<tbody>
+<tr><td><code>try_red_add_f32</code></td><td>34</td><td>36</td><td class="t-ok">+2</td><td rowspan="4"><code>LDCU.64</code>（取 <code>dst_counter_off</code>）<br><code>UIADD3.64</code>（算 counter 地址）</td></tr>
+<tr><td><code>try_red_multimem_add_f32</code></td><td>34</td><td>36</td><td class="t-ok">+2</td></tr>
+<tr><td><code>try_put</code></td><td colspan="2" rowspan="2">未单独统计总条数，只做了助记符差分</td><td class="t-ok">+2</td></tr>
+<tr><td><code>try_put_multimem</code></td><td class="t-ok">+2</td></tr>
+</tbody>
+</table>
+
+<p><span class="lab meas">四组一致</span>无论 put/red、unicast/multicast，counted 的代价都恒为<b>两条纯标量指令</b>，且都在发起之前执行。<b>没有任何一组出现第二条 <code>UBLK*</code>、<code>ATOM</code>、<code>RED</code> 或 <code>ATOMG</code></b> —— 这是"累加不发生在 SM 侧"最直接的实测证据。</p>
+
+<h4>11.5.4 对照实验 C：mbarrier 路径逐位不变</h4>
+
+<pre class="out"><code>plain   : SYNCS.ARRIVE.TRANS64.RED.A0TX RZ, [UR4], R0 ;   <i>// R0 = byte_count &gt;&gt; 4</i>
+counted : SYNCS.ARRIVE.TRANS64.RED.A0TX RZ, [UR4], R0 ;   <i>// R0 = byte_count &gt;&gt; 4，<b>编码相同</b></i></code></pre>
+
+<p><span class="lab meas">实测</span>expect-tx 的指令与操作数在两版之间<b>完全一致</b>。因此 counted counter <b>不向 <code>complete_tx</code> 贡献任何事务数</b>，两条完成通道彼此独立（对照表见 §5.6.5）。顺带印证了 §5.5 的 16 MB 上限<b>不受 counted 影响</b>。</p>
+
+<h4>11.5.5 与 §11.2 / §11.4.2 的交汇，以及缺口 G6 的部分关闭</h4>
+
+<table>
+<thead><tr><th style="width:24%">本节结论</th><th>与其它实测的交汇</th></tr></thead>
+<tbody>
+<tr><td>counter 与 data 共用同一条 <code>ULEA</code> base</td><td>§11.4.2 已独立证明该 base = <code>2<sup>53</sup> + le_id·2<sup>42</sup></code>。counter 必须在<b>同一个 LE 的同一个 window</b> 内 —— 与 PTX 只暴露一个 <code>dstLeId</code>、且要求 counter 落在 window 边界内完全吻合</td></tr>
+<tr><td>counted 需要 LE 带 <code>COUNTED_OPS</code></td><td>§11.2 实测：<code>UNICAST + COUNTED_OPS</code> 的 <code>maxSize</code> = <b>2<sup>38</sup></b>，比纯 UNICAST 的 2<sup>42</sup> <b>小 16×</b>。<span class="lab warn">不过度解读</span>16× 这个比值与 16B 完成粒度数值上巧合，但<b>无任何证据</b>表明二者有因果关系，此处只记录事实</td></tr>
+<tr><td>缺口 <b>G6</b>（counted LE 的设计未知）</td><td class="t-mid"><b>部分关闭</b>：device 侧指令 ABI（三元组 handle、bit 21、隐式 UR 四元组、proxy 侧累加）已查清并有实测支撑；<b>仍未知</b>的是 NCCL host 侧将如何创建/管理 counted LE —— master 里相关提交尚未出现</td></tr>
+</tbody>
+</table>
+
+<h3>11.6 对本报告其它章节的修正</h3>
+
+<p>两条早期基于纯推断的说法被实测推翻，在此更正：</p>
+<ul>
+<li><b>「aperture 可能不存在、CFT 地址不进 GMMU VA 域」</b>——错。aperture 真实存在于用户态进程 VA 空间（<code>/proc/self/maps</code> 可见），只是由<b>闭源用户态驱动</b>建立，因此在 <code>open-gpu-kernel-modules</code> 源码里查不到任何痕迹。「源码里没有」不等于「不存在」。</li>
+<li><b>「UVA 被 CPU VA 宽度 TASK_SIZE ≈ 2<sup>47</sup> 夹住」</b>——错。本机是 5-level paging，<code>mmap MAP_FIXED_NOREPLACE</code> 到 2<sup>54</sup> 都成功、2<sup>56</sup> 才 <code>ENOMEM</code>；高位 VA 完全可映射可访问。普通 CUDA 指针落在 <code>0x7f..</code>（bit 46）是 glibc/driver 的 mmap 布局习惯，不是地址位宽限制。</li>
+</ul>
+
+<h3>11.7 实验源码</h3>
+
+<p>本章全部数据由单个 host 探针产生：<span class="fp">fabric_instruction/fabric_le_va_limits_probe_host.cu</span>（~930 行）。核心探测函数逐字摘录如下。</p>
+
+<h4>11.7.1 aperture 探针：<code>hint_honored</code> + 逐 slot 扫描</h4>
+
+<pre><code>// hint 是否被 driver 采纳。1=honored, 0=refused(给了别的地址), -1=调用失败
+static int hint_honored(uint64_t hint, size_t gran) {
+  CUdeviceptr va = 0;
+  CUresult r = cuMemAddressReserve(&amp;va, gran, gran, (CUdeviceptr)hint, 0);
+  if (r != CUDA_SUCCESS) return -1;
+  int honored = ((uint64_t)va == hint) ? 1 : 0;
+  cuMemAddressFree(va, gran);
+  return honored;
+}
+
+static void section_aperture_scan(const LeApi& api) {
+  const uint64_t kTag    = 1ull &lt;&lt; 53;   // SASS ULEA 里的 0x200000 &lt;&lt; 32
+  const uint64_t kStride = 1ull &lt;&lt; 42;   // = unicast GetLimits maxSize = GB100 mapslot 粒度
+  const size_t   gran    = 2ull &lt;&lt; 20;
+  dump_high_maps("after CUDA context creation");
+
+  // 逐 mapslot 扫，找 aperture 上界
+  int first_honored = -1;
+  std::string bitmap;
+  for (int k = 0; k &lt; 320; ++k) {
+    int h = hint_honored(kTag + (uint64_t)k * kStride, gran);
+    bitmap.push_back(h == 1 ? 'H' : (h == 0 ? 'R' : 'E'));
+    if (h == 1 && first_honored &lt; 0) first_honored = k;
+  }
+  // first_honored == 256  =>  aperture = [2^53, 2^53 + 256*2^42) = 2^50
+}</code></pre>
+
+<h4>11.7.2 <code>/proc/self/maps</code> 高位区间 dump</h4>
+
+<pre><code>static void dump_high_maps(const char* tag) {
+  FILE* f = std::fopen("/proc/self/maps", "r");
+  if (!f) return;
+  char line[1024];
+  while (std::fgets(line, sizeof(line), f)) {
+    unsigned long long s = 0;
+    if (std::sscanf(line, "%llx", &amp;s) == 1 && s &gt;= (1ull &lt;&lt; 47))
+      std::printf("[maps] %s", line);   // 只打印起始地址 >= 2^47 的行
+  }
+  std::fclose(f);
+}</code></pre>
+
+<h4>11.7.3 高位 VA 真实 map + GPU 读写校验（子进程隔离）</h4>
+
+<p>用 <code>fork</code>+<code>execv</code> 起 worker，即使某地址触发 Xid 也只打死子进程。reserve → <code>cuMemCreate</code> → <code>cuMemMap</code> → <code>cuMemSetAccess</code> → kernel 写 → D2H 校验，任一步失败返回不同退出码。</p>
+
+<pre><code>const uint64_t magic = 0x5a5a0000c0ffeeull ^ target;
+stamp_kernel&lt;&lt;&lt;1, 1&gt;&gt;&gt;((uint64_t*)va, magic);
+cudaDeviceSynchronize();
+uint64_t hostbuf[2] = {0, 0};
+cudaMemcpy(hostbuf, (void*)va, sizeof(hostbuf), cudaMemcpyDeviceToHost);
+if (hostbuf[0] == magic && hostbuf[1] == ~magic)
+  std::printf("[map-test] 0x%016" PRIx64 " : ***  FULLY USABLE  ***\n", target);</code></pre>
+
+<h4>11.7.4 <code>GetLimits</code> sweep 与 le_id 耗尽</h4>
+
+<pre><code>// UNICAST：扫遍 size，看 maxSize 是否恒为 2^42
+CUlogicalEndpointProp p{};
+p.type = CU_LOGICAL_ENDPOINT_TYPE_UNICAST;
+p.unicast.device = g_probe_device;
+p.ipcHandleTypes = CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC;
+uint64_t bindAlignment = 0, maxSize = 0;
+api.getLimits(&amp;bindAlignment, &amp;maxSize, &amp;p);   // -> 0x200000, 0x40000000000
+
+// le_id：指数探测单次最大 count，再贪心耗尽整个命名空间
+for (int lg = 0; lg &lt;= 26; ++lg) {
+  CUlogicalEndpointId id = 0;
+  if (api.reserve(&amp;id, 1u &lt;&lt; lg) == CUDA_SUCCESS) api.release(id, 1u &lt;&lt; lg);
+  else break;   // count=512 (2^9) 处 FAIL CUDA_ERROR_INVALID_VALUE
+}</code></pre>
+
+<h4>11.7.5 完整源码：<code>fabric_le_va_limits_probe_host.cu</code>（逐字，927 行）</h4>
+
+<p>上面 4 段为核心探测函数的摘录；下面是产生 §11 全部数据的<b>完整单文件</b>源码，逐字收录、未删减，可直接 <code>nvcc -std=c++17 -arch=sm_100a -lcuda</code> 编译。点击展开：</p>
+
+<details class="srcfull">
+<summary><span class="fp">fabric_instruction/fabric_le_va_limits_probe_host.cu</span> · 927 行 · 点击展开/收起完整源码</summary>
+<pre><code>// B200 实测探针：回答三个问题
+//
+//   Q1  cuLogicalEndpointGetLimits 的真实 bindAlignment / maxSize 是多少？
+//       如果 maxSize == 2^42，则直接印证 le_id 步长 == Blackwell NVLink mapslot 粒度
+//       （open-gpu-kernel-modules: knvlinkValidateFabricBaseAddress_GB100 要求 4 TiB 对齐）。
+//
+//   Q2  le_id 命名空间到底有多大？撞 11 bit（2048，对应 2^53 进位处）还是 12 bit
+//       （4096，NV2080_CTRL_NVLINK_MAX_REMAP_TABLE_ENTRIES_V2）？
+//       这一个数据点就能判定 SASS 里的 0x200000（global bit 53）是「固定 tag」还是「aperture 基址」。
+//
+//   Q3  cuMemAddressReserve / cudaMalloc 拿到的 VA 是否真的全在低端（&lt; 2^47）？
+//       更关键：高位 VA（尤其 2^53）能不能被真实 map 并访问？
+//       如果能，则「2^53 被 driver 划为 CFT aperture、不参与普通 VA 分配」这一说法为假。
+//
+// 用法：
+//   ./probe                       完整跑（map 测试用子进程隔离，避免 Xid 打死主进程）
+//   ./probe --map-test 0x...      单地址 map+kernel 写入测试（内部 worker 模式）
+//   ./probe --skip-map-tests      只跑 limits / le_id / VA 观测
+
+#include &lt;cuda.h&gt;
+#include &lt;cuda_runtime.h&gt;
+
+#include &lt;sys/mman.h&gt;
+#include &lt;sys/wait.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;cerrno&gt;
+#include &lt;cinttypes&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstdio&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+#ifndef CU_IPC_HANDLE_SIZE
+#define CU_IPC_HANDLE_SIZE 64
+#endif
+#ifndef CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_SUPPORTED
+#define CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_SUPPORTED (CUdevice_attribute)153
+#endif
+#ifndef CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_MULTICAST_SUPPORTED
+#define CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_MULTICAST_SUPPORTED (CUdevice_attribute)154
+#endif
+#ifndef CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_COUNTED_OPS_SUPPORTED
+#define CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_COUNTED_OPS_SUPPORTED (CUdevice_attribute)155
+#endif
+#ifndef CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_ACCESS_ON_OWNER_DEVICE_SUPPORTED
+#define CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_ACCESS_ON_OWNER_DEVICE_SUPPORTED (CUdevice_attribute)156
+#endif
+
+#if !defined(CUDART_VERSION) || CUDART_VERSION &lt; 13030
+typedef uint32_t CUlogicalEndpointId;
+typedef enum CUlogicalEndpointType_enum {
+  CU_LOGICAL_ENDPOINT_TYPE_INVALID,
+  CU_LOGICAL_ENDPOINT_TYPE_UNICAST,
+  CU_LOGICAL_ENDPOINT_TYPE_MULTICAST
+} CUlogicalEndpointType;
+typedef enum CUlogicalEndpointIpcHandleType_enum {
+  CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_NONE,
+  CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC
+} CUlogicalEndpointIpcHandleType;
+typedef enum CUlogicalEndpointFlag_enum {
+  CU_LOGICAL_ENDPOINT_FLAG_NONE = 0x0,
+  CU_LOGICAL_ENDPOINT_FLAG_COUNTED_OPS = 0x1
+} CUlogicalEndpointFlag;
+typedef struct CUlogicalEndpointProp_struct {
+  CUlogicalEndpointType type;
+  union {
+    struct { CUdevice device; } unicast;
+    struct { unsigned int numDevices; } multicast;
+  };
+  unsigned long long size;
+  unsigned int ipcHandleTypes;
+  unsigned int flags;
+} CUlogicalEndpointProp;
+#endif
+
+using PFN_leIdReserve = CUresult(CUDAAPI*)(CUlogicalEndpointId*, uint32_t);
+using PFN_leIdRelease = CUresult(CUDAAPI*)(CUlogicalEndpointId, uint32_t);
+using PFN_leGetLimits = CUresult(CUDAAPI*)(uint64_t*, uint64_t*, const CUlogicalEndpointProp*);
+
+struct LeApi {
+  PFN_leIdReserve reserve = nullptr;
+  PFN_leIdRelease release = nullptr;
+  PFN_leGetLimits getLimits = nullptr;
+};
+
+static const char* cu_err(CUresult r) {
+  const char* n = nullptr;
+  cuGetErrorName(r, &amp;n);
+  return n ? n : "?";
+}
+
+#define CU_OR_RETURN(call)                                                     \
+  do {                                                                         \
+    CUresult _r = (call);                                                      \
+    if (_r != CUDA_SUCCESS) {                                                  \
+      std::fprintf(stderr, "[fatal] %s:%d %s -&gt; %s (%d)\n", __FILE__,          \
+                   __LINE__, #call, cu_err(_r), (int)_r);                      \
+      return 1;                                                                \
+    }                                                                          \
+  } while (0)
+
+// 用 Runtime API 建立 primary context。本机 GPU0 处于 busy/unavailable 状态，
+// 因此逐个尝试，选第一块真正可用的卡。返回选中的 device ordinal，失败返回 -1。
+static int g_probe_device = -1;
+
+static int ensure_primary_context() {
+  if (g_probe_device &gt;= 0) return 0;
+  int count = 0;
+  if (cudaGetDeviceCount(&amp;count) != cudaSuccess || count &lt;= 0) {
+    std::fprintf(stderr, "[fatal] cudaGetDeviceCount failed\n");
+    return 1;
+  }
+  for (int d = 0; d &lt; count; ++d) {
+    if (cudaSetDevice(d) != cudaSuccess) { cudaGetLastError(); continue; }
+    if (cudaFree(nullptr) != cudaSuccess) { cudaGetLastError(); continue; }
+    CUcontext cur = nullptr;
+    if (cuCtxGetCurrent(&amp;cur) != CUDA_SUCCESS || cur == nullptr) continue;
+    g_probe_device = d;
+    std::printf("[host] using GPU%d as probe device\n", d);
+    return 0;
+  }
+  std::fprintf(stderr, "[fatal] no usable CUDA device (all busy/unavailable)\n");
+  return 1;
+}
+
+static int load_le_api(LeApi&amp; api) {
+  struct { const char* name; void** dst; } syms[] = {
+      {"cuLogicalEndpointIdReserve", (void**)&amp;api.reserve},
+      {"cuLogicalEndpointIdRelease", (void**)&amp;api.release},
+      {"cuLogicalEndpointGetLimits", (void**)&amp;api.getLimits},
+  };
+  for (auto&amp; s : syms) {
+    CUresult r = cuGetProcAddress(s.name, s.dst, 13030, 0, nullptr);
+    if (r != CUDA_SUCCESS || *s.dst == nullptr) {
+      std::fprintf(stderr, "[host] symbol %s unavailable: %s (%d)\n", s.name,
+                   cu_err(r), (int)r);
+      return 1;
+    }
+  }
+  return 0;
+}
+
+// 把字节数印成人类可读的 2^n / GiB 形式，方便对齐 open driver 里的 NVBIT64(n)。
+static std::string pretty_size(uint64_t v) {
+  char buf[128];
+  if (v == 0) return "0";
+  int lg = -1;
+  if ((v &amp; (v - 1)) == 0) {
+    lg = 0;
+    while ((1ull &lt;&lt; lg) != v) ++lg;
+  }
+  const char* unit = "B";
+  double d = (double)v;
+  if (v &gt;= (1ull &lt;&lt; 40)) { d /= (double)(1ull &lt;&lt; 40); unit = "TiB"; }
+  else if (v &gt;= (1ull &lt;&lt; 30)) { d /= (double)(1ull &lt;&lt; 30); unit = "GiB"; }
+  else if (v &gt;= (1ull &lt;&lt; 20)) { d /= (double)(1ull &lt;&lt; 20); unit = "MiB"; }
+  else if (v &gt;= (1ull &lt;&lt; 10)) { d /= (double)(1ull &lt;&lt; 10); unit = "KiB"; }
+  if (lg &gt;= 0)
+    std::snprintf(buf, sizeof(buf), "%.3g %s = 2^%d", d, unit, lg);
+  else
+    std::snprintf(buf, sizeof(buf), "%.3g %s", d, unit);
+  return std::string(buf);
+}
+
+// ─────────── Section 0: 纯 Linux mmap 对照（不涉及 CUDA/NVIDIA driver） ──────
+//
+// 目的：区分两种解释
+//   (i)  高位 VA 拿不到，是 Linux 进程 VA 空间本身的限制（TASK_SIZE / 4-level paging）
+//   (ii) 高位 VA 拿不到，是 NVIDIA driver 把这段划走了
+// 如果 mmap(MAP_FIXED_NOREPLACE) 在 2^53 处也失败，那就是 (i)，与 NVIDIA 无关。
+
+static void section_mmap_control() {
+  std::printf("\n===== Section 0: 纯 Linux mmap 对照 (无 CUDA) =====\n");
+#if defined(__x86_64__) || defined(__aarch64__)
+  std::printf("[mmap] sysconf(_SC_PAGESIZE)=%ld\n", sysconf(_SC_PAGESIZE));
+#endif
+  const int bits[] = {40, 44, 46, 47, 48, 52, 53, 54, 56, 57};
+  for (int lg : bits) {
+    void* hint = (void*)(uintptr_t)(1ull &lt;&lt; lg);
+    void* p = mmap(hint, 4096, PROT_NONE,
+                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
+    if (p == MAP_FAILED) {
+      std::printf("[mmap] FIXED_NOREPLACE at 2^%-2d = 0x%014llx -&gt; FAIL errno=%d (%s)\n", lg,
+                  (unsigned long long)(uintptr_t)hint, errno, std::strerror(errno));
+    } else {
+      std::printf("[mmap] FIXED_NOREPLACE at 2^%-2d = 0x%014llx -&gt; OK got 0x%014llx\n", lg,
+                  (unsigned long long)(uintptr_t)hint, (unsigned long long)(uintptr_t)p);
+      munmap(p, 4096);
+    }
+  }
+  std::printf("[mmap] &gt;&gt;&gt; 若 2^47 及以上全部 FAIL，则高位 VA 不可用是 Linux TASK_SIZE 的性质，\n");
+  std::printf("[mmap]     与 NVIDIA driver 是否划 aperture 无关。\n");
+}
+
+// ───────────────────────────── Section 1: device attributes ────────────────
+
+static void section_attributes(int device_count) {
+  std::printf("\n===== Section 1: logical endpoint device attributes =====\n");
+  struct { CUdevice_attribute attr; const char* name; } attrs[] = {
+      {CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_SUPPORTED, "UNICAST_SUPPORTED (153)"},
+      {CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_MULTICAST_SUPPORTED, "MULTICAST_SUPPORTED (154)"},
+      {CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_COUNTED_OPS_SUPPORTED, "COUNTED_OPS_SUPPORTED (155)"},
+      {CU_DEVICE_ATTRIBUTE_LOGICAL_ENDPOINT_UNICAST_ACCESS_ON_OWNER_DEVICE_SUPPORTED,
+       "UNICAST_ACCESS_ON_OWNER_DEVICE_SUPPORTED (156)"},
+      {CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED, "HANDLE_TYPE_FABRIC_SUPPORTED (128)"},
+  };
+  for (int dev = 0; dev &lt; device_count; ++dev) {
+    CUdevice d{};
+    if (cuDeviceGet(&amp;d, dev) != CUDA_SUCCESS) continue;
+    std::printf("[attr] GPU%d:", dev);
+    for (auto&amp; a : attrs) {
+      int v = -1;
+      CUresult r = cuDeviceGetAttribute(&amp;v, a.attr, d);
+      std::printf("  %s=%s", a.name, r == CUDA_SUCCESS ? std::to_string(v).c_str() : "n/a");
+    }
+    std::printf("\n");
+    if (dev == 0) continue;  // 8 卡同型号，其余只打一行足够
+  }
+}
+
+// ───────────────────────────── Section 2: GetLimits sweep ──────────────────
+
+static void one_limits_probe(const LeApi&amp; api, const char* label,
+                             const CUlogicalEndpointProp&amp; prop) {
+  uint64_t bindAlignment = 0xdeadbeefull, maxSize = 0xdeadbeefull;
+  CUresult r = api.getLimits(&amp;bindAlignment, &amp;maxSize, &amp;prop);
+  if (r != CUDA_SUCCESS) {
+    std::printf("[limits] %-58s -&gt; %s (%d)\n", label, cu_err(r), (int)r);
+    return;
+  }
+  std::printf("[limits] %-58s -&gt; bindAlignment=0x%016" PRIx64 " (%s)  maxSize=0x%016" PRIx64 " (%s)\n",
+              label, bindAlignment, pretty_size(bindAlignment).c_str(), maxSize,
+              pretty_size(maxSize).c_str());
+}
+
+static void section_get_limits(const LeApi&amp; api, int device_count) {
+  std::printf("\n===== Section 2: cuLogicalEndpointGetLimits sweep =====\n");
+  std::printf("关注点：maxSize 是否 == 2^42 (4 TiB, Blackwell NVLink mapslot 粒度)\n\n");
+
+  const uint64_t sizes[] = {
+      4096ull, 2ull &lt;&lt; 20, 512ull &lt;&lt; 20, 1ull &lt;&lt; 30,
+      1ull &lt;&lt; 35, 1ull &lt;&lt; 38, 1ull &lt;&lt; 42, 1ull &lt;&lt; 45, 0ull,
+  };
+
+  for (uint64_t sz : sizes) {
+    CUlogicalEndpointProp p{};
+    p.type = CU_LOGICAL_ENDPOINT_TYPE_UNICAST;
+    p.unicast.device = g_probe_device;
+    p.size = sz;
+    p.ipcHandleTypes = CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC;
+    p.flags = CU_LOGICAL_ENDPOINT_FLAG_NONE;
+    char label[128];
+    std::snprintf(label, sizeof(label), "UNICAST dev0 size=0x%" PRIx64 " ipc=FABRIC flags=0", sz);
+    one_limits_probe(api, label, p);
+  }
+
+  {
+    CUlogicalEndpointProp p{};
+    p.type = CU_LOGICAL_ENDPOINT_TYPE_UNICAST;
+    p.unicast.device = g_probe_device;
+    p.size = 2ull &lt;&lt; 20;
+    p.ipcHandleTypes = CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_NONE;
+    p.flags = CU_LOGICAL_ENDPOINT_FLAG_NONE;
+    one_limits_probe(api, "UNICAST dev0 size=2MiB ipc=NONE flags=0", p);
+
+    p.ipcHandleTypes = CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC;
+    p.flags = CU_LOGICAL_ENDPOINT_FLAG_COUNTED_OPS;
+    one_limits_probe(api, "UNICAST dev0 size=2MiB ipc=FABRIC flags=COUNTED_OPS", p);
+  }
+
+  for (unsigned nd : {2u, 3u, 4u, 8u, 16u, 64u}) {
+    if ((int)nd &gt; device_count &amp;&amp; nd &gt; 8u) {
+      // 仍然试：GetLimits 是纯查询，不需要真的有那么多卡
+    }
+    for (uint64_t sz : {2ull &lt;&lt; 20, 1ull &lt;&lt; 38, 1ull &lt;&lt; 42}) {
+      CUlogicalEndpointProp p{};
+      p.type = CU_LOGICAL_ENDPOINT_TYPE_MULTICAST;
+      p.multicast.numDevices = nd;
+      p.size = sz;
+      p.ipcHandleTypes = CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC;
+      p.flags = CU_LOGICAL_ENDPOINT_FLAG_NONE;
+      char label[128];
+      std::snprintf(label, sizeof(label), "MULTICAST numDevices=%u size=0x%" PRIx64 " ipc=FABRIC", nd, sz);
+      one_limits_probe(api, label, p);
+    }
+  }
+}
+
+// ───────────────────────────── Section 3: le_id namespace ──────────────────
+
+struct LeRange {
+  CUlogicalEndpointId base;
+  uint32_t count;
+};
+
+static void section_le_id_space(const LeApi&amp; api) {
+  std::printf("\n===== Section 3: le_id namespace =====\n");
+  std::printf("关注点：总容量是 2048 (11 bit, 2^53 进位处) 还是 4096 (remap table V2)\n\n");
+
+  // 3a. 连续 count=1 预留，观察 id 分配模式与步长
+  {
+    std::vector&lt;LeRange&gt; got;
+    for (int i = 0; i &lt; 40; ++i) {
+      CUlogicalEndpointId id = 0;
+      CUresult r = api.reserve(&amp;id, 1);
+      if (r != CUDA_SUCCESS) {
+        std::printf("[le_id] sequential reserve(count=1) #%d failed: %s (%d)\n", i, cu_err(r), (int)r);
+        break;
+      }
+      got.push_back({id, 1});
+    }
+    std::printf("[le_id] 40x reserve(count=1) -&gt;");
+    for (size_t i = 0; i &lt; got.size(); ++i) std::printf(" 0x%x", got[i].base);
+    std::printf("\n");
+    for (auto&amp; g : got) api.release(g.base, g.count);
+    std::printf("[le_id] released %zu single ids\n", got.size());
+  }
+
+  // 3b. 单次最大 count（指数探测 + 二分收敛）
+  uint32_t max_single = 0;
+  {
+    uint32_t lo = 0, hi = 0;
+    for (int lg = 0; lg &lt;= 26; ++lg) {
+      uint32_t cnt = 1u &lt;&lt; lg;
+      CUlogicalEndpointId id = 0;
+      CUresult r = api.reserve(&amp;id, cnt);
+      if (r == CUDA_SUCCESS) {
+        std::printf("[le_id] reserve(count=2^%-2d = %-9u) OK   base=0x%x\n", lg, cnt, id);
+        api.release(id, cnt);
+        lo = cnt;
+      } else {
+        std::printf("[le_id] reserve(count=2^%-2d = %-9u) FAIL %s (%d)\n", lg, cnt, cu_err(r), (int)r);
+        hi = cnt;
+        break;
+      }
+    }
+    if (hi == 0) {
+      std::printf("[le_id] 指数探测未撞到上限（到 2^26 仍成功），放弃二分\n");
+      max_single = lo;
+    } else {
+      // (lo, hi) 之间二分，找最大成功值
+      uint32_t a = lo, b = hi;
+      while (b - a &gt; 1) {
+        uint32_t mid = a + (b - a) / 2;
+        CUlogicalEndpointId id = 0;
+        if (api.reserve(&amp;id, mid) == CUDA_SUCCESS) {
+          api.release(id, mid);
+          a = mid;
+        } else {
+          b = mid;
+        }
+      }
+      max_single = a;
+      std::printf("[le_id] &gt;&gt;&gt; 单次最大 reserve count = %u (0x%x)  %s\n", max_single, max_single,
+                  pretty_size(max_single).c_str());
+    }
+  }
+
+  // 3c. 贪心耗尽整个命名空间，统计总容量与 id 数值范围
+  {
+    std::vector&lt;LeRange&gt; held;
+    uint64_t total = 0;
+    CUlogicalEndpointId min_id = 0xffffffffu, max_id = 0;
+    uint32_t chunk = max_single ? max_single : 1u;
+    const size_t kMaxRecords = 200000;
+
+    while (chunk &gt;= 1) {
+      CUlogicalEndpointId id = 0;
+      CUresult r = api.reserve(&amp;id, chunk);
+      if (r == CUDA_SUCCESS) {
+        held.push_back({id, chunk});
+        total += chunk;
+        if (id &lt; min_id) min_id = id;
+        if (id + chunk - 1 &gt; max_id) max_id = id + chunk - 1;
+        if (held.size() &gt;= kMaxRecords) {
+          std::printf("[le_id] 记录数达上限 %zu，停止耗尽\n", kMaxRecords);
+          break;
+        }
+      } else {
+        if (chunk == 1) break;
+        chunk &gt;&gt;= 1;
+      }
+    }
+
+    std::printf("[le_id] &gt;&gt;&gt; 耗尽结果: 总共预留 %" PRIu64 " 个 le_id (%s), 分 %zu 段\n", total,
+                pretty_size(total).c_str(), held.size());
+    std::printf("[le_id] &gt;&gt;&gt; id 数值范围: [0x%x, 0x%x] = [%u, %u]\n", min_id, max_id, min_id, max_id);
+    std::printf("[le_id] &gt;&gt;&gt; 需要的位宽: max_id 需要 %d bit\n",
+                max_id == 0 ? 0 : (64 - __builtin_clzll((unsigned long long)max_id)));
+    std::printf("[le_id]     对照: 2048 =&gt; 11 bit (0x200000&lt;&lt;32 进位处) | 4096 =&gt; 12 bit (REMAP_TABLE_V2)\n");
+
+    size_t show = held.size() &lt; 8 ? held.size() : 8;
+    std::printf("[le_id] 前 %zu 段:", show);
+    for (size_t i = 0; i &lt; show; ++i) std::printf(" [0x%x,+%u]", held[i].base, held[i].count);
+    std::printf("\n");
+    if (held.size() &gt; 8) {
+      std::printf("[le_id] 后 8 段:");
+      for (size_t i = held.size() - 8; i &lt; held.size(); ++i)
+        std::printf(" [0x%x,+%u]", held[i].base, held[i].count);
+      std::printf("\n");
+    }
+
+    for (auto&amp; h : held) api.release(h.base, h.count);
+    std::printf("[le_id] 全部释放完成\n");
+  }
+}
+
+// ───────────────────────────── Section 4: VA observation ───────────────────
+
+static void section_va_observation() {
+  std::printf("\n===== Section 4: cudaMalloc / cuMemAddressReserve 实际 VA =====\n");
+  std::printf("关注点：返回的 VA 是否全部 &lt; 2^47 (x86-64 4-level TASK_SIZE)\n\n");
+
+  uint64_t max_seen = 0;
+  const size_t malloc_sizes[] = {4096, 1u &lt;&lt; 20, 256u &lt;&lt; 20, 1u &lt;&lt; 30};
+  for (size_t sz : malloc_sizes) {
+    void* p = nullptr;
+    cudaError_t e = cudaMalloc(&amp;p, sz);
+    if (e != cudaSuccess) {
+      std::printf("[va] cudaMalloc(%-12zu) -&gt; %s\n", sz, cudaGetErrorString(e));
+      continue;
+    }
+    uint64_t v = (uint64_t)p;
+    if (v &gt; max_seen) max_seen = v;
+    std::printf("[va] cudaMalloc(%-12zu) -&gt; 0x%016" PRIx64 "  highest set bit = %d\n", sz, v,
+                63 - __builtin_clzll(v));
+    cudaFree(p);
+  }
+
+  // 无 hint 的 cuMemAddressReserve，看 driver 自己挑哪一段 VA
+  {
+    size_t gran = 0;
+    CUmemAllocationProp prop{};
+    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.location.id = g_probe_device;
+    cuMemGetAllocationGranularity(&amp;gran, &amp;prop, CU_MEM_ALLOC_GRANULARITY_RECOMMENDED);
+    std::printf("[va] cuMemGetAllocationGranularity(RECOMMENDED) = 0x%zx (%s)\n", gran,
+                pretty_size(gran).c_str());
+    if (gran == 0) gran = 2ull &lt;&lt; 20;
+
+    std::vector&lt;CUdeviceptr&gt; reserved;
+    for (int i = 0; i &lt; 6; ++i) {
+      CUdeviceptr va = 0;
+      CUresult r = cuMemAddressReserve(&amp;va, gran, gran, 0, 0);
+      if (r != CUDA_SUCCESS) {
+        std::printf("[va] cuMemAddressReserve(no hint) #%d -&gt; %s\n", i, cu_err(r));
+        break;
+      }
+      if ((uint64_t)va &gt; max_seen) max_seen = (uint64_t)va;
+      std::printf("[va] cuMemAddressReserve(no hint) #%d -&gt; 0x%016llx  highest set bit = %d\n", i,
+                  (unsigned long long)va, 63 - __builtin_clzll((unsigned long long)va));
+      reserved.push_back(va);
+    }
+    for (auto va : reserved) cuMemAddressFree(va, gran);
+
+    // 单次能预留多大的连续 VA range —— 间接看到 VA 空间宽度
+    for (int lg = 30; lg &lt;= 57; ++lg) {
+      uint64_t sz = 1ull &lt;&lt; lg;
+      CUdeviceptr va = 0;
+      CUresult r = cuMemAddressReserve(&amp;va, sz, 0, 0, 0);
+      if (r == CUDA_SUCCESS) {
+        std::printf("[va] reserve range 2^%-2d OK   -&gt; 0x%016llx\n", lg, (unsigned long long)va);
+        cuMemAddressFree(va, sz);
+      } else {
+        std::printf("[va] reserve range 2^%-2d FAIL %s (%d)   &lt;== 连续 VA 上限在此附近\n", lg,
+                    cu_err(r), (int)r);
+        break;
+      }
+    }
+
+    // 带 fixed hint 的探测。先做一次「对照实验」确认 hint 到底会不会被采纳：
+    // 用 driver 刚刚自己返回过的那个地址当 hint。如果连这个都不被采纳，
+    // 说明 cuMemAddressReserve 根本忽略 addr 参数，后面的高位 hint 结果就没有判定力。
+    std::printf("\n[va] --- hint 有效性对照 ---\n");
+    {
+      CUdeviceptr probe = 0;
+      if (cuMemAddressReserve(&amp;probe, gran, gran, 0, 0) == CUDA_SUCCESS) {
+        uint64_t known_good = (uint64_t)probe;
+        cuMemAddressFree(probe, gran);
+        CUdeviceptr again = 0;
+        CUresult rr = cuMemAddressReserve(&amp;again, gran, gran, (CUdeviceptr)known_good, 0);
+        if (rr == CUDA_SUCCESS) {
+          std::printf("[va] hint = 刚释放的 0x%016" PRIx64 " -&gt; got 0x%016llx  %s\n", known_good,
+                      (unsigned long long)again,
+                      (uint64_t)again == known_good ? "HINT HONORED =&gt; hint 机制有效，下面的结果可判定"
+                                                    : "hint ignored =&gt; addr 参数被忽略，下面结果无判定力");
+          cuMemAddressFree(again, gran);
+        } else {
+          std::printf("[va] hint 对照实验失败: %s\n", cu_err(rr));
+        }
+      }
+    }
+
+    std::printf("\n[va] --- fixed-hint 探测 (hint 被接受 =&gt; 该地址可用于普通 VA 分配) ---\n");
+    const int hint_bits[] = {40, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56};
+    for (int lg : hint_bits) {
+      CUdeviceptr hint = (CUdeviceptr)(1ull &lt;&lt; lg);
+      CUdeviceptr va = 0;
+      CUresult r = cuMemAddressReserve(&amp;va, gran, gran, hint, 0);
+      if (r != CUDA_SUCCESS) {
+        std::printf("[va] hint 2^%-2d = 0x%016llx -&gt; FAIL %s (%d)\n", lg,
+                    (unsigned long long)hint, cu_err(r), (int)r);
+        continue;
+      }
+      std::printf("[va] hint 2^%-2d = 0x%016llx -&gt; got 0x%016llx  %s\n", lg,
+                  (unsigned long long)hint, (unsigned long long)va,
+                  va == hint ? "HINT HONORED" : "hint ignored (driver 另选地址)");
+      cuMemAddressFree(va, gran);
+    }
+
+    // 额外：le_id·2^42 + 2^53 形式的地址，直接对上 SASS 里的 ULEA 结果
+    std::printf("\n[va] --- CFT 推测地址形态 (le_id*2^42 + 2^53) hint 探测 ---\n");
+    for (uint32_t le : {0u, 1u, 101u, 2047u}) {
+      CUdeviceptr hint = (CUdeviceptr)((uint64_t)le * (1ull &lt;&lt; 42) + (1ull &lt;&lt; 53));
+      CUdeviceptr va = 0;
+      CUresult r = cuMemAddressReserve(&amp;va, gran, gran, hint, 0);
+      if (r != CUDA_SUCCESS) {
+        std::printf("[va] le_id=%-5u hint=0x%016llx -&gt; FAIL %s (%d)\n", le,
+                    (unsigned long long)hint, cu_err(r), (int)r);
+        continue;
+      }
+      std::printf("[va] le_id=%-5u hint=0x%016llx -&gt; got 0x%016llx  %s\n", le,
+                  (unsigned long long)hint, (unsigned long long)va,
+                  va == hint ? "HINT HONORED" : "hint ignored");
+      cuMemAddressFree(va, gran);
+    }
+  }
+
+  std::printf("\n[va] &gt;&gt;&gt; 本节观察到的最高 VA = 0x%016" PRIx64 " (bit %d)\n", max_seen,
+              max_seen ? 63 - __builtin_clzll(max_seen) : -1);
+}
+
+// ───────────────── Section 5: 高位 VA 真实 map + kernel 访问 ────────────────
+
+__global__ void stamp_kernel(uint64_t* p, uint64_t v) { p[0] = v; p[1] = ~v; }
+
+// worker 模式：在独立进程里对单个地址做 reserve + create + map + setAccess + kernel 写入 + 校验。
+// 独立进程是为了让潜在的 Xid / illegal address 不污染主进程。
+static int run_map_test(uint64_t target) {
+  std::printf("[map-test] target VA = 0x%016" PRIx64 " (bit %d)\n", target,
+              target ? 63 - __builtin_clzll(target) : -1);
+  CU_OR_RETURN(cuInit(0));
+  if (ensure_primary_context() != 0) return 1;
+
+  CUmemAllocationProp prop{};
+  prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+  prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+  prop.location.id = g_probe_device;
+  size_t gran = 0;
+  CU_OR_RETURN(cuMemGetAllocationGranularity(&amp;gran, &amp;prop, CU_MEM_ALLOC_GRANULARITY_RECOMMENDED));
+  if (gran == 0) gran = 2ull &lt;&lt; 20;
+
+  CUdeviceptr va = 0;
+  CUresult r = cuMemAddressReserve(&amp;va, gran, gran, (CUdeviceptr)target, 0);
+  if (r != CUDA_SUCCESS) {
+    std::printf("[map-test] 0x%016" PRIx64 " : cuMemAddressReserve FAIL %s (%d)\n", target,
+                cu_err(r), (int)r);
+    return 3;
+  }
+  if ((uint64_t)va != target) {
+    std::printf("[map-test] 0x%016" PRIx64 " : hint IGNORED, driver 给了 0x%016llx -&gt; 该地址不可用于普通 VA\n",
+                target, (unsigned long long)va);
+    cuMemAddressFree(va, gran);
+    return 4;
+  }
+  std::printf("[map-test] 0x%016" PRIx64 " : reserve OK (hint honored)\n", target);
+
+  CUmemGenericAllocationHandle h{};
+  r = cuMemCreate(&amp;h, gran, &amp;prop, 0);
+  if (r != CUDA_SUCCESS) {
+    std::printf("[map-test] 0x%016" PRIx64 " : cuMemCreate FAIL %s\n", target, cu_err(r));
+    cuMemAddressFree(va, gran);
+    return 5;
+  }
+  r = cuMemMap(va, gran, 0, h, 0);
+  if (r != CUDA_SUCCESS) {
+    std::printf("[map-test] 0x%016" PRIx64 " : cuMemMap FAIL %s (%d)\n", target, cu_err(r), (int)r);
+    cuMemRelease(h);
+    cuMemAddressFree(va, gran);
+    return 6;
+  }
+  CUmemAccessDesc acc{};
+  acc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+  acc.location.id = g_probe_device;
+  acc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+  r = cuMemSetAccess(va, gran, &amp;acc, 1);
+  if (r != CUDA_SUCCESS) {
+    std::printf("[map-test] 0x%016" PRIx64 " : cuMemSetAccess FAIL %s (%d)\n", target, cu_err(r), (int)r);
+    cuMemUnmap(va, gran);
+    cuMemRelease(h);
+    cuMemAddressFree(va, gran);
+    return 7;
+  }
+  std::printf("[map-test] 0x%016" PRIx64 " : map + setAccess OK, 启动 kernel 写入\n", target);
+
+  const uint64_t magic = 0x5a5a0000c0ffeeull ^ target;
+  stamp_kernel&lt;&lt;&lt;1, 1&gt;&gt;&gt;((uint64_t*)va, magic);
+  cudaError_t ce = cudaDeviceSynchronize();
+  int rc = 0;
+  if (ce != cudaSuccess) {
+    std::printf("[map-test] 0x%016" PRIx64 " : kernel FAIL %s  &lt;== 该地址不可被 GPU 访问\n", target,
+                cudaGetErrorString(ce));
+    rc = 8;
+  } else {
+    uint64_t hostbuf[2] = {0, 0};
+    ce = cudaMemcpy(hostbuf, (void*)va, sizeof(hostbuf), cudaMemcpyDeviceToHost);
+    if (ce != cudaSuccess) {
+      std::printf("[map-test] 0x%016" PRIx64 " : D2H FAIL %s\n", target, cudaGetErrorString(ce));
+      rc = 9;
+    } else if (hostbuf[0] != magic || hostbuf[1] != ~magic) {
+      std::printf("[map-test] 0x%016" PRIx64 " : 数据不符 got 0x%016" PRIx64 "/0x%016" PRIx64
+                  " want 0x%016" PRIx64 "/0x%016" PRIx64 "\n",
+                  target, hostbuf[0], hostbuf[1], magic, ~magic);
+      rc = 10;
+    } else {
+      std::printf("[map-test] 0x%016" PRIx64 " : ***  FULLY USABLE  *** GPU 读写校验通过\n", target);
+    }
+  }
+
+  cuMemUnmap(va, gran);
+  cuMemRelease(h);
+  cuMemAddressFree(va, gran);
+  return rc;
+}
+
+static void section_map_tests(const char* self) {
+  std::printf("\n===== Section 5: 高位 VA 真实 map + GPU 访问 (子进程隔离) =====\n");
+  std::printf("判定标准：若 2^53 处能 reserve+map+kernel 写入成功，则「2^53 被 driver 划为 CFT aperture、\n");
+  std::printf("          不参与普通 VA 分配」为假。\n\n");
+
+  const int bits[] = {40, 46, 47, 48, 52, 53, 54, 56};
+  for (int lg : bits) {
+    uint64_t target = 1ull &lt;&lt; lg;
+    char addr_arg[32];
+    std::snprintf(addr_arg, sizeof(addr_arg), "0x%" PRIx64, target);
+    std::printf("---- fork: %s --map-test %s ----\n", self, addr_arg);
+    std::fflush(stdout);
+    pid_t pid = fork();
+    if (pid == 0) {
+      char* argv[] = {(char*)self, (char*)"--map-test", addr_arg, nullptr};
+      execv(self, argv);
+      std::fprintf(stderr, "[map-test] execv failed\n");
+      _exit(127);
+    }
+    if (pid &lt; 0) {
+      std::printf("[map-test] fork failed\n");
+      continue;
+    }
+    int status = 0;
+    waitpid(pid, &amp;status, 0);
+    if (WIFSIGNALED(status)) {
+      std::printf("[map-test] 2^%d : 子进程被信号 %d 杀死\n", lg, WTERMSIG(status));
+    } else {
+      std::printf("[map-test] 2^%d : 子进程退出码 %d\n", lg, WEXITSTATUS(status));
+    }
+    std::fflush(stdout);
+  }
+}
+
+// ────────── Section 6: /proc/self/maps 高位区间 + CFT aperture 边界扫描 ─────
+
+static void dump_high_maps(const char* tag) {
+  std::printf("[maps] --- /proc/self/maps, start &gt;= 2^47  (%s) ---\n", tag);
+  FILE* f = std::fopen("/proc/self/maps", "r");
+  if (!f) { std::printf("[maps] open failed\n"); return; }
+  char line[1024];
+  int n = 0;
+  while (std::fgets(line, sizeof(line), f)) {
+    unsigned long long s = 0;
+    if (std::sscanf(line, "%llx", &amp;s) == 1 &amp;&amp; s &gt;= (1ull &lt;&lt; 47)) {
+      std::printf("[maps] %s", line);
+      ++n;
+    }
+  }
+  std::fclose(f);
+  if (n == 0) std::printf("[maps] (none)\n");
+}
+
+// hint 是否被 driver 采纳。ret: 1=honored, 0=refused(给了别的地址), -1=调用失败
+static int hint_honored(uint64_t hint, size_t gran) {
+  CUdeviceptr va = 0;
+  CUresult r = cuMemAddressReserve(&amp;va, gran, gran, (CUdeviceptr)hint, 0);
+  if (r != CUDA_SUCCESS) return -1;
+  int honored = ((uint64_t)va == hint) ? 1 : 0;
+  cuMemAddressFree(va, gran);
+  return honored;
+}
+
+static void section_aperture_scan(const LeApi&amp; api) {
+  const uint64_t kTag = 1ull &lt;&lt; 53;      // SASS ULEA 里的 0x200000 &lt;&lt; 32
+  const uint64_t kStride = 1ull &lt;&lt; 42;   // = unicast GetLimits maxSize = GB100 mapslot 粒度
+  const size_t gran = 2ull &lt;&lt; 20;
+
+  std::printf("\n===== Section 6: CFT aperture 边界扫描 =====\n");
+  std::printf("假设：driver 在 [2^53, 2^53 + N*2^42) 预留了 CFT aperture，N = le_id 命名空间大小\n\n");
+
+  dump_high_maps("after CUDA context creation");
+
+  // 6a. 2^53 以下：应当可以正常拿到
+  std::printf("\n[apert] --- 2^53 下方对照 ---\n");
+  for (int j = 1; j &lt;= 3; ++j) {
+    uint64_t h = kTag - (uint64_t)j * kStride;
+    std::printf("[apert] 2^53 - %d*2^42 = 0x%014" PRIx64 " -&gt; %s\n", j, h,
+                hint_honored(h, gran) == 1 ? "HONORED" : "refused");
+  }
+  for (uint64_t back : {2ull &lt;&lt; 20, 8ull &lt;&lt; 20, 1ull &lt;&lt; 30}) {
+    uint64_t h = kTag - back;
+    std::printf("[apert] 2^53 - 0x%llx = 0x%014" PRIx64 " -&gt; %s\n", (unsigned long long)back, h,
+                hint_honored(h, gran) == 1 ? "HONORED" : "refused");
+  }
+
+  // 6b. 紧贴 2^53 上方：确认 aperture 基址就是 2^53
+  std::printf("\n[apert] --- 2^53 上沿细扫 ---\n");
+  for (uint64_t off : {0ull, 2ull &lt;&lt; 20, 8ull &lt;&lt; 20, 1ull &lt;&lt; 30, 1ull &lt;&lt; 35, 1ull &lt;&lt; 40}) {
+    uint64_t h = kTag + off;
+    std::printf("[apert] 2^53 + 0x%-12llx = 0x%014" PRIx64 " -&gt; %s\n", (unsigned long long)off, h,
+                hint_honored(h, gran) == 1 ? "HONORED" : "refused");
+  }
+
+  // 6c. 按 2^42 步长逐 slot 扫，找 aperture 的上界
+  std::printf("\n[apert] --- 逐 mapslot 扫描 (步长 2^42)，R=refused H=honored E=error ---\n");
+  const int kMaxSlots = 320;
+  int first_honored = -1;
+  std::string bitmap;
+  for (int k = 0; k &lt; kMaxSlots; ++k) {
+    int h = hint_honored(kTag + (uint64_t)k * kStride, gran);
+    bitmap.push_back(h == 1 ? 'H' : (h == 0 ? 'R' : 'E'));
+    if (h == 1 &amp;&amp; first_honored &lt; 0) first_honored = k;
+  }
+  for (int i = 0; i &lt; kMaxSlots; i += 64) {
+    std::printf("[apert] slot %3d: %.*s\n", i, 64 &gt; kMaxSlots - i ? kMaxSlots - i : 64,
+                bitmap.c_str() + i);
+  }
+  if (first_honored &lt; 0) {
+    std::printf("[apert] &gt;&gt;&gt; 前 %d 个 slot 全部被拒，aperture 比 %d*2^42 更大\n", kMaxSlots, kMaxSlots);
+  } else {
+    uint64_t apert_size = (uint64_t)first_honored * kStride;
+    std::printf("[apert] &gt;&gt;&gt; 第一个可用 slot = %d，即 aperture = [2^53, 2^53 + %d*2^42)\n",
+                first_honored, first_honored);
+    std::printf("[apert] &gt;&gt;&gt; aperture 大小 = 0x%" PRIx64 " (%s)\n", apert_size,
+                pretty_size(apert_size).c_str());
+    std::printf("[apert] &gt;&gt;&gt; 对照 le_id 命名空间容量：若两者相等，则 aperture = le_id_count * per_LE_maxSize\n");
+  }
+
+  // 6d. 持有全部 le_id 时 aperture 是否变化（判断是静态预留还是动态分配）
+  std::printf("\n[apert] --- 预留全部 le_id 后再扫前 4 个 slot ---\n");
+  std::vector&lt;LeRange&gt; held;
+  {
+    uint32_t chunk = 256;
+    while (chunk &gt;= 1) {
+      CUlogicalEndpointId id = 0;
+      if (api.reserve(&amp;id, chunk) == CUDA_SUCCESS) held.push_back({id, chunk});
+      else if (chunk == 1) break;
+      else chunk &gt;&gt;= 1;
+    }
+  }
+  uint64_t total_le = 0;
+  for (auto&amp; h : held) total_le += h.count;
+  std::printf("[apert] 已持有 %" PRIu64 " 个 le_id\n", total_le);
+  for (int k = 0; k &lt; 4; ++k) {
+    std::printf("[apert] slot %d (0x%014" PRIx64 ") -&gt; %s\n", k, kTag + (uint64_t)k * kStride,
+                hint_honored(kTag + (uint64_t)k * kStride, gran) == 1 ? "HONORED" : "refused");
+  }
+  if (first_honored &gt;= 0) {
+    std::printf("[apert] slot %d (第一个原本可用的) -&gt; %s\n", first_honored,
+                hint_honored(kTag + (uint64_t)first_honored * kStride, gran) == 1 ? "HONORED"
+                                                                                  : "refused");
+  }
+  dump_high_maps("after reserving all le_ids");
+  for (auto&amp; h : held) api.release(h.base, h.count);
+}
+
+// 独立小模式：报告本进程能拿到多少 le_id（用于判断命名空间是否 per-process 虚拟化）。
+// hold_secs &gt; 0 时持有并睡眠，供另一个进程并发观察。
+static int run_le_count(int hold_secs) {
+  CU_OR_RETURN(cuInit(0));
+  if (ensure_primary_context() != 0) return 1;
+  LeApi api{};
+  if (load_le_api(api) != 0) return 1;
+
+  std::vector&lt;LeRange&gt; held;
+  uint64_t total = 0;
+  CUlogicalEndpointId min_id = 0xffffffffu, max_id = 0;
+  uint32_t chunk = 256;
+  while (chunk &gt;= 1) {
+    CUlogicalEndpointId id = 0;
+    if (api.reserve(&amp;id, chunk) == CUDA_SUCCESS) {
+      held.push_back({id, chunk});
+      total += chunk;
+      if (id &lt; min_id) min_id = id;
+      if (id + chunk - 1 &gt; max_id) max_id = id + chunk - 1;
+    } else if (chunk == 1) {
+      break;
+    } else {
+      chunk &gt;&gt;= 1;
+    }
+  }
+  std::printf("[le-count] pid=%d 拿到 %" PRIu64 " 个 le_id, 范围 [0x%x, 0x%x], 段数 %zu\n", (int)getpid(),
+              total, total ? min_id : 0, total ? max_id : 0, held.size());
+  std::fflush(stdout);
+  if (hold_secs &gt; 0) sleep((unsigned)hold_secs);
+  for (auto&amp; h : held) api.release(h.base, h.count);
+  return 0;
+}
+
+// 观察 2^53 处的 PROT_NONE 预留是在哪个阶段出现的，以及是否随 GPU 数量变化。
+static int run_maps_stages() {
+  dump_high_maps("stage0: before cuInit");
+  CU_OR_RETURN(cuInit(0));
+  dump_high_maps("stage1: after cuInit, no context");
+
+  int count = 0;
+  cudaGetDeviceCount(&amp;count);
+  std::printf("[stages] visible device count = %d\n", count);
+
+  int made = 0;
+  for (int d = 0; d &lt; count; ++d) {
+    if (cudaSetDevice(d) != cudaSuccess) { cudaGetLastError(); continue; }
+    if (cudaFree(nullptr) != cudaSuccess) { cudaGetLastError(); continue; }
+    if (g_probe_device &lt; 0) g_probe_device = d;
+    ++made;
+    char tag[96];
+    std::snprintf(tag, sizeof(tag), "stage2: after primary context on %d device(s), last=GPU%d", made, d);
+    dump_high_maps(tag);
+    if (made &gt;= 3) break;
+  }
+
+  // 继续细分：aperture 到底是被哪一次 LE API 调用触发建立的
+  LeApi api{};
+  if (load_le_api(api) != 0) return 1;
+
+  CUlogicalEndpointProp p{};
+  p.type = CU_LOGICAL_ENDPOINT_TYPE_UNICAST;
+  p.unicast.device = g_probe_device &gt; 0 ? g_probe_device : 0;
+  p.size = 2ull &lt;&lt; 20;
+  p.ipcHandleTypes = CU_LOGICAL_ENDPOINT_IPC_HANDLE_TYPE_FABRIC;
+  p.flags = 0;
+  uint64_t ba = 0, ms = 0;
+  std::printf("[stages] cuLogicalEndpointGetLimits -&gt; %s\n", cu_err(api.getLimits(&amp;ba, &amp;ms, &amp;p)));
+  dump_high_maps("stage3: after cuLogicalEndpointGetLimits");
+
+  CUlogicalEndpointId id = 0;
+  std::printf("[stages] cuLogicalEndpointIdReserve(1) -&gt; %s (id=0x%x)\n",
+              cu_err(api.reserve(&amp;id, 1)), id);
+  dump_high_maps("stage4: after cuLogicalEndpointIdReserve");
+
+  api.release(id, 1);
+  dump_high_maps("stage5: after cuLogicalEndpointIdRelease");
+
+  // stage6: 普通 VMM 路径。若 aperture 是被 cuMemAddressReserve 第一次调用
+  // （即 VA allocator 初始化）建立的，会在这里出现。
+  {
+    size_t gran = 2ull &lt;&lt; 20;
+    CUdeviceptr va = 0;
+    std::printf("[stages] cuMemAddressReserve(2MiB, no hint) -&gt; %s va=0x%llx\n",
+                cu_err(cuMemAddressReserve(&amp;va, gran, gran, 0, 0)), (unsigned long long)va);
+    dump_high_maps("stage6: after first cuMemAddressReserve");
+    if (va) cuMemAddressFree(va, gran);
+  }
+
+  // stage7: 真实分配一次显存（cudaMalloc 走 UVM/VA allocator 的完整初始化）
+  {
+    void* p2 = nullptr;
+    cudaError_t e = cudaMalloc(&amp;p2, 1u &lt;&lt; 20);
+    std::printf("[stages] cudaMalloc(1MiB) -&gt; %s ptr=%p\n", cudaGetErrorString(e), p2);
+    dump_high_maps("stage7: after cudaMalloc");
+    if (p2) cudaFree(p2);
+  }
+  return 0;
+}
+
+// ───────────────────────────────── main ────────────────────────────────────
+
+int main(int argc, char** argv) {
+  bool skip_map = false;
+  for (int i = 1; i &lt; argc; ++i) {
+    if (std::strcmp(argv[i], "--map-test") == 0 &amp;&amp; i + 1 &lt; argc) {
+      return run_map_test(std::strtoull(argv[i + 1], nullptr, 0));
+    }
+    if (std::strcmp(argv[i], "--skip-map-tests") == 0) skip_map = true;
+    if (std::strcmp(argv[i], "--le-count-only") == 0) return run_le_count(0);
+    if (std::strcmp(argv[i], "--maps-stages") == 0) return run_maps_stages();
+    if (std::strcmp(argv[i], "--le-hold-secs") == 0 &amp;&amp; i + 1 &lt; argc)
+      return run_le_count(std::atoi(argv[i + 1]));
+  }
+
+  std::printf("=========================================================\n");
+  std::printf(" B200 CFT / le_id / VA 实测探针\n");
+  std::printf(" CUDART_VERSION = %d\n", CUDART_VERSION);
+  std::printf("=========================================================\n");
+
+  // Section 0 是纯 Linux 测试，必须在任何 CUDA 初始化之前跑，避免 driver 已经占用地址空间。
+  section_mmap_control();
+  dump_high_maps("before cuInit");
+
+  // map 测试必须在本进程 cuInit 之前 fork，否则子进程继承的 CUDA 状态不可用。
+  if (!skip_map) section_map_tests(argv[0]);
+
+  CU_OR_RETURN(cuInit(0));
+  int driver_version = 0;
+  cuDriverGetVersion(&amp;driver_version);
+  std::printf("\n[host] cuDriverGetVersion = %d\n", driver_version);
+
+  int device_count = 0;
+  CU_OR_RETURN(cuDeviceGetCount(&amp;device_count));
+  std::printf("[host] device count = %d\n", device_count);
+
+  CUdevice dev{};
+  CU_OR_RETURN(cuDeviceGet(&amp;dev, 0));
+  if (ensure_primary_context() != 0) return 1;
+
+  LeApi api{};
+  if (load_le_api(api) != 0) return 1;
+
+  section_attributes(device_count);
+  section_get_limits(api, device_count);
+  section_le_id_space(api);
+  section_va_observation();
+  section_aperture_scan(api);
+
+  std::printf("\n[host] done.\n");
+  return 0;
+}
+</code></pre>
+</details>
+
+<div class="foot">
+<p><b>分析对象</b>：NVIDIA/nccl · master @ <code>fd168324</code>（由 <code>7b83616d</code> = tag <code>v2.31.2-1</code> fast-forward 30 个 commit 而来）</p>
+<p><b>代码读取范围</b>：<code>cft_dev_runtime.cc</code>(323) · <code>cft.h</code>(88) · <code>cft__funcs.h</code>(738) · <code>cft__types.h</code>(41) · <code>cft_barrier.h</code>(38) · <code>cft_barrier__funcs.h</code>(172) · <code>cft_barrier__types.h</code>(73) · <code>cft_barrier.cc</code>(21) · <code>cudawrap.h</code>(CFT 段) · <code>dev_runtime.cc</code>(66 处命中，4 段逐字) · <code>dev_runtime.h</code> · <code>init.cc</code>(hostCftMode 段) · <code>nccl.h.in</code> · <code>nccl_device/core.{h,cc}</code> · <code>impl/{comm__types.h, core__funcs.h, core__types.h}</code> · <code>bindings/nccl4py</code>(25 处命中) · <code>device_cft.rst</code>(336) · <code>usage/cft.rst</code>(200) · <code>04_cft_barrier/c/main.cu</code>(167)</p>
+<p><b>证据纪律</b>：§1–§8 全部代码块为源码逐字摘录；分析性内容一律以 <span class="lab ana">解读</span> 标记；§9 整节为推断并已在节首声明；§10.3 列出 7 项缺口，其中 <b>G2 已由 §11 的 B200 实测闭合</b>；剩余 G1/G3 意味着本报告<b>不能</b>作为 fabric PTX ISA 或 CUDA LE 驱动 API 的权威参考。§11 的结论以 <span class="lab meas">实测</span> 标记，全部可由所附 host 源码在 8×B200 + CUDA 13.3 上复现。</p>
+</div>
+
+</div>
+</body>
+</html>

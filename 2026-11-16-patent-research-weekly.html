@@ -81,196 +81,320 @@
                 <h2 class="text-lg font-bold text-green-400">NVIDIA 通信 / MMU / Memory 专利</h2>
             </div>
 
-            <!-- Patent 1: Dynamic KV Cache Scheduling -->
+            <!-- Patent 1: LLI compute tile register-direct network -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">动态KV缓存调度器 (Dynamic KV Cache Scheduler for LLMs)</h3>
+                        <h3 class="font-semibold text-violet-300">LLM解码芯片寄存器直连网络 (LLI Compute Tile - IMLP Tile Register-Direct Transfer)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">US20260133908A1</span>
-                            <span class="text-xs text-slate-500 self-center">2026-05-14 公开</span>
+                            <span class="company-badge">US2026/0349953 A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-11-05 公开 | 申请日: 2025-10-28</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 提出分层KV缓存内存管理系统,根据token的实时效用动态分配缓存注意力数据,防止硬件瓶颈。采用类似操作系统"按需调页"模型的连续调度算法,在受限硬件上实现扩展对话范围。
+                        <strong class="text-violet-300">核心创新:</strong> 在LLM解码专用芯片(LLI)上,计算瓦片的部分结果通过"预配置网络"在寄存器之间点对点直传,完全不落入共享内存,消除逐token生成阶段的访存停顿。发明团队为Bill Dally领导的NVResearch。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>分层KV缓存:多级存储层次包括处理器内部高速内存、片外二级存储和删除类别</li>
-                            <li>效用评估算法:连续调度算法实时评估token相关性,类似OS按需调页模型</li>
-                            <li>动态分配:根据当前效用动态分配缓存资源,防止硬件瓶颈</li>
-                            <li>扩展对话:在受限硬件上支持更长的对话上下文</li>
-                            <li>精确检索:在需要时精确检索关键信息,优化内存使用效率</li>
+                            <li>每个计算瓦片内含64个基本单元,各带本地SRAM、向量寄存器与MAC阵列</li>
+                            <li>IMLP瓦片完成sum/max/mean归约与归一化,示例中16个计算瓦片喂1个IMLP瓦片</li>
+                            <li>三条独立通路: gather(汇聚)、reduction(树状归约)、distribution(广播)</li>
+                            <li>连接按模型逐层预设,数据点对点直达,绕开SRAM/DRAM</li>
+                            <li>与US2026/0329803 A1(2026-10-22公开)同族:GPU做prefill、LLI板做decode</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利直接解决LLM长上下文推理中的KV cache内存瓶颈。在128K+ token序列场景中,单个GPU的HBM往往不足以容纳完整KV cache。通过分层动态调度,可扩展有效内存容量,降低推理延迟。对NVIDIA NVL72等多GPU系统的推理性能有直接优化作用。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">把"逐字生成"阶段彻底专用化。若授权范围如claim 1般宽泛,将覆盖主流低时延推理硬件设计,是NVIDIA为Rubin世代之后"decode专用硬件产品形态"铺路的关键专利。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-dynamic-kv-cache-scheduling-llms/" target="_blank" class="ref-link">Patentlyze - NVIDIA Dynamic KV Cache Scheduling</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-chip-design-faster-ai-chatbot-replies-9531/" target="_blank" class="ref-link">Patentlyze - NVIDIA LLI Chip Design</a> | <a href="https://www.patents-review.com/a/20260329803-low-latency-compute-architectures-neural-network-inference.html" target="_blank" class="ref-link">Patents-Review - US2026/0329803 A1</a></div>
                 </div>
             </div>
 
-            <!-- Patent 2: Multi-Chip GPU Local Memory Routing -->
+            <!-- Patent 2: PE array register exchange -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">多芯片GPU本地内存路由 (Multi-Chip GPU Local Memory Routing)</h3>
+                        <h3 class="font-semibold text-violet-300">加速器PE阵列寄存器级数据交换 (Data Processing Using Accelerators)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">US20260288335A1</span>
-                            <span class="text-xs text-slate-500 self-center">2026-09-24 公开</span>
+                            <span class="company-badge">US2026/0349958 A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-11-05 公开 | 申请 19/739,838</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 针对多chiplet GPU架构,通过将图形管线属性本地化写入各芯片的本地存储("一致性点"内存),大幅减少跨die通信开销。采用"粗粒度交替虚拟内存"布局,大块交替分配给各芯片,而非字节级交织。每个die独立渲染特定显示区域,仅在必要时通过die间互连交换数据。
+                        <strong class="text-violet-300">核心创新:</strong> SoC内二维处理单元(PE)阵列无需反复读写共享系统内存,直接在相邻PE的寄存器间交换邻域数据,消除SIMD加速器的读写延迟瓶颈。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>多芯片架构:每个处理die负责特定屏幕区域的渲染,独立运行</li>
-                            <li>本地化存储:管线参数和簿记结构保留在物理连接的本地存储中</li>
-                            <li>一致性点:各芯片维护本地"point of coherence"权威性存储</li>
-                            <li>粗粒度交替:大块交替虚拟内存布局,非字节级交织</li>
-                            <li>最小化跨die通信:仅在必要时通过高速互连交换关键数据</li>
+                            <li>每个PE接收第一像素数据+指令,结合相邻PE的第二像素数据计算更新值,适配大核卷积/滤波</li>
+                            <li>数据在PE寄存器与目标寄存器之间直接搬运(寄存器到寄存器),可跨PE转移</li>
+                            <li>2D阵列中PE相互耦合,数据独立于公共内存源处理,位宽可调</li>
+                            <li>指令可表达矩阵加/减/乘、滤波、带通滤波等操作序列</li>
+                            <li>发明人含Ching-Yu Hung、Jagadeesh Sankaran(Thor SoC团队)</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利直接支持NVIDIA Blackwell及后续GPU架构中的多chiplet设计。在GB200 NVL72等大规模系统中,减少跨die通信等待时间对训练和推理性能至关重要。本地化存储策略可减少30-50%的跨集群流量,显著提升能效。对LLM推理场景中的tail latency优化尤为关键。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">面向车载SoC与AI加速器的近存计算,把"算子内通信"从内存总线挪到PE互连,直接降低功耗与时延,与Thor平台的图像管线需求高度契合。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-multi-chip-gpu-local-memory-routing/" target="_blank" class="ref-link">Patentlyze - NVIDIA Multi-Chip GPU Local Memory Routing</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260349958-data-processing-accelerators.html" target="_blank" class="ref-link">Patents-Review - US2026/0349958 A1</a></div>
                 </div>
             </div>
 
-            <!-- Patent 3: Memory Management Enhancement -->
+            <!-- Patent 3: Page table info in cache -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">内存管理增强技术 (Enhanced Memory Management for GPU)</h3>
+                        <h3 class="font-semibold text-violet-300">缓存中页表信息的识别 (Identification of Page Table Information in Cache)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">US20260349929A1</span>
-                            <span class="text-xs text-slate-500 self-center">2026 公开</span>
+                            <span class="company-badge">US2026/0329776 A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10-22 公开 | 申请 19/186,432</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 通过警报机制和内存重组增强并发处理和数据传输效率。当处理单元完成特定数据块计算后,发送警报触发该块的数据传输,同时继续计算剩余数据块,防止处理中断。在发送前重组内存地址以适配标准库调用,传输完成后恢复原始序列。
+                        <strong class="text-violet-300">核心创新:</strong> 缓存控制器识别cache line是否为页表数据,对页表行采用"差异化老化"策略使其比普通数据驻留更久,加速page table walk与TLB重填——MMU方向的直接优化。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>警报机制:处理单元完成数据块后立即触发传输,无需等待全部完成</li>
-                            <li>并发执行:数据传输与计算并行进行,防止处理中断</li>
-                            <li>内存重组:发送前重新排列内存地址以适配标准库调用</li>
-                            <li>序列恢复:传输完成后恢复原始内存序列</li>
-                            <li>时序调整:最大化并发执行效率的调度优化</li>
+                            <li>cache fill电路的识别逻辑为每行打PT/Non-PT标签</li>
+                            <li>淘汰策略基于RRIP/LRU,差分老化逻辑使页表行老化更慢(计数器或1/64、1/256概率随机法)</li>
+                            <li>MMU内page table walker命中L2中的页表片段即可免去访存,快速填TLB</li>
+                            <li>尤其针对稀疏访问模式下频繁页表查找的高延迟</li>
+                            <li>适用于CPU/GPU/加速器,含HBM主存场景</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利对NVIDIA GPU的内存管理系统进行了重要增强。通过警报驱动的并发传输机制,可显著提升大规模AI训练中的梯度同步效率。内存重组技术使标准DMA库无需修改即可适配新型传输模式,降低了软件栈升级成本。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">GPU大显存+虚拟化下地址翻译开销正成为瓶颈,此专利直接改善walk效率,与下一条VM翻译专利共同构成NVIDIA的MMU专利布局。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patents.justia.com/patent/20260349929" target="_blank" class="ref-link">Justia Patents - US20260349929</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260329776-identification-page-table-information-cache.html" target="_blank" class="ref-link">Patents-Review - US2026/0329776 A1</a></div>
                 </div>
             </div>
 
-            <!-- Patent 4: NCCL CFT Device API -->
+            <!-- Patent 4: Fast secure address translation in VM -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">NCCL CFT Device API - 计算Fabric传输设备接口</h3>
+                        <h3 class="font-semibold text-violet-300">虚拟机系统快速安全地址翻译 (Fast and Secure Memory Address Translation in a VM Computing System)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">NCCL v2.31+ / 技术文档</span>
-                            <span class="text-xs text-slate-500 self-center">2026 更新</span>
+                            <span class="company-badge">WO2026136182A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-06-25 公开 | PCT/US2025/059538</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> NCCL v2.31引入Compute Fabric Transport(CFT)设备级API,允许自定义kernel直接执行fabric操作(put/get/reduce/barrier)。采用对称内存分配、16字节对齐规则、计数任务消除传统fence-flag同步模式。支持跨代理fence确保不同代理类型(如Fabric和Generic)间的内存可见性。
+                        <strong class="text-violet-300">核心创新:</strong> 二阶段(GPA→SPA)翻译不再走多级页表,改用片上高速SRAM中的三个数据结构(每VM VMMU段掩码、段有效掩码、全局段保护掩码),把整个翻译压缩到约5次访存、若干时钟周期。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>设备级API:自定义kernel内直接执行put/get/reduce/barrier操作</li>
-                            <li>对称内存:分配对称内存窗口,映射为逻辑端点标识符</li>
-                            <li>16字节对齐:所有源和目标指针必须16字节对齐,任务大小为16的倍数</li>
-                            <li>计数任务:消除传统fence+flag同步,使用用户管理的计数器</li>
-                            <li>跨代理fence:建立不同代理类型间的happens-before关系</li>
-                            <li>共享内存barrier:使用每个CTA一个slot的barrier会话实现团队同步</li>
+                            <li>段级(segment)映射替代逐页页表走查,支持动态/静态映射两种管理方式</li>
+                            <li>全局段保护掩码区分保护/安全SPA段,支撑机密计算(hypervisor不可信场景)的隔离与完整性策略</li>
+                            <li>免去大TLB的面积/功耗代价,改善上下文切换后TLB冷启动</li>
+                            <li>常规M×N次页表访存被"一级走查+段计算"取代</li>
+                            <li>申请人NVIDIA Corp(Attorney Docket 24-SC-1500)</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">NCCL CFT代表了NVIDIA在集合通信库层面的核心创新。通过将通信操作下沉到设备级API,实现真正的计算-通信并行。这对大规模训练(如Megatron-LM)和推理(如vLLM)的性能优化至关重要。要求CUDA Toolkit 13.3和SM_100架构(Blackwell)。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">面向GPU机密计算与多云虚拟化,是vGPU/CC硬件信任根的关键使能技术。段掩码方案绕开两级页表walk,对vGPU密度与冷启动延迟有直接收益。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/cft.html" target="_blank" class="ref-link">NCCL CFT官方文档</a> | <a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/api/device_cft.html" target="_blank" class="ref-link">NCCL Device API</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/WO2026136182A1" target="_blank" class="ref-link">Patsnap Eureka - WO2026136182A1</a></div>
                 </div>
             </div>
 
-            <!-- Patent 5: Speed-of-Light Collectives -->
+            <!-- Patent 5: Multi-dielet page migration -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">接近光速延迟的GPU集合通信 (Near Speed-of-Light GPU Collectives)</h3>
+                        <h3 class="font-semibold text-violet-300">多dielet系统硬件辅助页迁移 (Hardware Assisted Page Migration in a Multi-Dielet Processing System)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">arXiv:2607.16100</span>
-                            <span class="text-xs text-slate-500 self-center">2026 | ETH Zurich / NVIDIA</span>
+                            <span class="company-badge">US12645596B2</span>
+                            <span class="text-xs text-slate-500 self-center">2026-06-02 授权 | 申请 18/607,525</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 研究团队开发了专用routine,显著降低小规模数据交换的等待时间,使延迟接近物理硬件最小值。通过消除标准同步barrier、利用共享内存和数据广播技术,扩展NCCL设备级接口构建定制API。对LLM文本生成和传统HPC任务均有显著加速。
+                        <strong class="text-violet-300">核心创新:</strong> 多dielet GPU中每个dielet配独立访问计数器电路,并通过广播引擎-页表bind信息(VEID/IBP)使各dielet的计数器都能正确触发UVM驱动的按需页迁移通知。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>消除同步barrier:移除传统集合通信中的全局同步开销</li>
-                            <li>共享内存利用:通过共享内存实现快速数据交换</li>
-                            <li>数据广播:优化广播模式减少点对点通信延迟</li>
-                            <li>NCCL设备接口扩展:构建定制API支持对称内存布局优化</li>
-                            <li>接近物理极限:延迟达到硬件互连的理论最小值</li>
+                            <li>双dielet示例:主dielet持PCIe+NVLink端口,副dielet持C2C端口,各配独立notify buffer</li>
+                            <li>计数器按软件可编程粒度统计远端(系统内存/peer GPU)访问,超阈值写通知缓冲并中断驱动</li>
+                            <li>硬件支持多dielet计数器CLEAR操作的编排(MIG模式下引擎可跨dielet访问I/O)</li>
+                            <li>相关同族申请"Synchronizing MMUs in Multi-Dielet Processor Architectures"</li>
+                            <li>延续Pascal以来UM/cudaMallocManaged按需迁移路线</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该研究由ETH Zurich和NVIDIA联合完成,发表于2026年。对LLM推理中的自回归解码阶段尤为关键,每个token的生成都涉及多次小规模集合通信。接近光速延迟的实现可显著提升推理吞吐量和降低延迟。相关技术已整合入NCCL库。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">这是Blackwell双die(及未来多die)上统一内存页迁移的硬件基础,直接影响GPU显存超售性能;同期公布的MIG+locality domain官方实践(见下方博客)与其互为印证。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2607.16100" target="_blank" class="ref-link">arXiv:2607.16100</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/US12645596B2" target="_blank" class="ref-link">Patsnap Eureka - US12645596B2</a></div>
                 </div>
             </div>
 
-            <!-- Patent 6: NVIDIA Patent Strategy 2026 -->
+            <!-- Patent 6: Lane failure repair -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">NVIDIA 2026专利战略分析 - 向系统控制转型</h3>
+                        <h3 class="font-semibold text-violet-300">通信互连通道失效修复 (Lane Failure Repair in a Communication Interconnect)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">行业分析</span>
-                            <span class="text-xs text-slate-500 self-center">2026 报告</span>
+                            <span class="company-badge">US20260140834A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-05-21 公开 | 申请 18/954,340</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> NVIDIA 2026年专利战略从单一GPU硬件向系统级控制转型。专利布局覆盖多chiplet架构、3D封装、分布式KV cache、动态GPU重组、统一内存地址和自动化缓存同步等方向。通过系统级专利构建技术护城河,而非仅保护单点硬件创新。
+                        <strong class="text-violet-300">核心创新:</strong> 在NVLink/C2C/D2D互连中预留冗余通道,制造测试发现坏道后由控制逻辑按索引把逻辑通道重映射到修复通道,实现"逻辑无感修复"。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>多chiplet架构:US20260288335A1本地内存路由减少跨die通信</li>
-                            <li>3D封装:与SK Hynix合作开发逻辑-内存垂直堆叠技术</li>
-                            <li>分布式KV cache:US20260133908A1动态调度扩展推理上下文</li>
-                            <li>系统级控制:从GPU硬件扩展到完整数据中心解决方案</li>
-                            <li>生态护城河:通过CUDA+NCCL+NVLink专利组合锁定开发者</li>
+                            <li>接收坏道指示→确定第一/第二索引→将第一通道映射转换成第二映射并按新映射收发数据</li>
+                            <li>损坏物理通道被逻辑断开但仍物理存在,通道整体重新编号</li>
+                            <li>通过熔丝控制器(fuse controller)固化修复码</li>
+                            <li>明确覆盖NVLink、NVSwitch、PCIe、C2C、D2D场景</li>
+                            <li>目标是提升晶圆良率、带宽与可靠性(降级芯片再利用/binning)</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">NVIDIA的专利战略反映了AI计算从单卡向系统级演进的趋势。通过布局多chiplet、3D封装、系统软件等全栈专利,NVIDIA正在构建从芯片到数据中心的完整知识产权壁垒。这对竞争对手的追赶设置了更高的技术和法律门槛。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">对多dielet(GB200/Rubin类)互连良率工程极具价值,是NVLink规模化的制造侧支撑专利。冗余通道重映射直接决定超大die互连的量产成本。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patentailab.com/nvidias-patent-strategy-analysis/" target="_blank" class="ref-link">PatentAI Lab - NVIDIA Strategy 2026</a> | <a href="https://eureka.patsnap.com/resources/blog/rd-blog/gpu-architecture-and-parallel-compute-patent-landscape/" target="_blank" class="ref-link">Patsnap GPU Patent Landscape</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/US20260140834A1" target="_blank" class="ref-link">Patsnap Eureka - US20260140834A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 7: LLI stacked memory architecture -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">低时延神经网络推理计算架构 (Low-Latency Compute Architectures for Neural Network Inference)</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">US2026/0329803 A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10-22 公开 | 申请 19/372,189</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> LLI(低时延推理)芯片与内存芯片堆叠,KV cache存于叠层内存,权重驻本地片上内存,decode阶段经可配置网络瓦片间直传——把decode从通用GPU中剥离成专用硬件形态。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>每LLI板4×6阵列芯片,24芯片/板,可扩展到机柜;计算层置于顶部利于散热</li>
+                            <li>prefill由常规GPU板处理,decode由LLI板逐token生成,经网络互连扩展</li>
+                            <li>归约(dot product/max/sum)在结果汇聚点就近完成,削减通信带宽</li>
+                            <li>网络+动态分发网络支持数据依赖型通信,适配不同张量形状/上下文长度</li>
+                            <li>发明人:Dally、Venkatesan、Tsai、Zimmer(NVResearch核心团队)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">专利即路线图——NVIDIA正在为decode阶段规划独立于GPU的堆叠内存产品形态,与Rubin世代"decode专用化"路线相互印证,可能改变推理集群的形态 economics。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260329803-low-latency-compute-architectures-neural-network-inference.html" target="_blank" class="ref-link">Patents-Review - US2026/0329803 A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 8: Graph-based memory storage -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">基于图的内存存储与内核生成 (Graph-Based Memory Storage)</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">US2026/0339531 A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10-29 公开 | 申请 19/735,258</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 编译器把源码IR划分为kernel生成区域,依据图中张量数据流推导内存约束,让相关数据存入连续内存区间,减少并行计算的分散访存——"编译器接管内存布局"方向的卡位。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>图生成器产出CUDA图式IR:节点=计算操作、边=数据流</li>
+                            <li>图可直接指示虚拟/物理地址及向量化数据集存放</li>
+                            <li>内存约束描述张量元素在连续区间的存取方式,并据此生成kernel</li>
+                            <li>Grover/Collins(Triton团队发明人)署名,属Triton编译器栈专利化</li>
+                            <li>目标是消除GPU并行计算中load/store到离散地址的延迟</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">与Triton/TMA生态协同。当编译器能从数据流图推导最优内存布局时,开发者手写布局优化的重要性下降,Triton栈的护城河加深。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260339531-graph-based-memory-storage.html" target="_blank" class="ref-link">Patents-Review - US2026/0339531 A1</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 9: TMA compiler -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">用内存加速器访问内存/TMA编程化 (Memory Access Using Memory Accelerators)</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">JP2026170164A</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10-21 公开 | PCT/CN2025/082737</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 编译器识别用户程序中以"视图(view)"表达的内存访问模式,自动选择并生成TMA(NVIDIA Tensor Memory Accelerator)等内存加速器的硬件专用指令。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>view数据对象描述内存区段的布局/模式,抽象硬件直接操作的复杂度</li>
+                            <li>编译器匹配可用内存加速器的需求,生成load-tile/store-tile指令</li>
+                            <li>内存加速器含HBM直连通路,可绕过cache直接取张量数据、支持异步搬运</li>
+                            <li>用户无需掌握TMA语法即可获得加速;覆盖GPU/TPU/NPU/DLA</li>
+                            <li>编译至CUDA/ROCm/OpenCL多平台栈</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">TMA从CUDA 11.8的内联PT走向编译器自动生成,是Blackwell/Rubin"算法即访存"趋势的软件侧专利。异步内存搬运正是计算通信并行的另一半。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/JP2026170164A" target="_blank" class="ref-link">Patsnap Eureka - JP2026170164A</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 10: NVIDIA official blog co-design -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">NVIDIA官方:AI工厂每一字节价值最大化的五大协同设计</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">官方技术博客</span>
+                            <span class="text-xs text-slate-500 self-center">2026-11-05 发布</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心内容:</strong> KV cache被正式定义为跨HBM/Vera CPU/CMX存储层的机柜级分层资源:NVFP4(权重较FP16省~3.5×,KV cache较FP8省~50%)、Wide-EP专家并行(NVL72 130TB/s NVLink承载all-to-all)、Dynamo KVCR三级KV缓存(GPU/CPU/存储,经NIXL搬运)、Vera CPU(1.5TB LPDDR5X,1.8TB/s NVLink-C2C一致性链接暂存闲置上下文)、CMX G3.5存储层(BlueField-4 STX+Spectrum-X以太闪存,pod级KV共享)。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">关键数据:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>Vera Rubin NVL72在SemiAnalysis AgentX上每兆瓦吞吐最高为GB300 NVL72的30倍(同为288GB HBM/GPU)</li>
+                            <li>另一篇:Blackwell双die locality domain + MIG数据本地化,Wilson-Dslash示例400W限功率下2.25×加速</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">与本周解读的LLI/页迁移/地址翻译专利群互相印证:NVIDIA正把内存从"GPU的附属"升格为机柜级可编排资源,通信(NVLink/NIXL/以太)成为内存分层的中枢。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://developer.nvidia.com/blog/five-ways-nvidia-co-design-maximizes-the-value-of-every-byte-in-the-ai-factory/" target="_blank" class="ref-link">NVIDIA官方博客 - Five Ways Co-Design</a> | <a href="https://developer.nvidia.com/blog/accelerating-data-processing-with-nvidia-multi-instance-gpu-and-numa-node-localization" target="_blank" class="ref-link">NVIDIA官方博客 - MIG Locality Domains</a></div>
                 </div>
             </div>
 
@@ -282,105 +406,168 @@
                 <div class="w-8 h-8 bg-gradient-to-br from-red-500 to-red-700 rounded-lg flex items-center justify-center">
                     <i class="fas fa-server text-white"></i>
                 </div>
-                <h2 class="text-lg font-bold text-red-400">AMD 计算通信并行专利</h2>
+                <h2 class="text-lg font-bold text-red-400">AMD 计算通信并行 / 互连 / 内存专利</h2>
             </div>
 
-            <!-- AMD Patent 1: Combined Memory System -->
+            <!-- Patent 1: Pipelined horizontal parallelism -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">封装内与封装外混合内存系统 (Combined On-Package and Off-Package Memory)</h3>
+                        <h3 class="font-semibold text-violet-300">大语言模型流水线水平并行 (Pipelined Horizontal Parallelism for Large Language Models)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">US20230393788A1</span>
-                            <span class="text-xs text-slate-500 self-center">2023-12-07 公开</span>
+                            <span class="company-badge">US20260086885A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-03-26 公开 | 申请 18/895,281</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 专用硅层桥接GPU与内部堆叠存储(HBM)和外部模块(DDR),通过聚合不同硬件类型呈现单一统一可寻址空间。智能路由层将访问请求导向本地高速区域或外部高容量区域,后台自动在层级间迁移数据。
+                        <strong class="text-violet-300">核心创新:</strong> 在多加速器上以张量段(tensor segment)为粒度流水线化执行,将集合通信与后续计算段并行——AMD在"通信-计算重叠"方向的直接专利化。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>智能路由:基础逻辑层directing访问请求,免除主处理器的映射和转换负担</li>
-                            <li>分层池化:资源分为高速本地区域(HBM)和高容量外部区域(DDR)</li>
-                            <li>无缝迁移:系统在后台层级间迁移信息,确保连续运行不中断</li>
-                            <li>交织映射:访问请求同时分布到本地和外部硬件,最大化聚合传输率</li>
-                            <li>统一接口:主机处理器与单一整合内存空间交互</li>
+                            <li>加速器对第一个激活张量段执行张量运算得到结果段</li>
+                            <li>对该结果段与其他加速器执行集合通信</li>
+                            <li>通信进行期间同步对下一个激活段执行张量运算</li>
+                            <li>面向LLM的水平并行训练/推理场景(TP场景AllReduce隐藏)</li>
+                            <li>发明人Abhinav Vishnu等(AMD Research)</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利对AMD Instinct MI300/MI350系列APU架构至关重要。通过HBM与外部DDR内存的统一寻址,可在保持高带宽的同时扩展内存容量。MI300X的192GB HBM3统一内存直接受益于此技术,对大模型推理场景中的KV cache扩展有重要意义。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">与社区T3/ASPLOS类细粒度overlap思路一致,落地后可显著降低TP场景AllReduce串行等待,利好MI300/MI350大规模训练。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/US20230393788A1/en" target="_blank" class="ref-link">Google Patents - US20230393788A1</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260086885-pipelined-horizontal-parallelism-large-language-models.html" target="_blank" class="ref-link">Patents-Review - US20260086885A1</a></div>
                 </div>
             </div>
 
-            <!-- AMD Patent 2: Parallel GPU Sparse Matrix -->
+            <!-- Patent 2: T3 fused data generation -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">并行GPU稀疏矩阵调度 (Parallel GPU Sparse Matrix Scheduling)</h3>
+                        <h3 class="font-semibold text-violet-300">数据生成与通信融合 (Fused Data Generation and Associated Communication)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">AMD Patent</span>
-                            <span class="text-xs text-slate-500 self-center">2025 授权</span>
+                            <span class="company-badge">US20260044340A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-02-12 公开 | 申请 19/360,575</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> AMD开发了针对稀疏矩阵运算的GPU并行调度专利,优化多GPU间的数据分布和计算负载均衡。通过智能分区算法将稀疏矩阵的非零元素均匀分配到多个GPU,减少跨GPU通信开销。结合预计算通信模式,实现计算与通信的流水线重叠。
+                        <strong class="text-violet-300">核心创新:</strong> 硬件级"追踪-触发"机制,把数据生产(GEMM)与后续通信融合,无需CU参与协调——对应AMD T3论文的Transparent Tracking & Triggering。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>智能分区:将稀疏矩阵非零元素均匀分配到多GPU</li>
-                            <li>负载均衡:动态监控各GPU计算负载,实时调整分配策略</li>
-                            <li>通信预计算:提前计算通信模式,与计算阶段重叠</li>
-                            <li>流水线重叠:计算与通信采用流水线方式并行执行</li>
-                            <li>ROCm集成:深度集成到ROCm软件栈中</li>
+                            <li>系统追踪各处理器如何生成与共享数据</li>
+                            <li>依据追踪结果决定何时发送特定数据</li>
+                            <li>数据生成完成即自动触发传输</li>
+                            <li>发明人Shaizeen Aga、Nuwan Jayasena、Suchita Pati(近存计算/通信融合核心研究员)</li>
+                            <li>T3论文显示通信密集子层平均提速约30%、传输量降约22%</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利对AMD Instinct GPU在大规模稀疏计算场景(如GNN训练、推荐系统)中的性能至关重要。稀疏矩阵是许多AI模型的核心数据结构,优化其并行调度可显著提升训练效率。ROCm生态的集成使该技术在开源社区中具有广泛影响力。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利表明AMD正把T3研究成果推向可落地的Instinct硬件。硬件自动追踪数据依赖并触发通信,比软件流水线的调度开销更低。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/amd-parallel-gpu-sparse-matrix-scheduling-explained/" target="_blank" class="ref-link">Patentlyze - AMD Parallel GPU Sparse Matrix</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260044340-fused-data-generation-communication.html" target="_blank" class="ref-link">Patents-Review - US20260044340A1</a></div>
                 </div>
             </div>
 
-            <!-- AMD UALink -->
+            <!-- Patent 3: MCM smart switch + shared L3 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">UALink开放互连标准 (AMD联合Intel/Google等主导)</h3>
+                        <h3 class="font-semibold text-violet-300">多芯片GPU智能交换机+共享L3 (MCM GPU Smart Switch & Shared L3)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">UALink 1.0规范</span>
-                            <span class="text-xs text-slate-500 self-center">2024年成立 | 2026年白皮书</span>
+                            <span class="company-badge">2026-10曝光专利</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10-14 媒体解读</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> UALink是由AMD、Astera Labs、AWS、Cisco、Google、HPE、Intel、Meta、Microsoft等75家组织组成的联盟开发的开放互连标准。UALink 1.0规范提供200 GT/s双向数据速率,在x4配置下达到800 GB/s峰值带宽,支持最多1024个加速器,目标延迟小于1微秒往返。
+                        <strong class="text-violet-300">核心创新:</strong> 在Infinity Fabric内引入智能交换节点,解决MCM游戏级GPU的跨芯片内存延迟——交换机逐条分析内存访问,纳秒级决策"迁移任务 vs 复制数据"。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>200 GT/s每通道双向数据速率,x4配置达800 GB/s</li>
-                            <li>支持最多1024个加速器(对比NVLink的576 GPU)</li>
-                            <li>目标延迟小于1微秒往返,每加速器一个端口</li>
-                            <li>10位唯一标识符实现精确路由</li>
-                            <li>开放标准,支持多厂商硬件互操作</li>
-                            <li>模块化机架级架构,可整合不同厂商设备</li>
+                            <li>每个图形chiplet配本地L1/L2</li>
+                            <li>所有chiplet经交换机访问共享L3/堆叠SRAM(类似3D V-Cache的GPU版)</li>
+                            <li>消费级用GDDR/堆叠DRAM+TSMC InFO-RDL封装替代HBM</li>
+                            <li>预计随UDNA架构(UDNA 5候选)落地</li>
+                            <li>专利正式文本以CPU形式撰写,机制指向GPU</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">UALink是AMD联合Intel、Google等对抗NVIDIA NVLink垄断的核心战略。虽然单连接带宽(800 GB/s)低于NVLink 5.0(1.8 TB/s),但支持近两倍的加速器数量(1024 vs 576),且为开放标准。阿里云和苹果后续加入董事会,预计2026-2027年形成产业生态。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">打通消费级MCM GPU的最大瓶颈,同时复用Instinct MI200/MI350的chiplet经验,统一游戏与AI架构。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://ualinkconsortium.org/" target="_blank" class="ref-link">UALink联盟官网</a> | <a href="https://introl.com/blog/ualink-cxl-4-gpu-interconnect-memory-pooling-guide-2025" target="_blank" class="ref-link">UALink技术指南</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.xfastest.com/thread-302293-1-70.html" target="_blank" class="ref-link">XFaster - AMD MCM智能交换机专利解读</a></div>
                 </div>
             </div>
+
+            <!-- Patent 4: RCCL GPU-initiated SDMA -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">AMD RCCL GPU发起SDMA通信 (GPU-Initiated SDMA Copy Engine)</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">ROCm 10.1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-11-13 官方博客</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> RCCL支持GPU内核发起的SDMA传输——内核发起传输、专用SDMA引擎搬数,MI350X 8-GPU上AllToAll/AllGather仅用1个CU即达到默认64 CU的同等或更高带宽。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>GPU内核直接发起传输,专用SDMA引擎搬运数据</li>
+                            <li>计算-通信融合内核不再争用计算单元(CU)</li>
+                            <li>ROCm 7.2(2026-11-01):RCCL原生4-NIC拓扑感知、rail对齐优化、回迁NCCL 2.28算法</li>
+                            <li>rocSHMEM增加GDA后端,CPU完全退出通信关键路径</li>
+                            <li>MSMCL++集成(AllReduce/AllGather)、gfx950(MI350)LL128协议</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">AMD通信库正全面对标NVIDIA NCCL CE Collectives/GDS路线:"通信卸载到专用引擎+GPU发起"成为两家共同方向,64 CU→1 CU的资源释放对MoE all-to-all场景收益巨大。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://rocm.blogs.amd.com/software-tools-optimization/gpu-initiated-sdma/README.html" target="_blank" class="ref-link">AMD ROCm官方博客 - GPU-Initiated SDMA</a> | <a href="https://www.techpowerup.com/345550/amd-intros-rocm-v7-2-smarter-faster-more-scalable-for-modern-ai-workloads" target="_blank" class="ref-link">TechPowerUp - ROCm 7.2</a> | <a href="https://www.amd.com/en/corporate/events/advancing-ai/sessions-catalog/evolving-comms-libraries-in-rocm-for-future-ai-workloads.html" target="_blank" class="ref-link">AMD Advancing AI 2026 - Evolving Comms Libraries</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 5: Overlap stacking -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">叠瓦式3.5D封装 (Overlap Stacking: Breaking the Reticle Limit)</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">3.5D封装专利</span>
+                            <span class="text-xs text-slate-500 self-center">2024末披露 / 2026-04成为模块化战略基础</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 部分重叠的偏移堆叠(shingled)布局,突破光刻reticle极限——小chiplet部分叠放在大"master" die下方形成阶梯结构。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>TSV垂直信号缩短core-to-cache/memory路径</li>
+                            <li>高功率单元靠近散热盖、低功率单元置于下方,每"瓦片"独立电源域</li>
+                            <li>2026年支撑16-24核封装与Ryzen AI "Medusa"等产品</li>
+                            <li>MI400/Helios机架2026年引入UAL 1.0机架内scale-up(带宽2x PCIe Gen6)、Vulcano 800G UEC NIC</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">使3.5D封装成为CPU/GPU tile灵活混排的基础,直接决定MI400之后与对手的密度竞争;AMD与Intel的UAL联盟共同对冲NVLink封闭生态。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.kad8.com/hardware/amd-overlap-stacking-breaking-the-reticle-limit-in-2026/" target="_blank" class="ref-link">KAD8 - AMD Overlap Stacking</a> | <a href="https://www.storagereview.com/nl/news/from-mi350-to-mi500-amds-bold-ai-accelerator-roadmap-through-2027" target="_blank" class="ref-link">StorageReview - MI350到MI500路线图</a></div>
+                </div>
+            </div>
+
         </section>
 
         <!-- ==================== INTEL SECTION ==================== -->
@@ -389,350 +576,436 @@
                 <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
                     <i class="fas fa-hdd text-white"></i>
                 </div>
-                <h2 class="text-lg font-bold text-blue-400">Intel 计算通信并行专利</h2>
+                <h2 class="text-lg font-bold text-blue-400">Intel 计算-通信并行 / 互连 / 封装专利</h2>
             </div>
 
-            <!-- Intel Patent 1: Multi-GPU Cache-Sync -->
+            <!-- Patent 1: Cross GPU barriers -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">多GPU内存缓存同步系统 (Multi-GPU Memory Cache-Sync System)</h3>
+                        <h3 class="font-semibold text-violet-300">基于内存语义协议的跨GPU屏障 (Cross GPU Barriers Using Memory Semantics Protocol)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">US20260211839A1</span>
-                            <span class="text-xs text-slate-500 self-center">2026-07-23 公开</span>
+                            <span class="company-badge">US20260195292A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-07-09 公开 | 德国优先权 2025-01</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 自动化多GPU间的内存缓存协调。采用多tile布局,每个tile拥有独立的内存管理控制器(MMU),主动监控相邻tile的本地存储缓冲区。检测到本地修改后,自主评估是否需要推送更新到远程tile,选择性通过高速通信fabric发送更新,避免过时信息同时节省带宽。
+                        <strong class="text-violet-300">核心创新:</strong> 在互连(附图明确标注Ultra Acceleration Link, UAL)的内存语义之上构建去中心化多GPU同步协议——N GPU只需N条消息,无需CPU仲裁或专用硬件。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>多tile架构:每个segment拥有独立的内存管理控制器(MMU)</li>
-                            <li>主动缓存监控:一个tile的MMU追踪相邻segment的存储内容</li>
-                            <li>选择性刷新:检测到修改后自主判断是否需要更新远程缓存</li>
-                            <li>带宽优化:仅传输变更数据,而非全量刷新</li>
-                            <li>通信fabric:通过高速互连实现跨tile缓存一致性</li>
+                            <li>每个GPU映射其他GPU的内存aperture</li>
+                            <li>一台GPU以适当内存语义向全部aperture广播</li>
+                            <li>其他GPU等待写入可见即完成同步</li>
+                            <li>每块GPU的command processor执行同步逻辑</li>
+                            <li>发明人Sellers、Herholz、Boudier、Chajdas(图形/互连软件团队)</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利对Intel Falcon Shores和未来的多tile GPU架构至关重要。自动化缓存同步减少了软件维护一致性的开销,对分布式训练中的梯度同步和推理中的KV cache共享有直接优化作用。这也是Intel对标NVIDIA NVLink缓存一致性技术的关键布局。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">Intel加入UAL联盟(与AMD/微软等共建开放scale-up互连)后的关键软件层专利;若与Gaudi/Crescent Island结合,将直接对标NVSwitch的barrier能力。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/multi-gpu-memory-cache-sync-system/" target="_blank" class="ref-link">Patentlyze - Intel Multi-GPU Cache-Sync</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260195292-cross-gpu-barriers-memory-semantics-protocol.html" target="_blank" class="ref-link">Patents-Review - US20260195292A1</a></div>
                 </div>
             </div>
 
-            <!-- Intel Patent 2: XBM Memory Architecture -->
+            <!-- Patent 2: Communication optimizations -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">XBM内存架构 - 替代HBM的新型内存方案 (Extended Backend Memory)</h3>
+                        <h3 class="font-semibold text-violet-300">分布式机器学习通信优化 (Communication Optimizations for Distributed Machine Learning)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">Intel Patent</span>
-                            <span class="text-xs text-slate-500 self-center">2025 申请 | 审查中</span>
+                            <span class="company-badge">US20260119902A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-04-30 公开 | 申请 19/339,439</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> Intel提出XBM(Extended Backend Memory)架构,采用后端晶体管DRAM堆叠替代传统HBM的昂贵硅中介层。通过UCIe链路实现内存与处理单元的高速互连,内置自动修复机制提高良率。该架构旨在消除AI系统中的内存瓶颈,同时降低封装成本。
+                        <strong class="text-violet-300">核心创新:</strong> 基于互连交换机的多GPU分布式训练通信优化体系——覆盖拓扑感知分组、QoS管理、无服务器加速器池化与故障恢复。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>后端晶体管DRAM:采用新型堆叠技术替代HBM的硅中介层</li>
-                            <li>UCIe链路:通过Universal Chiplet Interconnect Express实现高速互连</li>
-                            <li>自动修复:内置built-in repair机制提高制造良率</li>
-                            <li>成本优化:消除昂贵的硅中介层,降低封装成本</li>
-                            <li>内存层邻近处理单元:通过垂直通道实现低延迟访问</li>
+                            <li>交换机经点对点互连耦合多块GPU</li>
+                            <li>拓扑感知的灵活节点分组算法</li>
+                            <li>通信QoS管理(节点间与节点内并行处理器)</li>
+                            <li>持久化深度学习通信、无服务器加速器池化(server-less pooling)与故障恢复点机制</li>
+                            <li>发明人Sridharan、Das等</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">XBM架构代表了Intel对下一代AI加速器内存方案的前瞻布局。通过消除HBM的硅中介层依赖,Intel可在降低封装成本的同时提升内存带宽。UCIe互连标准的支持使该架构具有多厂商兼容性。预计2027-2028年可能在Intel下一代GPU中商用。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">覆盖MLSL之后的oneCCL/oneAPI通信栈演进路线,支撑Intel以太网scale-up与多机机箱扩展。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://www.tomshardware.com/tech-industry/semiconductors/intel-patent-reveals-new-xbm-memory-architecture-that-ditches-hbms-costly-silicon-interposer-backend-transistor-dram-stack-uses-ucie-links-and-built-in-repair-to-ease-ais-memory-bottleneck" target="_blank" class="ref-link">Tom's Hardware - Intel XBM Memory Architecture</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260119992-communication-optimizations-distributed-machine-learning.html" target="_blank" class="ref-link">Patents-Review - US20260119902A1</a></div>
                 </div>
             </div>
 
-            <!-- Intel oneAPI 2026 -->
+            <!-- Patent 3: TSV bridges -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">Intel oneAPI Toolkit 2026 - 异构通信编程模型</h3>
+                        <h3 class="font-semibold text-violet-300">顶层先装TSV桥接封装 (TSV Bridges with Top Die First)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">oneAPI 2026</span>
-                            <span class="text-xs text-slate-500 self-center">2026 发布</span>
+                            <span class="company-badge">US20260231831A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-08-06 公开</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> Intel oneAPI 2026版本强化了跨CPU/GPU/FPGA的统一通信编程模型。oneCCL集合通信库优化了AllGather、ReduceScatter等操作的流水线调度,支持通信-计算重叠。新增对Intel Max系列GPU的深度优化,提供SYCL 2024标准支持。
+                        <strong class="text-violet-300">核心创新:</strong> 双GPU die+双HBM栈+三块桥接die的高性能微组装结构,以"top die first"装配序规避昂贵计算die后贴装的良率损失。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>统一编程模型:跨CPU/GPU/FPGA的SYCL 2024标准支持</li>
-                            <li>oneCCL优化:AllGather/ReduceScatter流水线调度改进</li>
-                            <li>通信计算重叠:后台通信与前台计算并行执行</li>
-                            <li>Max系列GPU:针对Intel Data Center GPU Max的深度优化</li>
-                            <li>开源生态:作为oneAPI toolkit的一部分开源发布</li>
+                            <li>底层3 die中第一/三块含TSV,中间桥die不含</li>
+                            <li>绝缘层旁的导电pillar与绝缘层等厚,形成直通垂直路径</li>
+                            <li>顶层floorplan为HBM-GPU-GPU-HBM,两块GPU各横跨中间桥</li>
+                            <li>两GPU顶面共面(利于散热盖),HBM高度不要求共面</li>
+                            <li>同日配套die-to-die适配器专利(按链路参数选数据格式)</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">oneAPI 2026是Intel对标CUDA生态的核心工具链。通过统一编程模型降低从CUDA迁移的成本,oneCCL的优化使Intel GPU在大规模训练中具备竞争力。但与NCCL的生态成熟度差距仍然存在。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">构成Intel多tile GPU(Ponte Vecchio后继)互连-封装协同布局,解决信号绕过桥层的布线问题。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://www.intel.com/content/www/us/en/developer/articles/release-notes/oneapi-toolkit/2026.html" target="_blank" class="ref-link">Intel oneAPI 2026 Release Notes</a> | <a href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html" target="_blank" class="ref-link">Intel oneCCL官方</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://chipdocket.com/articles/intel-tsv-bridge-gpu-hbm-package-architecture-tech-brief-2026-08-06" target="_blank" class="ref-link">ChipDocket - Intel TSV Bridge GPU+HBM</a></div>
                 </div>
             </div>
+
+            <!-- Patent 4: multi-GPU cache sync -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">多GPU内存缓存同步系统 (Multi-GPU Memory Cache Sync System)</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">US2026/0211839 A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-07-23 公开 | 申请 2025-12-29</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 多tile GPU中每tile的MMU自动跟踪邻tile cache内容并决策是否推送更新,硬件化跨tile缓存一致性。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>每tile自带memory side cache</li>
+                            <li>第一tile的MMU扩展为可跟踪邻tile cache持有的数据</li>
+                            <li>数据变更时经通信fabric自动推送远端cache更新</li>
+                            <li>自动权衡"推送过多浪费带宽 vs 过少产生脏数据"</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">跨tile缓存一致性是多芯片GPU最难的静默性能杀手;硬件化后开发者无需手写一致性代码,直接惠及AI训练吞吐。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/multi-gpu-memory-cache-sync-system/" target="_blank" class="ref-link">Patentlyze - Multi-GPU Memory Cache Sync</a></div>
+                </div>
+            </div>
+
+            <!-- Patent 5: CN fine-grained overlap + Gaudi 3 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">细粒度计算-通信交错执行 + Gaudi 3片上以太网集合通信</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">CN121981208A / 白皮书</span>
+                            <span class="text-xs text-slate-500 self-center">CN公开 2026-05-05 / Gaudi 3白皮书</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> Intel中国申请的CN121981208A在库层将GPU计算与网络接口的梯度收发交错(interleave)执行,配合MLSL式流水线调度实现overlap;Gaudi 3则以24x200GbE RoCE v2+NIC内张量引擎实现片上以太网集合通信与计算重叠。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>CN专利:库层交错执行GPU计算与网络接口梯度收发</li>
+                            <li>Gaudi 3:in-network reduction(sum/min/max,FP32/FP16/BF16/FP8)</li>
+                            <li>NIC内tensor engine支持张量语义RDMA、选择性重传</li>
+                            <li>NIC与计算引擎片内同步:MME→NIC→TPC生产者-消费者流水线</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">Gaudi 3的"集合通信offload到以太网NIC"是Intel区别于NVLink/UAL路线的差异化方案;ACM CSUR 2026综述指出Intel SHMEM跨节点仍依赖host proxy,是后续优化方向。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/CN121981208A" target="_blank" class="ref-link">Patsnap - CN121981208A</a> | <a href="https://www.aspsys.com/wp-content/uploads/2024/04/gaudi-3-ai-accelerator-white-paper.pdf" target="_blank" class="ref-link">Gaudi 3白皮书(官方PDF)</a> | <a href="https://github.com/2022hitoss/papers/blob/main/docs/CSUR2026-GPU-Centric-Communication/paper.md" target="_blank" class="ref-link">ACM CSUR 2026 GPU-Centric Communication综述</a></div>
+                </div>
+            </div>
+
         </section>
 
         <!-- ==================== HUAWEI SECTION ==================== -->
         <section id="huawei" class="section-block" style="display:none;">
             <div class="flex items-center gap-3 mb-6">
-                <div class="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-lg flex items-center justify-center">
+                <div class="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-700 rounded-lg flex items-center justify-center">
                     <i class="fas fa-network-wired text-white"></i>
                 </div>
-                <h2 class="text-lg font-bold text-yellow-400">华为 计算通信并行专利</h2>
+                <h2 class="text-lg font-bold text-orange-400">华为 集合通信 / 计算通信并行专利</h2>
             </div>
 
-            <!-- Huawei Patent 1: HCCL Optimization -->
+            <!-- Patent 1 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">集合通信方法及装置 (Collective Communication Method and Apparatus)</h3>
+                        <h3 class="font-semibold text-violet-300">距离感知的集合通信分片方法 (Collective Communication Method and Computing Device Cluster)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">CN117827645A</span>
-                            <span class="text-xs text-slate-500 self-center">2024 公开</span>
+                            <span class="company-badge">WO2026091617A1</span>
+                            <span class="text-xs text-slate-500 self-center">2026-05-07 公开 | 优先权 2024-10-28</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 提出一种基于昇腾NPU架构的集合通信优化方法。通过双平面网络拓扑实现AllReduce操作的流水线化,将数据分割为多个micro-batch在不同平面并行传输。结合计算通信重叠调度,在反向传播时提前触发梯度通信。
+                        <strong class="text-violet-300">核心创新:</strong> 按计算单元间物理距离反比分配分片数据量——距离近者传大数据、距离远者传小数据,优化环/HD(Halving-Doubling)算法在大规模集群中的通信效率。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>双平面拓扑:利用两个独立网络平面并行传输数据</li>
-                            <li>Micro-batch流水线:将大数据块分割为小批次在不同平面交替传输</li>
-                            <li>提前触发:反向传播时提前计算部分梯度并启动通信</li>
-                            <li>HCCL库优化:昇腾集合通信库深度适配双平面硬件</li>
-                            <li>计算通信重叠:调度器自动安排计算和通信任务的时间窗口</li>
+                            <li>N个计算单元数据超过阈值时切分为N片分片</li>
+                            <li>收发分片数与两单元间物理距离成反比,减少跨交换机流量冲突</li>
+                            <li>无论N是否为2的幂,通信步数均达对数级理论最优</li>
+                            <li>覆盖AllGather、Reduce-Scatter、Scatter等算子的具体步进公式</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该专利是华为昇腾集群通信优化的核心。双平面架构在昇腾910B集群中已得到应用,支撑了盘古大模型等训练任务。HCCL库的优化使昇腾在大规模集合通信场景中接近NVLink性能。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">直接针对Atlas超节点类大规模NPU集群的集合通信瓶颈,缓解非2幂卡数集群和跨交换机冲突问题,是昇腾集群通信库的算法层核心专利。发明人:徐斌、陈毅、李标智。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://www.sohu.com/a/1094931465_114984" target="_blank" class="ref-link">华为集合通信专利分析</a> | <a href="https://www.hiascend.com/cann/hccl" target="_blank" class="ref-link">HCCL官方文档</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/WO2026091617A1" target="_blank" class="ref-link">Patsnap Eureka - WO2026091617A1</a></div>
                 </div>
             </div>
 
-            <!-- Huawei Patent 2: Super Node Architecture -->
+            <!-- Patent 2 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">昇腾超节点"算力存储通信"三墙突破架构</h3>
+                        <h3 class="font-semibold text-violet-300">拓扑感知通信环步数压缩 (集合通信方法、装置和计算设备集群)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">华为技术白皮书</span>
-                            <span class="text-xs text-slate-500 self-center">2025 发布</span>
+                            <span class="company-badge">CN123020365A</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10 公开 | 申请 2025-09</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 华为提出突破"算力、存储、通信"三堵墙的超节点架构。通过HCCS 2.0互连(400 GB/s双向带宽)实现64块NPU的全互连,支持节点内统一内存地址空间。引入桥接NPU实现跨节点通信优化,支持十万卡级集群训练。2026年华为全联接大会进一步发布业界首个使用NPO(光近封装)的昇腾超节点方案。
+                        <strong class="text-violet-300">核心创新:</strong> 基于通信域拓扑构建通信环,在总通信量与Ring算法一致的前提下将通信步数从(N-1)级显著降低。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>HCCS 2.0:华为自研互连协议,400 GB/s双向带宽</li>
-                            <li>64 NPU全互连:单节点内最多64块NPU通过HCCS全互连</li>
-                            <li>统一内存地址:节点内NPU共享统一虚拟地址空间</li>
-                            <li>桥接NPU:专用NPU负责跨节点通信转发</li>
-                            <li>NPO光互连:2026年引入光近封装技术提升互连带宽</li>
+                            <li>获取集合通信算子所在通信域的拓扑信息</li>
+                            <li>依据目标计算卡数量确定通信步数</li>
+                            <li>结合拓扑信息、步数与环上计算卡先后顺序推导每步通信关系</li>
+                            <li>总通信量不变、步数压缩,实现时延降低</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">华为超节点架构是国产AI基础设施的核心。在信创背景下,该架构支撑了国内多个万卡级AI集群的建设。HCCS 2.0的400 GB/s带宽虽低于NVLink 5.0的1.8 TB/s,但在国产互连技术中处于领先水平。NPO光互连的引入有望在2027年大幅提升互连带宽。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">面向多卡训练/推理场景的时延优化,与超节点内环形拓扑(如UB-Mesh)适配性高。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://m.zhidx.com/p/597088.html" target="_blank" class="ref-link">智东西 - 华为昇腾超节点</a> | <a href="https://www.huawei.com/cn/news/2026/9/hc-wang-keynote" target="_blank" class="ref-link">华为全联接大会2026</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.163.com/dy/article/LAGEKRJ80519QIKK.html" target="_blank" class="ref-link">网易 - 华为通信环步数压缩专利报道</a></div>
                 </div>
             </div>
 
-            <!-- Huawei Patent 3: Top 10 Inventions -->
+            <!-- Patent 3 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">华为第六届"十大发明" - 通信计算融合创新</h3>
+                        <h3 class="font-semibold text-violet-300">集合通信算法的自动合成 (合成方法及装置)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">华为创新奖</span>
-                            <span class="text-xs text-slate-500 self-center">2025 公布</span>
+                            <span class="company-badge">CN122994184A</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10 公开 | 申请 2025-04</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 华为公布第六届"十大发明"创新成果,其中多项涉及通信与计算的深度融合。包括基于AI的信道编码优化、通信感知一体化、以及面向6G的联合通信计算架构。这些发明直接支撑了昇腾NPU中的通信硬件加速单元设计。
+                        <strong class="text-violet-300">核心创新:</strong> 将超大规模集合通信算法合成问题建模为优化问题并按维度(含数据块维度)切分求解,大幅提升求解效率——"通信算法自动合成/编译"方向。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>AI信道编码:利用机器学习优化通信编码方案</li>
-                            <li>通信感知一体化:将通信和感知功能融合到同一硬件架构</li>
-                            <li>6G联合通信计算:面向未来网络的通信计算协同设计</li>
-                            <li>硬件加速单元:昇腾NPU内置专用通信处理单元</li>
-                            <li>跨层优化:从算法到硬件的端到端协同设计</li>
+                            <li>基于算子类型、输入数据规模、集群拓扑结构建模为算法优化模型</li>
+                            <li>至少按数据块维度切分为多个优化子模型</li>
+                            <li>分别求解子模型再合并得到每个数据块的发送路径</li>
+                            <li>输出的集合通信算法直接指示数据块级路由</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">华为十大发明反映了其在通信计算融合领域的前瞻布局。这些技术不仅服务于5G/6G基站,也为昇腾AI芯片中的通信优化提供了基础IP。预计2026-2027年将有更多专利公开。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">与学界TACCL/Syncopate的"编译器自动编排通信"思路殊途同归,说明华为正把通信优化从人工调优转向自动化求解,支撑超大集群通信库演进。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://www.huawei.com/cn/ipr" target="_blank" class="ref-link">华为创新与知识产权</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.sohu.com/a/1094782846_114984" target="_blank" class="ref-link">搜狐 - 华为集合通信算法合成专利报道</a></div>
                 </div>
             </div>
+
+            <!-- Patent 4 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="font-semibold text-violet-300">RDMA节点内本地代理计算 (数据处理装置和方法)</h3>
+                        <div class="flex gap-2 mt-1">
+                            <span class="company-badge">CN121858389A</span>
+                            <span class="text-xs text-slate-500 self-center">2026-04-14 公开 | 申请 CN202512048062.0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 在集合通信节点内引入本地代理(HA)模块,用非总线接口完成数据计算与回写,绕开总线访存瓶颈——通信路径上做计算的典型实现。
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">技术实现:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>装置含RDMA模块(110)、本地代理HA模块(120)、内存模块(130)</li>
+                            <li>HA模块直接计算RDMA消息中的操作数与本地数据</li>
+                            <li>计算结果经非总线接口写入内存,避免经总线读取本地数据</li>
+                            <li>减少总线访问次数,降低节点内处理时延和总线带宽占用</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">可缓解AllReduce类场景节点侧瓶颈,与华为Toronto团队的CommFuse论文(见研究栏目)共同体现"通信-计算融合"的软硬协同路线。</span>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/CN121858389A" target="_blank" class="ref-link">Patsnap Eureka - CN121858389A</a></div>
+                </div>
+            </div>
+
         </section>
 
-        <!-- ==================== CHINA OTHER SECTION ==================== -->
+        <!-- ==================== CHINA SECTION ==================== -->
         <section id="china" class="section-block" style="display:none;">
             <div class="flex items-center gap-3 mb-6">
-                <div class="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-700 rounded-lg flex items-center justify-center">
+                <div class="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-lg flex items-center justify-center">
                     <i class="fas fa-flag text-white"></i>
                 </div>
-                <h2 class="text-lg font-bold text-orange-400">国内其他公司专利</h2>
+                <h2 class="text-lg font-bold text-yellow-400">国内其他公司:寒武纪 / 海光 / 摩尔线程</h2>
             </div>
 
-            <!-- Biren Optical Interconnect -->
+            <!-- Patent 1 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">壁仞科技 - NPO光互连分布式超节点架构</h3>
+                        <h3 class="font-semibold text-violet-300">寒武纪组合处理装置与通用互联接口 (数据处理装置、芯片、板卡及数据处理方法)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">光跃128卡商用版</span>
-                            <span class="text-xs text-slate-500 self-center">2026 WAIC发布</span>
+                            <span class="company-badge">CN123011322A</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10 公开 | 上海寒武纪,申请 2026-07</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 壁仞科技联合三方发布"国内首个光互连光交换超节点商用版"。采用硅光OCS芯片实现动态拓扑重构和协议无关扩展,突破传统电互连距离限制。集成CoWoS 2.5D先进封装和多chiplet设计,实现微秒级模型切换,传输延迟较传统电交换降低90%以上。已部署千卡级集群支持DeepSeek V3 671B训练。
+                        <strong class="text-violet-300">核心创新:</strong> 组合处理装置架构:计算装置经通用互联接口与其他处理装置协同完成计算操作,存储装置分别与两者连接共享数据。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>硅光OCS芯片:实现动态拓扑重构和协议无关的光交换</li>
-                            <li>CoWoS 2.5D封装:高密度液冷模块集成多chiplet设计</li>
-                            <li>微秒级切换:模型切换时间达到微秒级别</li>
-                            <li>延迟降低90%+:相比传统电交换显著降低传输延迟</li>
-                            <li>千卡部署:已成功支持DeepSeek V390%以上:相比传统电交换显著降低传输延迟</li>
-                            <li>千卡部署:已成功支持DeepSeek V3 671B等大模型训练</li>
-                            <li>软件平台:细粒度资源调度、秒级故障节点替换、分钟级checkpoint恢复</li>
+                            <li>计算装置+接口装置+其他处理装置组成组合处理装置</li>
+                            <li>以板卡/芯片/装置多层级权利要求覆盖片间协同</li>
+                            <li>延续寒武纪MLU-Link类通用互联接口体系布局</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">壁仞科技的光互连超节点代表了国产GPU互连技术的重要突破。NPO(光近封装)技术绕过了传统电互连的距离和带宽限制,为万卡级集群提供了可扩展的互连方案。在国产替代背景下,该技术对构建大规模AI基础设施具有战略价值。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">是寒武纪多芯片协同训练架构的基础专利之一,片间互联接口是其对抗单卡劣势的体系化筹码。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://www.birentech.com/news/h5vjj6lsw4n5za2yw6ayyv1e/" target="_blank" class="ref-link">壁仞科技 - 光跃128卡商用版</a> | <a href="https://www.birentech.com/news/odug5ugc29npl8m6slum8d9k/" target="_blank" class="ref-link">壁仞NPO光互连方案</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.163.com/dy/article/LAGHP9BQ0519QIKK.html" target="_blank" class="ref-link">网易 - 寒武纪组合处理装置专利报道</a></div>
                 </div>
             </div>
 
-            <!-- Cambricon Patent -->
+            <!-- Patent 2 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">寒武纪 - 数据处理装置通信优化专利</h3>
+                        <h3 class="font-semibold text-violet-300">海光跨域互联路由 (用于扩展互联芯片的报文发送方法、装置及芯片互联系统)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">寒武纪</span>
-                            <span class="text-xs text-slate-500 self-center">2026-04-09 授权</span>
+                            <span class="company-badge">CN123055677A</span>
+                            <span class="text-xs text-slate-500 self-center">2026-11-06 报道 | 海光信息,申请 2026-08</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 寒武纪取得数据处理装置相关专利,涉及AI芯片间的高效数据传输和同步机制。该专利优化了MLP架构下的数据流转效率,通过硬件级流水线和DMA引擎协同,减少通信等待时间。
+                        <strong class="text-violet-300">核心创新:</strong> 在本地路由表中预存标识目的地址所属芯片扩展架构类型的"域标识",按域选策略生成事务层报文,提升跨架构芯片互联的报文传输效率。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>硬件流水线:AI芯片内置专用数据传输流水线</li>
-                            <li>DMA引擎协同:直接内存访问引擎与计算单元并行工作</li>
-                            <li>MLP架构优化:针对矩阵运算的数据布局优化</li>
-                            <li>同步机制:低延迟的芯片间同步原语</li>
-                            <li>能效优化:降低数据传输的能耗开销</li>
+                            <li>发送端计算芯片基于本地路由表获取目的地址对应的域标识</li>
+                            <li>域标识区分不同芯片扩展架构类型(如不同Scale-up域)</li>
+                            <li>按域标识确定目标处理策略并生成携带域标识的事务层报文下发链路层</li>
+                            <li>与CN122909109A(NoC访问控制)、CN122757205A(双NoC低时延传输)形成配套专利群</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">寒武纪的通信优化专利对其思元系列AI芯片在大规模集群中的部署至关重要。随着国内AI芯片出货量的增长(2025年约165万张,占市场41%),通信效率成为影响集群训练性能的关键因素。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">支撑海光DCU/多芯扩展架构中跨域互联的路由效率,与其片上网络专利群共同构成Chiplet化路线的网络层基础。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://finance.sina.com.cn/stock/aigc/zl/2026-04-09/doc-inhtwaii6021360.shtml" target="_blank" class="ref-link">新浪财经 - 寒武纪专利授权</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.163.com/dy/article/LB32PN6I0519QIKK.html" target="_blank" class="ref-link">网易 - 海光跨域互联专利报道</a></div>
                 </div>
             </div>
 
-            <!-- MetaX Patent -->
+            <!-- Patent 3 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">沐曦股份 - 国产GPU研发投入与专利布局</h3>
+                        <h3 class="font-semibold text-violet-300">海光晶粒间多PHY传输延时对齐 (发送装置、接收装置、晶粒、芯片及通信系统)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">沐曦股份</span>
-                            <span class="text-xs text-slate-500 self-center">2026 上榜500强</span>
+                            <span class="company-badge">CN202511446310.0 授权</span>
+                            <span class="text-xs text-slate-500 self-center">2026-10-27 授权公告</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 沐曦股份上榜"2026民营企业研发投入与发明专利500家",其在国产GPU领域的专利布局涵盖互连通信、内存管理和集合通信优化。MXC系列芯片采用自研互连协议,支持多GPU间的高速数据传输和分布式内存管理。
+                        <strong class="text-violet-300">核心创新:</strong> 晶粒(die)间多PHY并行传输的发送延时对齐机制,降低D2D互联传输时延——Chiplet物理层互联的量产关键技术。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>自研互连协议:MXC系列芯片采用适配国产工艺的高速互连协议</li>
-                            <li>分布式内存管理:支持多GPU间的统一内存地址空间</li>
-                            <li>集合通信优化:针对国产网络环境优化的AllReduce算法</li>
-                            <li>软件栈兼容:提供类CUDA编程模型降低迁移成本</li>
-                            <li>专利500强:研发投入和专利数量进入民营企业前列</li>
+                            <li>第一晶粒发送装置含多个物理层电路接口模块,各发多路数据信号</li>
+                            <li>每模块内置发送延时子模块,采用传输训练确定的延时参数</li>
+                            <li>对齐各PHY"第一目标路"信号到达第二晶粒的时刻(差值小于阈值)</li>
+                            <li>适用于晶粒间互联通信(Chiplet/多die封装场景)</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">沐曦股份作为国产GPU新势力,其专利布局对国产AI芯片生态具有重要价值。在信创背景下,沐曦的互连通信技术积累为大规模国产GPU集群建设提供了基础。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">直接服务海光Chiplet化处理器的物理层互联,与行业Chiplet+先进封装趋势一致。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://www.metax-tech.com/en/ndetail/12654.html" target="_blank" class="ref-link">沐曦股份 - 2026民营企500强</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="http://stock.stockstar.com/RB2026102900056748.shtml" target="_blank" class="ref-link">证券之星 - 海光晶粒间通信专利授权报道</a></div>
                 </div>
             </div>
 
-            <!-- Shandong University + Inspur -->
+            <!-- Patent 4 -->
             <div class="patent-card rounded-xl p-5 mb-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>
-                        <h3 class="font-semibold text-violet-300">山东大学/浪潮 - 异构GPU系统统一内存接口</h3>
+                        <h3 class="font-semibold text-violet-300">摩尔线程显存-内存统一虚拟化 (内存管理方法、装置、系统、设备及存储介质)</h3>
                         <div class="flex gap-2 mt-1">
-                            <span class="company-badge">CN119718676A</span>
-                            <span class="text-xs text-slate-500 self-center">2025 公开</span>
+                            <span class="company-badge">CN122387587B</span>
+                            <span class="text-xs text-slate-500 self-center">2026-11-03 授权公告 | 申请 2026-06-10</span>
                         </div>
                     </div>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 提出支持NVIDIA/AMD/寒武纪等多厂商GPU设备的统一内存接口标准。通过抽象层屏蔽不同厂商的内存管理差异,实现异构GPU集群中的统一内存分配、迁移和同步。
+                        <strong class="text-violet-300">核心创新:</strong> 将宿主机物理显存与系统内存统一作为虚拟机虚拟内存,按实际负载在两者间动态切换可迁移虚拟内存的物理存储资源。
                     </div>
                     <div>
                         <strong class="text-slate-300">技术实现:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>多厂商抽象层:统一接口屏蔽NVIDIA/AMD/寒武纪等差异</li>
-                            <li>异构内存分配:跨不同GPU类型的智能内存分配策略</li>
-                            <li>统一同步原语:跨厂商的内存一致性维护</li>
-                            <li>迁移优化:异构GPU间的数据迁移加速</li>
-                            <li>信创适配:全面适配国产GPU生态</li>
+                            <li>物理显存+系统内存共同构成虚拟处理器虚拟内存</li>
+                            <li>划出"可迁移虚拟内存"分区,依据各内存数据使用情况切换物理存储资源</li>
+                            <li>闲置/低利用率资源可让渡给其他设备,提高利用率与分配灵活性</li>
+                            <li>与同期显存资源管理申请CN123011497A(推理实例迁移释放GPU显存)、集合通信专利CN122802424A构成组合</li>
                         </ul>
                     </div>
                     <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">在信创背景下,该专利为国内数据中心整合多厂商GPU设备提供了标准化方案。预计2026-2027年将推动形成国产异构互操作行业标准。</span>
+                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">面向GPU虚拟化/推理池化场景的内存架构专利——国产厂商正把NVIDIA UVM式统一内存思路落到推理云场景,补齐软件栈短板。</span>
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://patents.google.com/patent/CN119718676A/en" target="_blank" class="ref-link">Google Patents - CN119718676A</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://finance.sina.com.cn/stock/aigc/zl/2026-11-07/doc-inixwhsn5222623.shtml" target="_blank" class="ref-link">新浪财经 - 摩尔线程内存管理专利授权报道</a></div>
                 </div>
             </div>
+
         </section>
 
         <!-- ==================== RESEARCH SECTION ==================== -->
@@ -741,230 +1014,196 @@
                 <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center">
                     <i class="fas fa-flask text-white"></i>
                 </div>
-                <h2 class="text-lg font-bold text-cyan-400">计算通信并行研究论文与技术进展</h2>
+                <h2 class="text-lg font-bold text-cyan-400">计算通信并行最新研究 (2026)</h2>
             </div>
 
-            <!-- Paper 1: FlashOverlap -->
+            <!-- Paper 1 -->
             <div class="patent-card rounded-xl p-5 mb-4">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <h3 class="font-semibold text-violet-300">FlashOverlap: 轻量级计算通信重叠框架</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span class="company-badge">arXiv:2504.19519</span>
-                            <span class="text-xs text-slate-500 self-center">2025-04 | ACM 2026</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-violet-300">Scheduling Data to Compute: AMD GPU上的LLM训练分层流水线</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">arXiv:2611.05751</span>
+                    <span class="text-xs text-slate-500 self-center">AMD | 2026-11-03</span>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 提出轻量级计算通信重叠设计,通过警报机制和内存重组实现高效并发。当处理单元完成特定数据块后发送警报触发传输,同时继续计算剩余数据。在发送前重组内存地址适配标准库调用,传输完成后恢复原始序列。相比先前方法实现1.65倍加速比。
+                        <strong class="text-violet-300">核心创新:</strong> 以"数据等待时间"为主瓶颈,编排AMD GPU显式数据搬运硬件特性,形成向计算单元持续供数的分层流水线——首个利用GPU全部数据流水线特性的AMD LLM训练系统。
                     </div>
                     <div>
-                        <strong class="text-slate-300">技术实现:</strong>
+                        <strong class="text-slate-300">技术方案:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>警报机制:数据块完成后立即触发传输,无需等待全部完成</li>
-                            <li>内存重组:发送前重新排列地址适配标准库,传输后恢复</li>
-                            <li>并发执行:最大化block级并发,防止处理中断</li>
-                            <li>库无关性:不依赖特定数据传输库,通用性强</li>
-                            <li>1.65x加速:相比先前最优方法实现显著性能提升</li>
+                            <li>Tensor Data Mover(TDM):HBM→片上内存搬运,内核级平均1.88x(最高2.74x)</li>
+                            <li>transpose-load:加载同时重排为LLM所需布局,平均1.19x</li>
+                            <li>SDMA(scale-up)/RDMA(scale-out)跨GPU传输与计算重叠,平均1.16x / 1.33x</li>
+                            <li>代码开源:Primus-Turbo/Primus(AMD-AGI组织)</li>
                         </ul>
                     </div>
-                    <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">FlashOverlap发表于ACM 2026,是计算通信重叠领域的最新突破。1.65倍加速比对工业界具有极高价值。轻量级设计使其易于集成到现有训练框架中。已开源实现促进社区 adoption。</span>
-                    </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2504.19519" target="_blank" class="ref-link">arXiv:2504.19519</a> | <a href="https://github.com/infinigence/FlashOverlap" target="_blank" class="ref-link">GitHub - FlashOverlap</a> | <a href="https://dl.acm.org/doi/10.1145/3767295.3769370" target="_blank" class="ref-link">ACM Digital Library</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2611.05751" target="_blank" class="ref-link">arXiv:2611.05751 论文原文</a></div>
                 </div>
             </div>
 
-            <!-- Paper 2: Resource-aware Overlap -->
+            <!-- Paper 2 -->
             <div class="patent-card rounded-xl p-5 mb-4">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <h3 class="font-semibold text-violet-300">Resource-aware 计算通信重叠 (多GPU ML工作负载)</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span class="company-badge">arXiv:2606.09200</span>
-                            <span class="text-xs text-slate-500 self-center">2026-06 | Chalmers大学</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-violet-300">Syncopate: chunk中心的自动计算-通信重叠 (OSDI '26)</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">OSDI '26</span>
+                    <span class="text-xs text-slate-500 self-center">UCSD / Meta / OpenAI | arXiv:2601.20595</span>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 提出资源感知的计算通信重叠方法,通过两个自适应运行时机制实现高效并发。一是"共享内存驱动的占用率塑形"(occupancy shaping)优化计算任务;二是赋予数据传输更高的调度优先级。在NVIDIA和AMD多种硬件上验证,减少总执行时间高达25.5%,且无需修改原始厂商代码。
+                        <strong class="text-violet-300">核心创新:</strong> 编译器+运行时,在单个融合kernel内实现自动细粒度计算-通信重叠,通信"chunk"抽象解耦通信粒度与kernel结构/后端。
                     </div>
                     <div>
-                        <strong class="text-slate-300">技术实现:</strong>
+                        <strong class="text-slate-300">技术方案:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>共享内存驱动占用率塑形:通过分配共享内存per block控制计算资源占用</li>
-                            <li>高优先级调度:赋予数据流最高调度优先级保证传输进度</li>
-                            <li>资源预留:留足够片上资源供数据传输顺利进行</li>
-                            <li>跨硬件验证:在NVIDIA和AMD多种GPU架构上验证有效性</li>
-                            <li>零代码修改:无需修改原始库和kernel代码即可实现重叠</li>
+                            <li>chunk计划可从现有分布式编译器(Domino、Alpa、Mercury)移植</li>
+                            <li>改写tile调度对齐chunk顺序+chunk内swizzle,免数据重排</li>
+                            <li>通信后端自动选择(Copy Engine / 专用SM / 与计算同置)</li>
+                            <li>性能:4 GPU上平均达最优手写kernel的99.8%,8 GPU上达104%</li>
                         </ul>
                     </div>
-                    <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该研究由Chalmers理工大学完成,发表于2026年。25.5%的执行时间减少在工业界具有显著价值。跨NVIDIA/AMD硬件的验证表明该方法具有通用性。零代码修改特性使其易于部署到现有生产环境。</span>
-                    </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2606.09200" target="_blank" class="ref-link">arXiv:2606.09200</a> | <a href="https://odr.chalmers.se/items/4c25d40c-6fe9-4426-9fcf-c7857413db27" target="_blank" class="ref-link">Chalmers Research</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.usenix.org/conference/osdi26/presentation/qiang" target="_blank" class="ref-link">USENIX OSDI'26 论文页</a> | <a href="https://arxiv.org/abs/2601.20595" target="_blank" class="ref-link">arXiv:2601.20595 论文原文</a></div>
                 </div>
             </div>
 
-            <!-- Paper 3: Occult -->
+            <!-- Paper 3 -->
             <div class="patent-card rounded-xl p-5 mb-4">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <h3 class="font-semibold text-violet-300">Occult: 优化MoE专家间协作通信 (ICML 2025)</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span class="company-badge">ICML 2025</span>
-                            <span class="text-xs text-slate-500 self-center">arXiv:2505.13345</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-violet-300">TokenWeave: 面向分布式LLM推理的计算-通信重叠 (MLSys '26)</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">MLSys 2026</span>
+                    <span class="text-xs text-slate-500 self-center">Microsoft Research India | arXiv:2505.11329</span>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 提出"协作数据交换"概念,优化专家并行中的跨设备通信。发现同一数据块激活的专家间的协作可显著加速分布式处理。通过硬件和软件协同优化,实现比现有方案1.5倍以上的加速,同时保持高输出质量。
+                        <strong class="text-violet-300">核心创新:</strong> 首个面向TP推理、token数低至1024即可生效的高效重叠系统(vLLM/SGLang默认不开启重叠)。
                     </div>
                     <div>
-                        <strong class="text-slate-300">技术实现:</strong>
+                        <strong class="text-slate-300">技术方案:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>协作数据交换:同一数据块激活的专家间进行本地协作</li>
-                            <li>本地/远程分类:根据专家物理位置区分协作模式</li>
-                            <li>精确结果保证:在减少通信量的同时保证数学精确性</li>
-                            <li>协作剪枝:通过修改微调过程最小化跨设备数据交换</li>
-                            <li>1.5x+加速:相比现有方案实现显著性能提升</li>
+                            <li>新的AllReduce-RMSNorm融合kernel(利用被忽视的RMSNorm重叠机会)</li>
+                            <li>对称内存+Multimem/NVLS降低通信SM占用</li>
+                            <li>wave-aware宏拆分降低切分开销</li>
+                            <li>性能:延迟最高1.28x、端到端吞吐最高1.19x(8×H100);已集成Llama-3.3-70B、Qwen2.5-72B、Mixtral-8x22B并开源</li>
                         </ul>
                     </div>
-                    <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">Occult发表于ICML 2025,是MoE通信优化领域的重要工作。40%+的运行时开销被通信占据的问题在MoE规模化部署中日益突出。Occult通过协作通信概念开辟了新的优化方向。已开源实现促进社区验证。</span>
-                    </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2505.13345" target="_blank" class="ref-link">arXiv:2505.13345</a> | <a href="https://github.com/UNITES-Lab/Occult" target="_blank" class="ref-link">GitHub - Occult</a> | <a href="https://proceedings.mlr.press/v267/luo25f.html" target="_blank" class="ref-link">ICML 2025 Proceedings</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2505.11329" target="_blank" class="ref-link">arXiv:2505.11329 论文原文</a> | <a href="https://github.com/microsoft/tokenweave" target="_blank" class="ref-link">GitHub开源代码</a></div>
                 </div>
             </div>
 
-            <!-- Paper 4: Characterizing Overhead -->
+            <!-- Paper 4 -->
             <div class="patent-card rounded-xl p-5 mb-4">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <h3 class="font-semibold text-violet-300">量化GPU计算通信重叠的性能与功耗影响</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span class="company-badge">IEEE TPDS 2025</span>
-                            <span class="text-xs text-slate-500 self-center">arXiv:2507.03114</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-violet-300">CommFuse: 通信分解与融合消除尾延迟 (华为多伦多昇腾团队)</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">arXiv:2604.24013</span>
+                    <span class="text-xs text-slate-500 self-center">Huawei Toronto Ascend | 2026-04</span>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 首次系统性量化GPU上计算-通信重叠的开销。发现虽然并行执行优于串行(串行慢10.2%),但相比理想无干扰状态仍导致平均18.9%计算减速。大模型场景下功耗可达TDP的140%,严格能耗限制可使延迟增加107%。
+                        <strong class="text-violet-300">核心创新:</strong> 消除数据切片式重叠方法残留的尾延迟(tail latency)——把reduce-scatter/all-gather分解为对等P2P传输,再同步调度分块计算与通信。
                     </div>
                     <div>
-                        <strong class="text-slate-300">技术实现:</strong>
+                        <strong class="text-slate-300">技术方案:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>硬件瓶颈:并行操作产生资源争用导致18.9%减速</li>
-                            <li>扩展问题:模型参数和数据批次扩展放大性能下降</li>
-                            <li>能耗峰值:并行任务驱动功耗达TDP的140%</li>
-                            <li>严格限制:强制能耗上限使延迟增加最高107%</li>
-                            <li>专用硬件:低精度或矩阵核心有助于小任务但加剧大任务干扰</li>
+                            <li>FuseAG / FuseRS原语同步调度分块计算与通信</li>
+                            <li>环形通信方向可变,保持集合通信语义的精确算法</li>
+                            <li>面向TP/DP及TPSP、Ulysses并行,兼容GPU/TPU/NPU</li>
                         </ul>
                     </div>
-                    <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该研究发表于IEEE TPDS 2025,为分布式训练系统设计提供了重要量化基准。18.9%的平均减速和140%的峰值功耗警告对数据中心散热设计和框架优化具有指导意义。</span>
-                    </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2507.03114" target="_blank" class="ref-link">arXiv:2507.03114</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2604.24013" target="_blank" class="ref-link">arXiv:2604.24013 论文原文</a></div>
                 </div>
             </div>
 
-            <!-- Paper 5: Demystifying NCCL -->
+            <!-- Paper 5 -->
             <div class="patent-card rounded-xl p-5 mb-4">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <h3 class="font-semibold text-violet-300">深度解析NCCL: GPU通信协议与算法分析</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span class="company-badge">arXiv:2507.04786</span>
-                            <span class="text-xs text-slate-500 self-center">2025-07</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-violet-300">DisagMoE: 解耦AF-Pipe并行的计算-通信重叠MoE训练 (字节跳动)</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">arXiv:2605.11005</span>
+                    <span class="text-xs text-slate-500 self-center">ByteDance Seed / UW / Cornell | 2026-05</span>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 对NCCL集合通信库进行深度系统性分析,揭示其内部算法选择、拓扑感知和传输优化机制。详细剖析了Ring、Tree、NVLink等算法在不同消息规模和拓扑下的性能特征。为NCCL优化和替代方案设计提供理论基础。
+                        <strong class="text-violet-300">核心创新:</strong> 按模块类型解耦Attention与FFN到不相交GPU池,联合优化模型放置与调度,消除MoE all-to-all通信泡。
                     </div>
                     <div>
-                        <strong class="text-slate-300">技术实现:</strong>
+                        <strong class="text-slate-300">技术方案:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>算法分析:深入解析Ring/Tree/NVLink算法的适用场景</li>
-                            <li>拓扑感知:揭示NCCL如何根据硬件拓扑选择最优算法</li>
-                            <li>传输优化:分析NCCL内部的数据传输和同步机制</li>
-                            <li>性能建模:建立不同消息规模下的性能预测模型</li>
-                            <li>开源验证:提供可复现的分析框架和测试工具</li>
+                            <li>A-Worker(组内DP)与F-Worker(组内EP)分离;M2N/N2M单向many-to-many通信原语</li>
+                            <li>AF-Pipe多级流水时分调度,token dispatch/combine跨阶段重叠</li>
+                            <li>roofline模型+MILP+局部搜索决定GPU/NIC配比</li>
+                            <li>性能:较Megatron-LM 1F1B最高1.81x;较Tutel/Comet 1.2-1.5x;较DualPipe 1.05-1.13x(DeepSeek-MoE、GPT-OSS-120B、Qwen3-235B实测)</li>
                         </ul>
                     </div>
-                    <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该研究为理解和优化NCCL提供了系统性视角。对开发替代通信库(如RCCL、oneCCL)具有参考价值。深入理解NCCL内部机制有助于在实际训练中做出更优的配置选择。</span>
-                    </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2507.04786" target="_blank" class="ref-link">arXiv:2507.04786</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/html/2605.11005v1" target="_blank" class="ref-link">arXiv:2605.11005 论文原文</a></div>
                 </div>
             </div>
 
-            <!-- Paper 6: Lagom MoE -->
+            <!-- Paper 6 -->
             <div class="patent-card rounded-xl p-5 mb-4">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <h3 class="font-semibold text-violet-300">Lagom: 释放通信与计算并行潜力用于MoE训练</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span class="company-badge">arXiv:2602.20656</span>
-                            <span class="text-xs text-slate-500 self-center">2026-02</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-violet-300">Tile级信令与调度的MoE细粒度重叠 (ICPP 2026)</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">ICPP 2026</span>
+                    <span class="text-xs text-slate-500 self-center">Linnaeus University | arXiv:2607.19539</span>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 针对MoE模型训练中的通信瓶颈,Lagom提出通信与计算并行的系统化优化方案。通过自适应工作负载分配和细粒度流水线调度,最大化计算通信重叠效率。在大规模MoE训练中实现显著的端到端加速。
+                        <strong class="text-violet-300">核心创新:</strong> 通过tile级信令与调度,将专家计算与第二个all-to-all(结果回传)重叠,而不改动底层算子或通信原语。
                     </div>
                     <div>
-                        <strong class="text-slate-300">技术实现:</strong>
+                        <strong class="text-slate-300">技术方案:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>自适应工作负载分配:动态调整计算和通信任务比例</li>
-                            <li>细粒度流水线:在MoE层级别实现计算通信深度重叠</li>
-                            <li>All-to-All优化:针对MoE特有的all-to-all通信模式优化</li>
-                            <li>负载均衡:防止小通信延迟成为整体瓶颈</li>
-                            <li>大规模验证:在千卡级集群中验证加速效果</li>
+                            <li>持久化per-rank计算内核(生产者),覆盖本rank全部专家,消除重复launch</li>
+                            <li>优先调度remote-critical tile;专用SM分区上的持久化通信内核(消费者)</li>
+                            <li>tile就绪即发segment粒度传输;生产者/消费者SM划分可调</li>
+                            <li>性能:对比4个SOTA MoE系统,端到端最高2.64x、MoE层最高2.74x加速(4×A100)</li>
                         </ul>
                     </div>
-                    <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">Lagom是2026年MoE通信优化领域的最新工作。随着DeepSeek-V3、Qwen 3等超大MoE模型的普及,All-to-All通信优化成为训练效率的关键瓶颈。Lagom的系统化方案为工业界提供了可落地的优化策略。</span>
-                    </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2602.20656" target="_blank" class="ref-link">arXiv:2602.20656</a></div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2607.19539" target="_blank" class="ref-link">arXiv:2607.19539 论文原文</a></div>
                 </div>
             </div>
 
-            <!-- Paper 7: Tile-Level MoE Overlap -->
+            <!-- Paper 7 -->
             <div class="patent-card rounded-xl p-5 mb-4">
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <h3 class="font-semibold text-violet-300">Tile级MoE计算通信重叠 (Fine-grained Overlap via Tile Scheduling)</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span class="company-badge">arXiv:2607.19539</span>
-                            <span class="text-xs text-slate-500 self-center">2026-07</span>
-                        </div>
-                    </div>
+                <h3 class="font-semibold text-violet-300">Lagom: 计算-通信重叠参数联合调优</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">arXiv:2602.20656</span>
+                    <span class="text-xs text-slate-500 self-center">USTC | 2026-02</span>
                 </div>
                 <div class="space-y-3 text-sm">
                     <div class="highlight-box">
-                        <strong class="text-violet-300">核心创新:</strong> 提出基于tile调度的细粒度计算通信重叠方法。将MoE模型的数据和专家参数划分为tile级别的基本单元,通过智能调度实现tile级别的计算通信并行。相比传统chunk级重叠,tile级调度可实现更细粒度的资源利用和更高的重叠效率。
+                        <strong class="text-violet-300">核心创新:</strong> 面向"计算成为瓶颈"场景,联合调优通信参数以平衡计算与通信资源占用。
                     </div>
                     <div>
-                        <strong class="text-slate-300">技术实现:</strong>
+                        <strong class="text-slate-300">技术方案:</strong>
                         <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
-                            <li>Tile划分:将数据和专家参数划分为tile级基本单元</li>
-                            <li>智能调度:根据依赖关系和数据流优化tile执行顺序</li>
-                            <li>细粒度并行:在tile级别实现计算和通信的精确重叠</li>
-                            <li>资源利用:最大化GPU和网络带宽的利用率</li>
-                            <li>自适应策略:根据运行时状态动态调整tile大小</li>
+                            <li>统一代价模型;基于优先级的搜索算法,将优化复杂度从指数级降为线性</li>
+                            <li>覆盖多种并行策略;在高/低带宽GPU集群上自适应配置</li>
+                            <li>性能:较NCCL提速1.07-1.33x,较AutoCCL提速1.03-1.27x</li>
                         </ul>
                     </div>
-                    <div>
-                        <strong class="text-slate-300">影响分析:</strong> <span class="text-slate-400">该研究代表了计算通信重叠从chunk级向tile级细粒度演进的趋势。Tile级调度可更精确地匹配计算和通信的时间窗口,减少资源空闲。对MoE模型的训练效率优化具有重要价值。</span>
+                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2602.20656" target="_blank" class="ref-link">arXiv:2602.20656 论文原文</a></div>
+                </div>
+            </div>
+
+            <!-- Paper 8 -->
+            <div class="patent-card rounded-xl p-5 mb-4">
+                <h3 class="font-semibold text-violet-300">Kareus: 大模型训练动态/静态能耗联合优化 (OSDI '26)</h3>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <span class="company-badge">OSDI '26</span>
+                    <span class="text-xs text-slate-500 self-center">University of Michigan | 2026-07</span>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="highlight-box">
+                        <strong class="text-violet-300">核心创新:</strong> 将能耗作为一等设计指标,把通信-计算重叠(nanobatch分解+SM调度)与GPU频率调节联合优化,推进训练"时间-能量"前沿。
                     </div>
-                    <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2607.19539" target="_blank" class="ref-link">arXiv:2607.19539</a></div>
+                    <div>
+                        <strong class="text-slate-300">技术方案:</strong>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1 mt-2">
+                            <li>microbatch分解为nanobatch使重叠更充分利用SM</li>
+                            <li>kernel调度优化(去掉后能耗+10.8%);恒频定理(基于Jensen不等式证明恒频优于波动频率)</li>
+                            <li>多遍多目标优化(MBO)求各划分的时间-能量前沿</li>
+                            <li>去掉频率调节能耗+12.9%;对比Nanobatching时间/能耗更优</li>
+                        </ul>
+                    </div>
+                    <div class="text-xs text-slate-500">来源: <a href="https://www.usenix.org/system/files/osdi26-full-proceedings.pdf" target="_blank" class="ref-link">OSDI'26 论文集(官方PDF)</a> | <a href="https://zhuanlan.zhihu.com/p/2063262538263957557" target="_blank" class="ref-link">知乎中文评述</a></div>
                 </div>
             </div>
 
@@ -973,225 +1212,136 @@
         <!-- ==================== COMPARISON SECTION ==================== -->
         <section id="comparison" class="section-block" style="display:none;">
             <div class="flex items-center gap-3 mb-6">
-                <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-lg flex items-center justify-center">
+                <div class="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-700 rounded-lg flex items-center justify-center">
                     <i class="fas fa-table text-white"></i>
                 </div>
-                <h2 class="text-lg font-bold text-indigo-400">技术对比分析</h2>
+                <h2 class="text-lg font-bold text-teal-400">技术对比</h2>
             </div>
 
-            <div class="patent-card rounded-xl p-5 mb-4 overflow-x-auto">
-                <h3 class="font-semibold text-violet-300 mb-4">MoE通信优化方案对比 (2025-2026)</h3>
-                <table class="comparison-table w-full text-sm">
+            <div class="patent-card rounded-xl p-5 overflow-x-auto">
+                <h3 class="font-semibold text-violet-300 mb-4">计算-通信并行与互连路线对比 (2026年11月)</h3>
+                <table class="comparison-table w-full text-sm text-slate-300">
                     <thead>
-                        <tr class="border-b border-slate-700">
-                            <th class="text-left py-3 px-4 text-slate-300">方案</th>
-                            <th class="text-left py-3 px-4 text-green-400">NVIDIA Hybrid-EP</th>
-                            <th class="text-left py-3 px-4 text-red-400">DeepSeek DeepEP</th>
-                            <th class="text-left py-3 px-4 text-blue-400">UEP (OSDI'26)</th>
-                            <th class="text-left py-3 px-4 text-yellow-400">Lagom</th>
+                        <tr class="text-left">
+                            <th class="p-3">维度</th>
+                            <th class="p-3">NVIDIA</th>
+                            <th class="p-3">AMD</th>
+                            <th class="p-3">Intel</th>
+                            <th class="p-3">华为</th>
+                            <th class="p-3">国内其他</th>
                         </tr>
                     </thead>
-                    <tbody class="text-slate-400">
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">通信模式</td>
-                            <td class="py-3 px-4">RDMA + NVLink融合</td>
-                            <td class="py-3 px-4">GPU发起RDMA</td>
-                            <td class="py-3 px-4">CPU代理控制</td>
-                            <td class="py-3 px-4">自适应流水线</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">硬件依赖</td>
-                            <td class="py-3 px-4">NVLink + RDMA</td>
-                            <td class="py-3 px-4">紧耦合GPU-NIC</td>
-                            <td class="py-3 px-4">异构GPU/NIC兼容</td>
-                            <td class="py-3 px-4">通用GPU集群</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">SM占用</td>
-                            <td class="py-3 px-4">4-16个SM</td>
-                            <td class="py-3 px-4">较高</td>
-                            <td class="py-3 px-4">低 (CPU卸载)</td>
-                            <td class="py-3 px-4">优化</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">性能对比</td>
-                            <td class="py-3 px-4">比DeepEP快14%</td>
-                            <td class="py-3 px-4">基线</td>
-                            <td class="py-3 px-4">Dispatch快2.1x</td>
-                            <td class="py-3 px-4">细粒度加速</td>
+                    <tbody class="divide-y divide-slate-700">
+                        <tr>
+                            <td class="p-3 font-medium text-violet-300">重叠机制</td>
+                            <td class="p-3">LLI计算/IMLP瓦片寄存器直传;预配置gather/reduction/distribution三通路,绕开共享内存</td>
+                            <td class="p-3">硬件追踪-触发(T3,US20260044340A1);张量段流水线(US20260086885A1);TDM/SDMA/RDMA分层流水线</td>
+                            <td class="p-3">UAL内存语义去中心化barrier;Gaudi 3 NIC内张量引擎MME→NIC→TPC生产者-消费者流水线</td>
+                            <td class="p-3">RDMA节点内HA本地代理计算(CN121858389A);CommFuse通信分解P2P</td>
+                            <td class="p-3">库层梯度收发交错(Intel CN121981208A);显存-内存统一虚拟化(摩尔线程CN122387587B)</td>
                         </tr>
                         <tr>
-                            <td class="py-3 px-4 font-medium">可移植性</td>
-                            <td class="py-3 px-4">仅NVIDIA</td>
-                            <td class="py-3 px-4">仅NVIDIA</td>
-                            <td class="py-3 px-4">跨厂商硬件</td>
-                            <td class="py-3 px-4">通用</td>
+                            <td class="p-3 font-medium text-violet-300">通信卸载</td>
+                            <td class="p-3">Copy Engine / TMA异步搬运;编译器自动生成TMA指令(JP2026170164A)</td>
+                            <td class="p-3">GPU-initiated SDMA:1 CU达64 CU带宽(RCCL,ROCm 10.1)</td>
+                            <td class="p-3">in-network reduction(NIC内);command processor执行同步</td>
+                            <td class="p-3">算法自动合成(CN122994184A);距离感知分片(WO2026091617A1)</td>
+                            <td class="p-3">海光跨域路由域标识;寒武纪MLU-Link类通用互联接口</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 font-medium text-violet-300">互连与封装</td>
+                            <td class="p-3">NVLink通道失效修复(US20260140834A1);LLI-HBM 3D堆叠(US2026/0329803 A1)</td>
+                            <td class="p-3">Infinity Fabric智能交换机+共享L3;Overlap Stacking 3.5D;UAL 1.0+Vulcano 800G UEC</td>
+                            <td class="p-3">UAL联盟开放scale-up;TSV桥接"top die first"封装(US20260231831A1);24x200GbE RoCE v2</td>
+                            <td class="p-3">超节点UB-Mesh环形拓扑适配</td>
+                            <td class="p-3">海光晶粒间多PHY延时对齐(2026-10-27授权);InFO/Chiplet化路线</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 font-medium text-violet-300">内存/MMU</td>
+                            <td class="p-3">页表cache差异化老化(US2026/0329776 A1);VM段掩码快速翻译(WO2026136182A1);多dielet页迁移(US12645596B2);KV cache机柜级分层(KVCR/NIXL/CMX)</td>
+                            <td class="p-3">MI350 NPS1/NPS2内存分区;MI400 UAL机架;智能交换机"迁移任务vs复制数据"决策</td>
+                            <td class="p-3">多tile GPU MMU缓存自动同步(US2026/0211839A1)</td>
+                            <td class="p-3">HA模块非总线回写,降低总线占用</td>
+                            <td class="p-3">摩尔线程:物理显存+系统内存统一虚拟内存,按负载动态切换</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 font-medium text-violet-300">代表性能数据</td>
+                            <td class="p-3">Vera Rubin NVL72每MW吞吐为GB300 NVL72的30倍(SemiAnalysis AgentX);MIG+locality domain 400W限功率下2.25x</td>
+                            <td class="p-3">TDM内核级1.88x(最高2.74x);SDMA/RDMA重叠1.16x/1.33x;AllToAll/AllGather 1 CU≈64 CU带宽</td>
+                            <td class="p-3">N GPU同步仅需N条消息(无需CPU仲裁)</td>
+                            <td class="p-3">通信步数对数级理论最优(非2幂卡数同样成立)</td>
+                            <td class="p-3">—</td>
                         </tr>
                     </tbody>
                 </table>
-                <div class="text-xs text-slate-500 mt-3">来源: <a href="https://developer.nvidia.com/blog/optimizing-communication-for-mixture-of-experts-training-with-hybrid-expert-parallel/" target="_blank" class="ref-link">NVIDIA Hybrid-EP</a> | <a href="https://github.com/deepseek-ai/DeepEP" target="_blank" class="ref-link">DeepEP</a> | <a href="https://www.usenix.org/conference/osdi26/presentation/mao-ziming-uep" target="_blank" class="ref-link">UEP OSDI'26</a> | <a href="https://arxiv.org/abs/2602.20656" target="_blank" class="ref-link">Lagom</a></div>
+                <div class="text-xs text-slate-500 mt-4">来源: <a href="https://www.patents-review.com/a/20260349958-data-processing-accelerators.html" target="_blank" class="ref-link">US2026/0349958A1</a> | <a href="https://eureka.patsnap.com/patent/US12645596B2" target="_blank" class="ref-link">US12645596B2</a> | <a href="https://www.patents-review.com/a/20260086885-pipelined-horizontal-parallelism-large-language-models.html" target="_blank" class="ref-link">US20260086885A1</a> | <a href="https://www.patents-review.com/a/20260195292-cross-gpu-barriers-memory-semantics-protocol.html" target="_blank" class="ref-link">US20260195292A1</a> | <a href="https://eureka.patsnap.com/patent/WO2026091617A1" target="_blank" class="ref-link">WO2026091617A1</a> | <a href="https://finance.sina.com.cn/stock/aigc/zl/2026-11-07/doc-inixwhsn5222623.shtml" target="_blank" class="ref-link">摩尔线程CN122387587B</a> | <a href="https://arxiv.org/abs/2611.05751" target="_blank" class="ref-link">AMD数据流水线论文</a> | <a href="https://developer.nvidia.com/blog/five-ways-nvidia-co-design-maximizes-the-value-of-every-byte-in-the-ai-factory/" target="_blank" class="ref-link">NVIDIA Co-Design官方博客</a></div>
             </div>
 
-            <div class="patent-card rounded-xl p-5 mb-4 overflow-x-auto">
-                <h3 class="font-semibold text-violet-300 mb-4">计算通信重叠技术对比 (2025-2026)</h3>
-                <table class="comparison-table w-full text-sm">
+            <div class="patent-card rounded-xl p-5 mt-4">
+                <h3 class="font-semibold text-violet-300 mb-4">研究系统粒度演进对比</h3>
+                <table class="comparison-table w-full text-sm text-slate-300">
                     <thead>
-                        <tr class="border-b border-slate-700">
-                            <th class="text-left py-3 px-4 text-slate-300">技术</th>
-                            <th class="text-left py-3 px-4 text-green-400">FlashOverlap</th>
-                            <th class="text-left py-3 px-4 text-red-400">Resource-aware</th>
-                            <th class="text-left py-3 px-4 text-blue-400">Tile-Level MoE</th>
-                            <th class="text-left py-3 px-4 text-yellow-400">NCCL CFT</th>
+                        <tr class="text-left">
+                            <th class="p-3">系统</th>
+                            <th class="p-3">机构</th>
+                            <th class="p-3">重叠粒度</th>
+                            <th class="p-3">适用场景</th>
+                            <th class="p-3">性能</th>
+                            <th class="p-3">来源</th>
                         </tr>
                     </thead>
-                    <tbody class="text-slate-400">
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">重叠粒度</td>
-                            <td class="py-3 px-4">数据块级</td>
-                            <td class="py-3 px-4">Block级</td>
-                            <td class="py-3 px-4">Tile级</td>
-                            <td class="py-3 px-4">操作级</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">加速比</td>
-                            <td class="py-3 px-4">1.65x</td>
-                            <td class="py-3 px-4">1.255x</td>
-                            <td class="py-3 px-4">细粒度优化</td>
-                            <td class="py-3 px-4">接近光速延迟</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">代码修改</td>
-                            <td class="py-3 px-4">需要轻量集成</td>
-                            <td class="py-3 px-4">零修改</td>
-                            <td class="py-3 px-4">调度器修改</td>
-                            <td class="py-3 px-4">设备API调用</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">硬件平台</td>
-                            <td class="py-3 px-4">通用GPU</td>
-                            <td class="py-3 px-4">NVIDIA + AMD</td>
-                            <td class="py-3 px-4">通用GPU</td>
-                            <td class="py-3 px-4">Blackwell (SM_100)</td>
+                    <tbody class="divide-y divide-slate-700">
+                        <tr>
+                            <td class="p-3">Syncopate</td>
+                            <td class="p-3">UCSD/Meta/OpenAI</td>
+                            <td class="p-3">单kernel内chunk级</td>
+                            <td class="p-3">融合kernel训练</td>
+                            <td class="p-3">手写kernel的99.8%(4 GPU)</td>
+                            <td class="p-3"><a href="https://arxiv.org/abs/2601.20595" target="_blank" class="ref-link">arXiv:2601.20595</a></td>
                         </tr>
                         <tr>
-                            <td class="py-3 px-4 font-medium">发表年份</td>
-                            <td class="py-3 px-4">2025/ACM 2026</td>
-                            <td class="py-3 px-4">2026</td>
-                            <td class="py-3 px-4">2026</td>
-                            <td class="py-3 px-4">2026</td>
+                            <td class="p-3">TokenWeave</td>
+                            <td class="p-3">Microsoft Research</td>
+                            <td class="p-3">token级+RMSNorm融合</td>
+                            <td class="p-3">TP推理(低至1024 token)</td>
+                            <td class="p-3">1.28x延迟/1.19x吞吐</td>
+                            <td class="p-3"><a href="https://arxiv.org/abs/2505.11329" target="_blank" class="ref-link">arXiv:2505.11329</a></td>
+                        </tr>
+                        <tr>
+                            <td class="p-3">DisagMoE</td>
+                            <td class="p-3">ByteDance/UW/Cornell</td>
+                            <td class="p-3">模块级AF-Pipe流水线</td>
+                            <td class="p-3">MoE训练all-to-all</td>
+                            <td class="p-3">较1F1B最高1.81x</td>
+                            <td class="p-3"><a href="https://arxiv.org/html/2605.11005v1" target="_blank" class="ref-link">arXiv:2605.11005</a></td>
+                        </tr>
+                        <tr>
+                            <td class="p-3">Tile-level Signaling</td>
+                            <td class="p-3">Linnaeus Univ.</td>
+                            <td class="p-3">tile级信令/调度</td>
+                            <td class="p-3">MoE第二个all-to-all</td>
+                            <td class="p-3">端到端最高2.64x</td>
+                            <td class="p-3"><a href="https://arxiv.org/abs/2607.19539" target="_blank" class="ref-link">arXiv:2607.19539</a></td>
+                        </tr>
+                        <tr>
+                            <td class="p-3">CommFuse</td>
+                            <td class="p-3">华为多伦多</td>
+                            <td class="p-3">P2P分解+分块融合</td>
+                            <td class="p-3">TP/DP/TPSP训练(尾延迟)</td>
+                            <td class="p-3">尾延迟显著降低</td>
+                            <td class="p-3"><a href="https://arxiv.org/abs/2604.24013" target="_blank" class="ref-link">arXiv:2604.24013</a></td>
+                        </tr>
+                        <tr>
+                            <td class="p-3">AMD Data Pipelining</td>
+                            <td class="p-3">AMD</td>
+                            <td class="p-3">数据搬运层级流水线</td>
+                            <td class="p-3">AMD GPU训练</td>
+                            <td class="p-3">TDM 1.88x / RDMA 1.33x</td>
+                            <td class="p-3"><a href="https://arxiv.org/abs/2611.05751" target="_blank" class="ref-link">arXiv:2611.05751</a></td>
                         </tr>
                     </tbody>
                 </table>
-                <div class="text-xs text-slate-500 mt-3">来源: <a href="https://arxiv.org/abs/2504.19519" target="_blank" class="ref-link">FlashOverlap</a> | <a href="https://arxiv.org/abs/2606.09200" target="_blank" class="ref-link">Resource-aware Overlap</a> | <a href="https://arxiv.org/abs/2607.19539" target="_blank" class="ref-link">Tile-Level MoE</a> | <a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/cft.html" target="_blank" class="ref-link">NCCL CFT</a></div>
             </div>
-
-            <div class="patent-card rounded-xl p-5 mb-4 overflow-x-auto">
-                <h3 class="font-semibold text-violet-300 mb-4">GPU互连技术对比 (2026)</h3>
-                <table class="comparison-table w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-slate-700">
-                            <th class="text-left py-3 px-4 text-slate-300">特性</th>
-                            <th class="text-left py-3 px-4 text-green-400">NVLink 5.0</th>
-                            <th class="text-left py-3 px-4 text-red-400">UALink 1.0</th>
-                            <th class="text-left py-3 px-4 text-yellow-400">HCCS 2.0</th>
-                            <th class="text-left py-3 px-4 text-orange-400">NPO光互连</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-slate-400">
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">主导公司</td>
-                            <td class="py-3 px-4">NVIDIA</td>
-                            <td class="py-3 px-4">AMD/Intel/Google联盟</td>
-                            <td class="py-3 px-4">华为</td>
-                            <td class="py-3 px-4">壁仞科技</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">双向带宽</td>
-                            <td class="py-3 px-4">1.8 TB/s</td>
-                            <td class="py-3 px-4">800 GB/s (x4)</td>
-                            <td class="py-3 px-4">400 GB/s</td>
-                            <td class="py-3 px-4">微秒级延迟</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">最大加速器数</td>
-                            <td class="py-3 px-4">576 GPU</td>
-                            <td class="py-3 px-4">1024 加速器</td>
-                            <td class="py-3 px-4">64 NPU</td>
-                            <td class="py-3 px-4">1024 卡</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">目标延迟</td>
-                            <td class="py-3 px-4">亚微秒</td>
-                            <td class="py-3 px-4">&lt;1微秒往返</td>
-                            <td class="py-3 px-4">微秒级</td>
-                            <td class="py-3 px-4">微秒级切换</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">开放标准</td>
-                            <td class="py-3 px-4">封闭</td>
-                            <td class="py-3 px-4">开放</td>
-                            <td class="py-3 px-4">封闭</td>
-                            <td class="py-3 px-4">自研协议</td>
-                        </tr>
-                        <tr>
-                            <td class="py-3 px-4 font-medium">传输介质</td>
-                            <td class="py-3 px-4">铜缆</td>
-                            <td class="py-3 px-4">铜缆</td>
-                            <td class="py-3 px-4">铜缆</td>
-                            <td class="py-3 px-4">光纤</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="text-xs text-slate-500 mt-3">来源: <a href="https://www.nvidia.com/en-us/data-center/nvlink/" target="_blank" class="ref-link">NVIDIA NVLink</a> | <a href="https://ualinkconsortium.org/" target="_blank" class="ref-link">UALink联盟</a> | <a href="https://m.zhidx.com/p/597088.html" target="_blank" class="ref-link">华为HCCS</a> | <a href="https://www.birentech.com/news/h5vjj6lsw4n5za2yw6ayyv1e/" target="_blank" class="ref-link">壁仞NPO光互连</a></div>
-            </div>
-
-            <div class="patent-card rounded-xl p-5 mb-4 overflow-x-auto">
-                <h3 class="font-semibold text-violet-300 mb-4">NVIDIA专利布局方向分析 (2025-2026)</h3>
-                <table class="comparison-table w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-slate-700">
-                            <th class="text-left py-3 px-4 text-slate-300">专利方向</th>
-                            <th class="text-left py-3 px-4 text-green-400">代表专利</th>
-                            <th class="text-left py-3 px-4 text-red-400">技术目标</th>
-                            <th class="text-left py-3 px-4 text-blue-400">产业影响</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-slate-400">
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">动态KV缓存</td>
-                            <td class="py-3 px-4">US20260133908A1</td>
-                            <td class="py-3 px-4">分层调度扩展上下文</td>
-                            <td class="py-3 px-4">NVL72推理优化</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">多Chiplet架构</td>
-                            <td class="py-3 px-4">US20260288335A1</td>
-                            <td class="py-3 px-4">减少跨die通信30-50%</td>
-                            <td class="py-3 px-4">Blackwell/Rubin核心</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">内存管理增强</td>
-                            <td class="py-3 px-4">US20260349929A1</td>
-                            <td class="py-3 px-4">警报驱动并发传输</td>
-                            <td class="py-3 px-4">梯度同步优化</td>
-                        </tr>
-                        <tr class="border-b border-slate-700/50">
-                            <td class="py-3 px-4 font-medium">NCCL CFT</td>
-                            <td class="py-3 px-4">NCCL v2.31+</td>
-                            <td class="py-3 px-4">设备级fabric操作</td>
-                            <td class="py-3 px-4">计算通信并行</td>
-                        </tr>
-                        <tr>
-                            <td class="py-3 px-4 font-medium">系统级战略</td>
-                            <td class="py-3 px-4">多专利组合</td>
-                            <td class="py-3 px-4">从GPU到数据中心</td>
-                            <td class="py-3 px-4">全栈IP护城河</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="text-xs text-slate-500 mt-3">来源: <a href="https://patentailab.com/nvidias-patent-strategy-analysis/" target="_blank" class="ref-link">NVIDIA Patent Strategy 2026</a> | <a href="https://eureka.patsnap.com/resources/blog/rd-blog/gpu-architecture-and-parallel-compute-patent-landscape/" target="_blank" class="ref-link">Patsnap GPU Patent Landscape</a></div>
-            </div>
-
         </section>
 
         <!-- ==================== TRENDS SECTION ==================== -->
@@ -1204,51 +1354,51 @@
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">1. 内存语义互连成为竞争焦点</h3>
-                <p class="text-slate-400 text-sm mb-3">NVIDIA NVLink 5.0(1.8 TB/s)、UALink 1.0(800 GB/s但支持1024加速器)、华为HCCS 2.0(400 GB/s)都在向内存语义演进。UALink作为开放标准支持多厂商互操作,直接挑战NVLink的封闭生态。壁仞科技的NPO光互连更是突破传统电互连限制,实现微秒级延迟和动态拓扑重构。未来互连将不再仅仅是数据传输通道,而是共享内存空间的延伸。NVIDIA的多GPU缓存同步专利(US20260211839A1)和内存管理增强专利(US20260349929A1)反映了这一趋势。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://ualinkconsortium.org/" target="_blank" class="ref-link">UALink联盟</a> | <a href="https://www.nvidia.com/en-us/data-center/nvlink/" target="_blank" class="ref-link">NVIDIA NVLink</a> | <a href="https://www.birentech.com/news/h5vjj6lsw4n5za2yw6ayyv1e/" target="_blank" class="ref-link">壁仞NPO光互连</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">1. decode专用硬件成为NVIDIA新战线</h3>
+                <p class="text-slate-400 text-sm mb-3">本周解读的LLI专利族(US2026/0349953A1、US2026/0329803A1)显示NVIDIA正为逐token生成阶段规划独立于GPU的堆叠内存产品:计算瓦片-IMLP瓦片寄存器直传、24芯片/板可扩展到机柜、prefill/decode分工。结合官方博客将KV cache定义为机柜级分层资源(KVCR/NIXL/CMX),推理集群的形态可能从"更多GPU"转向"GPU(prefill)+专用decode硬件+分层内存"。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-chip-design-faster-ai-chatbot-replies-9531/" target="_blank" class="ref-link">Patentlyze - LLI芯片</a> | <a href="https://www.patents-review.com/a/20260329803-low-latency-compute-architectures-neural-network-inference.html" target="_blank" class="ref-link">US2026/0329803A1</a> | <a href="https://developer.nvidia.com/blog/five-ways-nvidia-co-design-maximizes-the-value-of-every-byte-in-the-ai-factory/" target="_blank" class="ref-link">NVIDIA Co-Design博客</a></div>
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">2. 计算通信重叠从软件走向硬件</h3>
-                <p class="text-slate-400 text-sm mb-3">NCCL CFT的设备级API、FlashOverlap的警报驱动并发、Resource-aware的零代码修改方案表明,计算通信重叠正在从纯软件层面下沉到硬件特性利用。接近光速延迟的集合通信(arXiv:2607.16100)通过消除同步barrier和利用共享内存,将延迟推向物理硬件极限。未来可能出现专用的通信引擎与计算引擎完全并行,实现真正的"零SM占用"通信。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/cft.html" target="_blank" class="ref-link">NCCL CFT</a> | <a href="https://arxiv.org/abs/2504.19519" target="_blank" class="ref-link">FlashOverlap</a> | <a href="https://arxiv.org/abs/2606.09200" target="_blank" class="ref-link">Resource-aware Overlap</a> | <a href="https://arxiv.org/abs/2607.16100" target="_blank" class="ref-link">Speed-of-Light Collectives</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">2. MMU专利密集落地:多dielet与机密计算双主线</h3>
+                <p class="text-slate-400 text-sm mb-3">NVIDIA一周内可考的MMU方向专利覆盖:页表cache差异化老化(US2026/0329776A1)、VM段掩码快速安全翻译(WO2026136182A1)、多dielet硬件页迁移(US12645596B2)。地址翻译正同时服务两个新需求——多die封装带来的跨die一致性与计数,以及机密计算/多云vGPU的安全隔离。GPU MMU从"附属电路"变成产品差异点。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260329776-identification-page-table-information-cache.html" target="_blank" class="ref-link">US2026/0329776A1</a> | <a href="https://eureka.patsnap.com/patent/WO2026136182A1" target="_blank" class="ref-link">WO2026136182A1</a> | <a href="https://eureka.patsnap.com/patent/US12645596B2" target="_blank" class="ref-link">US12645596B2</a></div>
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">3. 多Chiplet架构驱动本地化内存设计</h3>
-                <p class="text-slate-400 text-sm mb-3">NVIDIA的多芯片本地内存路由专利(US20260288335A1)和内存管理增强专利(US20260349929A1)反映了Blackwell及后续架构向多chiplet演进的趋势。将数据本地化到各chiplet的"一致性点"内存,减少跨die通信,成为大规模GPU设计的核心策略。Intel的XBM内存架构(后端晶体管DRAM堆叠)和缓存同步专利(US20260211839A1)专门解决多tile间的一致性问题。这一趋势在AMD MI300(混合内存系统)中同样明显。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-multi-chip-gpu-local-memory-routing/" target="_blank" class="ref-link">NVIDIA Multi-Chip Patent</a> | <a href="https://www.tomshardware.com/tech-industry/semiconductors/intel-patent-reveals-new-xbm-memory-architecture-that-ditches-hbms-costly-silicon-interposer-backend-transistor-dram-stack-uses-ucie-links-and-built-in-repair-to-ease-ais-memory-bottleneck" target="_blank" class="ref-link">Intel XBM Architecture</a> | <a href="https://patentlyze.com/patent/multi-gpu-memory-cache-sync-system/" target="_blank" class="ref-link">Intel Cache-Sync</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">3. CPU全面退出通信关键路径</h3>
+                <p class="text-slate-400 text-sm mb-3">AMD RCCL的GPU-initiated SDMA(1 CU达64 CU带宽)、rocSHMEM GDA后端、Intel的command processor去中心化barrier、华为HA本地代理计算,共同指向同一方向:通信发起、同步与数据搬运全部下沉到GPU/NPU侧专用引擎。ACM CSUR 2026综述将rocSHMEM评为最接近完全CPU-free的实现,Intel SHMEM跨节点仍依赖host proxy——这将是一到两年内的关键竞争点。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://rocm.blogs.amd.com/software-tools-optimization/gpu-initiated-sdma/README.html" target="_blank" class="ref-link">AMD GPU-Initiated SDMA</a> | <a href="https://www.patents-review.com/a/20260195292-cross-gpu-barriers-memory-semantics-protocol.html" target="_blank" class="ref-link">Intel UAL barrier专利</a> | <a href="https://github.com/2022hitoss/papers/blob/main/docs/CSUR2026-GPU-Centric-Communication/paper.md" target="_blank" class="ref-link">CSUR 2026综述</a></div>
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">4. MoE通信成为新战场</h3>
-                <p class="text-slate-400 text-sm mb-3">DeepSeek-V3/Qwen 3等超大MoE模型的兴起催生了通信库的激烈竞争。NVIDIA Hybrid-EP比DeepEP快14%,UEP(OSDI 2026)通过CPU代理实现跨硬件兼容,Occult(ICML 2025)通过协作通信减少40%+运行时开销,Lagom提出自适应流水线优化。Tile级MoE重叠(arXiv:2607.19539)代表了从chunk级向更细粒度演进的趋势。MoE的all-to-all通信模式与传统AllReduce不同,需要专门的优化策略,这一领域预计将持续快速发展。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://developer.nvidia.com/blog/optimizing-communication-for-mixture-of-experts-training-with-hybrid-expert-parallel/" target="_blank" class="ref-link">NVIDIA Hybrid-EP</a> | <a href="https://arxiv.org/abs/2505.13345" target="_blank" class="ref-link">Occult ICML'25</a> | <a href="https://arxiv.org/abs/2602.20656" target="_blank" class="ref-link">Lagom</a> | <a href="https://arxiv.org/abs/2607.19539" target="_blank" class="ref-link">Tile-Level MoE Overlap</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">4. 编译器接管通信与内存布局编排</h3>
+                <p class="text-slate-400 text-sm mb-3">Syncopate(OSDI'26)在单kernel内自动编排chunk级重叠,达手写kernel的99.8%;NVIDIA的Graph-Based Memory Storage(US2026/0339531A1)让编译器从数据流图推导内存连续布局;TMA编程化(JP2026170164A)让编译器自动生成内存加速器指令;华为CN122994184A把通信算法合成建模为优化问题自动求解。人工调优通信/内存的时代正在被编译器取代。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2601.20595" target="_blank" class="ref-link">Syncopate OSDI'26</a> | <a href="https://www.patents-review.com/a/20260339531-graph-based-memory-storage.html" target="_blank" class="ref-link">US2026/0339531A1</a> | <a href="https://eureka.patsnap.com/patent/JP2026170164A" target="_blank" class="ref-link">JP2026170164A</a> | <a href="https://www.sohu.com/a/1094782846_114984" target="_blank" class="ref-link">华为算法合成专利</a></div>
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">5. 编译器自动化重叠成为主流</h3>
-                <p class="text-slate-400 text-sm mb-3">从手工调度到编译器自动生成重叠方案是重要趋势。Resource-aware的零代码修改方案、FlashOverlap的轻量级集成、Tile级调度的自适应策略都表明编译器正在接管计算通信重叠的编排工作。开发者不再需要手动安排通信与计算的时序,编译器自动分析数据依赖并生成最优重叠计划。这将大幅降低分布式训练的开发门槛。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2606.09200" target="_blank" class="ref-link">Resource-aware Overlap</a> | <a href="https://arxiv.org/abs/2504.19519" target="_blank" class="ref-link">FlashOverlap</a> | <a href="https://arxiv.org/abs/2607.19539" target="_blank" class="ref-link">Tile-Level MoE</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">5. MoE通信:从算子优化走向架构解耦</h3>
+                <p class="text-slate-400 text-sm mb-3">DisagMoE把Attention与FFN解耦到不相交GPU池(AF-Pipe,较1F1B最高1.81x);Tile-level信令调度端到端最高2.64x;AMD SDMA把all-to-all的CU占用从64降到1。MoE的all-to-all通信优化已从"更快地发"演进到"重新划分硬件职责",字节/微软/AMD三条路线并行,预计2027年训练框架将默认集成其中至少一条。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/html/2605.11005v1" target="_blank" class="ref-link">DisagMoE</a> | <a href="https://arxiv.org/abs/2607.19539" target="_blank" class="ref-link">Tile-level Signaling ICPP'26</a> | <a href="https://rocm.blogs.amd.com/software-tools-optimization/gpu-initiated-sdma/README.html" target="_blank" class="ref-link">AMD SDMA</a></div>
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">6. 光互连技术突破电互连限制</h3>
-                <p class="text-slate-400 text-sm mb-3">壁仞科技的NPO(光近封装)光互连超节点代表了互连技术的重要方向转变。通过硅光OCS芯片实现动态拓扑重构和协议无关扩展,突破传统电互连的距离和带宽限制。微秒级模型切换和90%+延迟降低为万卡级集群提供了新的互连方案。预计2027-2028年,光互连将在大规模AI集群中得到更广泛应用,成为电互连的重要补充。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://www.birentech.com/news/h5vjj6lsw4n5za2yw6ayyv1e/" target="_blank" class="ref-link">壁仞光跃128卡商用版</a> | <a href="https://www.birentech.com/news/odug5ugc29npl8m6slum8d9k/" target="_blank" class="ref-link">壁仞NPO技术方案</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">6. UAL开放互连联盟对冲NVLink封闭生态</h3>
+                <p class="text-slate-400 text-sm mb-3">Intel的跨GPU屏障专利明确标注UAL(Ultra Acceleration Link),AMD MI400/Helios机架2026年引入UAL 1.0(带宽2x PCIe Gen6)+Vulcano 800G UEC NIC;Gaudi 3的24x200GbE RoCE v2+NIC内张量引擎代表"以太网scale-up"差异化路线。开放互连+以太网生态正在成为AMD/Intel/博通阵营对抗NVLink+NVSwitch的统一战线,机架级互连标准之争将主导2027年AI基础设施采购决策。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://www.patents-review.com/a/20260195292-cross-gpu-barriers-memory-semantics-protocol.html" target="_blank" class="ref-link">Intel UAL barrier专利</a> | <a href="https://www.storagereview.com/nl/news/from-mi350-to-mi500-amds-bold-ai-accelerator-roadmap-through-2027" target="_blank" class="ref-link">AMD MI400路线图</a> | <a href="https://www.aspsys.com/wp-content/uploads/2024/04/gaudi-3-ai-accelerator-white-paper.pdf" target="_blank" class="ref-link">Gaudi 3白皮书</a></div>
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">7. 动态KV缓存管理支撑长上下文推理</h3>
-                <p class="text-slate-400 text-sm mb-3">NVIDIA的动态KV缓存调度专利(US20260133908A1)揭示了LLM推理内存管理的新方向。通过分层存储和按需调页模型,在受限硬件上支持更长的对话上下文。结合分布式KV cache(跨芯片分配)和3D堆叠内存技术,NVIDIA正在构建面向LLM推理的全栈内存优化方案。这对NVL72等大规模推理系统的性能和成本优化至关重要。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://patentlyze.com/patent/nvidia-dynamic-kv-cache-scheduling-llms/" target="_blank" class="ref-link">NVIDIA动态KV缓存专利</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">7. 国产超节点:互联创新弥补单卡差距</h3>
+                <p class="text-slate-400 text-sm mb-3">2026年10-11月华为密集公开集合通信专利(距离感知分片、拓扑感知步数压缩、算法自动合成、HA代理计算),海光聚焦晶粒间PHY延时对齐与跨域路由,摩尔线程布局显存-内存统一虚拟化,寒武纪延续通用互联接口。国产厂商正以"超节点+系统级互联创新"路线弥补单卡差距;高通向华为付费获得逻辑折叠与NPO互连专利许可,也印证其互连专利组合的商业价值。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://eureka.patsnap.com/patent/WO2026091617A1" target="_blank" class="ref-link">华为WO2026091617A1</a> | <a href="http://stock.stockstar.com/RB2026102900056748.shtml" target="_blank" class="ref-link">海光晶粒专利授权</a> | <a href="https://finance.sina.com.cn/stock/aigc/zl/2026-11-07/doc-inixwhsn5222623.shtml" target="_blank" class="ref-link">摩尔线程内存专利</a> | <a href="https://www.163.com/dy/article/LAGHP9BQ0519QIKK.html" target="_blank" class="ref-link">寒武纪互联专利</a></div>
             </div>
 
             <div class="trend-card rounded-xl p-5 mb-4">
-                <h3 class="font-semibold text-violet-300 mb-3">8. 能效优化成为大规模集群核心关切</h3>
-                <p class="text-slate-400 text-sm mb-3">IEEE研究(arXiv:2507.03114)发现计算通信并行时功耗可达TDP的140%,严格能耗限制可使延迟增加107%。随着GPU集群规模突破10万卡(NVIDIA SuperPOD, Meta AI集群),能效管理已从辅助功能变为核心需求。Resource-aware方案通过占用率塑形控制功耗,动态调频、负载感知调度和热管理将成为下一代集群管理系统的标配。</p>
-                <div class="text-xs text-slate-500">来源: <a href="https://arxiv.org/abs/2507.03114" target="_blank" class="ref-link">IEEE TPDS 2025 - 功耗量化研究</a> | <a href="https://arxiv.org/abs/2606.09200" target="_blank" class="ref-link">Resource-aware Overlap</a></div>
+                <h3 class="font-semibold text-violet-300 mb-3">8. 能耗成为一等设计指标</h3>
+                <p class="text-slate-400 text-sm mb-3">OSDI'26的Kareus把通信-计算重叠与GPU频率调节联合优化(恒频定理基于Jensen不等式),去掉频率调节能耗+12.9%;NVIDIA官方也强调Vera Rubin NVL72每兆瓦吞吐为GB300的30倍。当集群规模突破10万卡、电力成为稀缺资源,"每焦耳token数"将取代"每秒token数"成为基础设施的核心KPI,通信能耗(而非仅延迟)会成为通信库优化的显式目标函数。</p>
+                <div class="text-xs text-slate-500">来源: <a href="https://www.usenix.org/system/files/osdi26-full-proceedings.pdf" target="_blank" class="ref-link">Kareus OSDI'26论文集</a> | <a href="https://developer.nvidia.com/blog/five-ways-nvidia-co-design-maximizes-the-value-of-every-byte-in-the-ai-factory/" target="_blank" class="ref-link">NVIDIA Co-Design博客</a></div>
             </div>
 
         </section>
@@ -1258,7 +1408,7 @@
     <footer class="glass-card border-t border-slate-700 py-6 mt-12">
         <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
             <p>专利研究周报 | 生成日期: 2026-11-16</p>
-            <p class="mt-2">数据来源: Google Patents, USPTO, CNIPA, arXiv, IEEE, ACM, ICML, USENIX, 公司官方博客</p>
+            <p class="mt-2">数据来源: Google Patents, USPTO, CNIPA, Patentlyze, Patents-Review, Patsnap Eureka, Justia, arXiv, USENIX, ACM, 公司官方博客</p>
             <p class="mt-1 text-xs">所有专利信息基于公开可查的专利文档,引用链接可直接访问原始来源</p>
         </div>
     </footer>

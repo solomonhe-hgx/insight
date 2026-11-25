@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA Open GPU Kernel 周报 (2026-11-18 ~ 2026-11-25)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; color: #e2e8f0; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; border-bottom: 3px solid transparent; }
+        .nav-tab:hover { background: rgba(148, 163, 184, 0.1); }
+        .nav-tab.active { border-bottom-color: #76b900; background: rgba(118, 185, 0, 0.1); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .module-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); transition: all 0.2s ease; cursor: pointer; }
+        .module-card:hover { border-color: rgba(118, 185, 0, 0.4); box-shadow: 0 4px 20px rgba(118, 185, 0, 0.15); }
+        .ref-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dashed #60a5fa; transition: all 0.2s; }
+        .ref-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+        .highlight-box { border-left: 4px solid #76b900; background: rgba(118, 185, 0, 0.1); padding: 1rem 1.25rem; border-radius: 0 0.5rem 0.5rem 0; }
+        .section-block { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .badge-nvidia { background: linear-gradient(135deg, #76b900, #5a8f00); color: white; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-bug { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-pr { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-release { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-new { background: #ef4444; color: white; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; }
+        .badge-info { background: linear-gradient(135deg, #06b6d4, #0891b2); color: white; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-closed { background: linear-gradient(135deg, #6b7280, #4b5563); color: white; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-fix { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .expand-icon { transition: transform 0.3s ease; }
+        .expand-icon.rotated { transform: rotate(180deg); }
+        .detail-section { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+        .detail-section.expanded { max-height: 3000px; }
+        .table-row-hover:hover { background: rgba(148, 163, 184, 0.08); }
+        .trend-arrow { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .code-inline { background: rgba(15, 23, 42, 0.9); color: #7dd3fc; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; }
+        .detail-block { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.12); border-radius: 0.5rem; padding: 1rem; }
+    </style>
+</head>
+<body class="antialiased">
+    <!-- Sticky Header -->
+    <header class="sticky top-0 z-50 backdrop-filter backdrop-blur-md bg-slate-900/80 border-b border-slate-700/50">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #76b900, #5a8f00);">
+                        <i class="fas fa-microchip text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">NVIDIA Open GPU Kernel 周报</h1>
+                        <p class="text-xs text-slate-400">2026-11-18 ~ 2026-11-25 | NVLink / NVSwitch / NVLink-C2C / MMU</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="badge-release"><i class="fas fa-tag mr-1"></i>一周 4 版本发布</span>
+                    <span class="badge-nvidia"><i class="fas fa-industry mr-1"></i>SC26: 第七代 NVLink 公布</span>
+                </div>
+            </div>
+            <!-- Metric cards -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
+                <div class="glass-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-[#76b900]">4</div>
+                    <div class="text-xs text-slate-400">新版本发布</div>
+                </div>
+                <div class="glass-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-red-400">15</div>
+                    <div class="text-xs text-slate-400">新增 Issues</div>
+                </div>
+                <div class="glass-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-purple-400">5</div>
+                    <div class="text-xs text-slate-400">新增 PRs</div>
+                </div>
+                <div class="glass-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-amber-400">620.73</div>
+                    <div class="text-xs text-slate-400">最新生产分支</div>
+                </div>
+                <div class="glass-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-cyan-400">+540</div>
+                    <div class="text-xs text-slate-400">UVM 新文件行数</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="showTab('nvlink')" id="tab-nvlink" class="nav-tab active px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-link mr-1"></i> NVLink</button>
+            <button onclick="showTab('nvswitch')" id="tab-nvswitch" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-network-wired mr-1"></i> NVSwitch</button>
+            <button onclick="showTab('nvlink-c2c')" id="tab-nvlink-c2c" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-microchip mr-1"></i> NVLink C2C</button>
+            <button onclick="showTab('mmu')" id="tab-mmu" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-memory mr-1"></i> MMU/UVM</button>
+            <button onclick="showTab('community')" id="tab-community" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-comments mr-1"></i> 社区反馈</button>
+            <button onclick="showTab('comparison')" id="tab-comparison" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-balance-scale mr-1"></i> 技术对比</button>
+            <button onclick="showTab('trends')" id="tab-trends" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-chart-line mr-1"></i> 趋势展望</button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 pb-12">
+        <!-- ================= NVLink ================= -->
+        <section id="nvlink" class="tab-content active section-block space-y-4">
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-link text-[#76b900]"></i> NVLink 模块更新</h2>
+                <p class="text-sm text-slate-400 mt-1">SC26 超算大会公布第七代 NVLink（Rubin HPC GPU，2028 年上市）；开源驱动 NVLink 内核子模块本周无新增提交；Vera Rubin NVL72 交付持续扩展</p>
+            </div>
+
+            <!-- SC26 Rubin HPC GPU + NVLink 7 -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-nvl7', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-nvidia">SC26</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">NVIDIA 公布 Rubin HPC GPU：第七代 NVLink 互连首次亮相，单卡 5 万+ CUDA 核心</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>11 月 15-20 日芝加哥 SC26 超级计算大会上，NVIDIA 发布面向科学计算的 Rubin HPC GPU，归属 Vera Rubin 平台。单颗 GPU 超过 5 万个 CUDA 核心（约为 RTX PRO 6000 Blackwell 的两倍），支持稀疏数据加速，计算精度覆盖 FP64 到 FP4，并首次确认采用<strong>第七代 NVLink</strong>（NVLink 7）互连，预计 2028 年供应。这是继 NVLink 5（Hopper/Blackwell）、NVLink 6（Vera Rubin NVL72，3.6 TB/s per GPU / 260 TB/s per rack）之后的新一代规格披露。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://www.sohu.com/a/1105215245_236796/" target="_blank">SC26 大会报道 (搜狐/芝能智芯)</a> | <a class="ref-link" href="https://xueqiu.com/9452022913/417330262" target="_blank">兴证通信 AI 日报 20261117</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-nvl7" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-server mr-1"></i> 与现有 NVLink 代的对比</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>NVLink 5：Blackwell GB200/GB300 NVL72 采用 NVLink 5 + NVSwitch 5/6，单机架 72 GPU 统一 NVLink 域。</li>
+                            <li>NVLink 6：Vera Rubin NVL72 每颗 GPU 3.6 TB/s 带宽、整柜 260 TB/s（NVIDIA 技术博客口径），联想已于 11 月初开始全球交付该系统。</li>
+                            <li>NVLink 7：本周随 Rubin HPC GPU 首次公布，细节带宽参数尚未披露，2028 年随 Rubin HPC 规模化上市。</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-chart-bar mr-1"></i> 开源驱动侧对照</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>开源内核模块中 <span class="code-inline">NVLINK_DEVICE_VERSION_60</span>（NVLink 6）已随 620.70.06 落地；NVLink 7 枚举与运行时支持预计随 Rubin HPC 开源节奏在 2027-2028 年间补齐。</li>
+                            <li>本周主分支仅 1 个提交（620.73.04 版本发布 commit <span class="code-inline">a4b95f6a</span>），NVLink 子系统（<span class="code-inline">kernel-open/nvidia/nvlink/</span>）无功能变更。</li>
+                        </ul>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/commit/a4b95f6a2db0" target="_blank">620.73.04 主分支提交</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vera HPC rack -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-verarack', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-nvidia">HPC</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">Vera HPC 机架：192 颗 Vera CPU、峰值汇总内存带宽超 200 TB/s，2027 年初由 Dell/HPE/Lenovo/Supermicro 供应</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>NVIDIA 同期公布 HPC 版 Vera CPU 机架：液冷 MGX 系统、Quantum-X800 InfiniBand 互连，机架汇总峰值内存带宽超过 200 TB/s，配置约 300 TB 内存与 1 PB 存储。每颗 Vera CPU 拥有 88 个 Olympus 定制核心（176 线程）、单 CPU 最高 1.2 TB/s 内存带宽，1U 托盘放 8 颗 CPU、192 颗配置对应 24 个托盘，全机架 16896 CPU 核心 / 33792 线程。OpenFOAM motorBike Large 测试中，Vera 相对所选 x86 系统达到 1.9 倍性能与 2.4 倍每瓦性能。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://www.sohu.com/a/1105215245_236796/" target="_blank">SC26 大会报道 (搜狐/芝能智芯)</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-verarack" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-server mr-1"></i> 供应链与开源信号</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>Vera HPC 机架预计 2027 年初由 Dell、HPE、Lenovo、Supermicro 供应；Rubin HPC GPU 计划 2028 年供应。</li>
+                            <li>开源驱动侧信号：620.73.04 更新了多份 GR100 平台 GSP 固件 bindata（如 <span class="code-inline">src/nvidia/generated/g_bindata_kgspGetBinArchiveGspRmFmcGfwProdSigned_GR100.c</span>，+12729/-12713），GR100 即 Rubin 家族芯片代号——Vera Rubin 平台的开源 GSP 固件随版本持续演进。</li>
+                            <li>620.70.06 数据中心发布说明中亦提及「移除 GR100 Driver CoRIM 中的 profile tag」修复，指向 Rubin 平台 Confidential Computing 组件已在 620 分支持续集成。</li>
+                        </ul>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/commit/a4b95f6a2db0" target="_blank">620.73.04 提交文件列表</a> | <a class="ref-link" href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-620-70-06/index.html" target="_blank">620.70.06 数据中心发布说明</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lenovo VR NVL72 -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-lenovo', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-info">ECOSYSTEM</span>
+                            <h3 class="font-bold text-white">Vera Rubin NVL72 持续交付：NVLink 6 每兆瓦吞吐最高提升 30 倍、每百万 Token 成本最高降 45 倍</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>联想集团于 11 月初确认已开始全球交付 NVIDIA Vera Rubin NVL72 机架级系统（72 颗 Rubin GPU + 36 颗 Vera CPU，NVLink 6 互连），并将其纳入联想 AI 云「超级工厂」方案。相较上一代 GB300 NVL72，每兆瓦吞吐量最高提升 30 倍，每百万 Token 推理成本最高降低 45 倍。产业分析指出：纵向扩展（scale-up）网络到 2027 年前仍将由 NVLink 主导，UALink 等开放方案的专用交换芯片要到 2027 年才进入产品。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://blog.csdn.net/IT_ORACLE/article/details/169804659" target="_blank">AI 资讯日报 2026-11-01 (CSDN)</a> | <a class="ref-link" href="https://xueqiu.com/5575536130/417759451" target="_blank">网络交换产业链研究 2026-11-19 (雪球)</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+            </div>
+
+            <!-- NVLink kernel no update -->
+            <div class="glass-card rounded-xl p-4">
+                <p class="text-sm text-slate-400"><i class="fas fa-circle-info text-slate-500 mr-2"></i>开源内核 NVLink 子模块（<span class="code-inline">kernel-open/nvidia/nvlink/</span>、<span class="code-inline">src/nvidia/src/kernel/gpu/nvlink/</span>）本周<strong>无重大更新</strong>——620.73.04 提交涉及 UVM/DRM/DisplayPort/GSP 固件，未触及 NVLink 驱动路径。</p>
+            </div>
+        </section>
+
+        <!-- ================= NVSwitch ================= -->
+        <section id="nvswitch" class="tab-content section-block space-y-4">
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-network-wired text-[#76b900]"></i> NVSwitch 模块更新</h2>
+                <p class="text-sm text-slate-400 mt-1">Lambda 在 SC26 展示万卡 GB300 NVL72 集群部署 NVIDIA CPO 交换机；620.70.10 数据中心版披露 Fabric Manager RHEL 10 已知问题</p>
+            </div>
+
+            <!-- Lambda CPO -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-lambda', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-nvidia">SC26</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">Lambda：超 1 万颗 GPU 的 GB300 NVL72 集群部署 NVIDIA 共封装光学（CPO）交换机</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>SC26 上 Lambda 公开其在超过 1 万颗 GPU 的 GB300 NVL72 机架集群中部署 NVIDIA Photonics CPO 交换机的实践。CPO 将光学引擎集成到交换芯片封装附近，缩短高速电信号铜介质传输路径。NVIDIA 数据：CPO 相比可插拔光器件最高改善 5 倍光互连能效、15 倍可靠性，激光器数量减少约四分之三。Lambda 系统采用每台 144 个 800Gb/s 端口的交换机，典型光学温度中位数从 51℃ 降至 36℃，机架级网络延迟下降约 4%，Pod 级最多下降约 10%。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://www.sohu.com/a/1105215245_236796/" target="_blank">SC26 大会报道 (搜狐/芝能智芯)</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-lambda" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-network-wired mr-1"></i> 与 NVSwitch 的关系</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>GB300 NVL72 机架内 72 GPU 通过 NVSwitch 构成统一 NVLink 域；CPO 交换机部署在集群级（scale-out）光网络层，两者互补。</li>
+                            <li>运维挑战：交换机更换成本、激光源维护、光纤布线、现场检修与规模良率——CPO 从工程样机走向万卡集群实践后的下一课题。</li>
+                            <li>开源驱动侧：NVSwitch 内核路径（<span class="code-inline">src/nvidia/src/kernel/gpu/nvswitch/</span>）本周无代码变更。</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fabric Manager known issue -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-fm', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-bug">KNOWN ISSUE</span>
+                            <h3 class="font-bold text-white">620.70.10：RHEL 10 特定内核上 Fabric Manager 启动失败（doca-ofed 缺 ib_umad.ko）</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>11 月 23 日发布的 620.70.10 数据中心驱动发布说明披露：在 RHEL 10 内核 <span class="code-inline">6.12.0-55.29.1.el10_0.x86_64</span> 上，doca-ofed 包不包含 <span class="code-inline">ib_umad.ko</span> 模块，导致 Fabric Manager（管理 NVSwitch 织物的核心组件）启动失败；旧内核版本不受影响。另注明手动安装 <span class="code-inline">nvidia-fabricmanager-devel-620.70.10-1</span> 前需先卸载旧包。本版本 Fixed Issues 为「None in this release」，主要价值在于 UVM 动态迁移阈值等内核新特性（详见 MMU/UVM 标签页）。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-620-70-10/index.html" target="_blank">620.70.10 数据中心发布说明</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/620.70.10" target="_blank">GitHub Release 620.70.10</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= NVLink C2C ================= -->
+        <section id="nvlink-c2c" class="tab-content section-block space-y-4">
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-microchip text-[#76b900]"></i> NVLink C2C 模块更新</h2>
+                <p class="text-sm text-slate-400 mt-1">Vera CPU 与 GPU 间一致性互连随 HPC 机架披露更多参数；620 分支 CDMM（一致性内存管理）成为硬件一致平台默认——C2C 软件栈重要演进</p>
+            </div>
+
+            <!-- CDMM -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-cdmm', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-nvidia">C2C SOFTWARE</span>
+                            <h3 class="font-bold text-white">CDMM 成为 620 分支默认：硬件一致平台（Grace/Vera 系 C2C）驱动内存管理模式切换</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>620.70.10 数据中心发布说明再次确认 620 分支的重要架构变化：在所有 NVIDIA 硬件一致性平台（即 CPU-GPU 通过 NVLink-C2C 类一致性互连的 Grace/Vera 平台）上，驱动默认采用 <strong>Coherent Driver-Based Memory Management (CDMM)</strong>，而不再把 GPU 内存作为 NUMA 节点上线（NUMA 模式仍完全支持，经内核模块参数 <span class="code-inline">NVreg_CoherentGPUMemoryMode</span> 切换，需重载驱动或重启）。配套 UVM 参数 <span class="code-inline">uvm_disable_sam_migration</span> 可控制 SAM 迁移行为；GDRCopy 需 2.5.1+ 才能与 CDMM 配合。这是 C2C 一致性平台上 UVM/驱动内存管理的方向性变化。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-620-70-10/index.html" target="_blank">620.70.10 发布说明 CDMM 章节</a> | <a class="ref-link" href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-620-70-06/index.html" target="_blank">620.70.06 发布说明（CDMM 引入）</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-cdmm" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-code mr-1"></i> 配置与验证命令</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>启用 CDMM：<span class="code-inline">options nvidia NVreg_CoherentGPUMemoryMode=driver</span></li>
+                            <li>切回 NUMA：<span class="code-inline">options nvidia NVreg_CoherentGPUMemoryMode=numa</span>（驱动重载/重启后生效）</li>
+                            <li>验证：<span class="code-inline">grep Coherent /proc/driver/nvidia/params</span> 与 <span class="code-inline">cat /sys/module/nvidia_uvm/parameters/uvm_disable_sam_migration</span></li>
+                            <li>注意：已有配置文件时需将选项合并到单一 options 行；升级前应先选定模式。</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-diagram-project mr-1"></i> 与 UVM 动态迁移阈值的协同</h4>
+                        <p class="text-slate-300">同一 620.70.10 版本引入了 UVM 动态迁移阈值（PID 控制器，详见 MMU/UVM 标签页）：在 C2C 一致性平台上，GPU-CPU 页迁移的自动调优与 CDMM 模式共同构成 Grace/Vera 世代内存管理软件栈的两大支柱。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vera CPU C2C params -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-c2c-vera', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-info">SC26</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">Vera CPU 细节披露：88 Olympus 核心 / 1.2 TB/s 单 CPU 内存带宽，C2C 一致性机架规模进一步扩大</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>SC26 公布的 HPC 版 Vera CPU 机架（192 颗 Vera CPU）显示：每颗 Vera CPU 88 个 Olympus 定制 Arm 核心、176 线程、单 CPU 最高 1.2 TB/s LPDDR5X 内存带宽，全机架汇总峰值内存带宽超 200 TB/s。Vera CPU 与 Rubin GPU 通过 NVLink-C2C/一致性互连组成 Vera Rubin 平台——开源驱动 620.73.04 中持续更新的 GR100 GSP 固件 bindata 正是该平台的软件准备。此前 NVIDIA 曾展示最高 256 颗 CPU 的其他 Vera 机架配置。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://www.sohu.com/a/1105215245_236796/" target="_blank">SC26 大会报道 (搜狐/芝能智芯)</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/commit/a4b95f6a2db0" target="_blank">620.73.04 GR100 固件更新</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-4">
+                <p class="text-sm text-slate-400"><i class="fas fa-circle-info text-slate-500 mr-2"></i>开源内核中无独立的 NVLink-C2C 源码目录（C2C 归属 NVLink/平台初始化路径）；本周相关变更体现在 CDMM 文档与 GR100 固件，<strong>无新增 C2C 专属内核代码提交</strong>。</p>
+            </div>
+        </section>
+
+        <!-- ================= MMU/UVM ================= -->
+        <section id="mmu" class="tab-content section-block space-y-4">
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-memory text-[#76b900]"></i> MMU/UVM 模块更新</h2>
+                <p class="text-sm text-slate-400 mt-1">本周重点：620.70.10 新增 UVM 动态迁移阈值子系统（PID 控制器，+540 行）；620.73.04 修复 device P2P VMA 生命周期与 HMM hugetlb 兼容；#1582 报告 N1X pageable 传输劣化</p>
+            </div>
+
+            <!-- Dynamic migration threshold -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-dynthresh', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-nvidia">NEW FEATURE</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">UVM 动态迁移阈值（Dynamic Migration Threshold）：PID 控制器自动调优页面迁移速率</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>620.70.10（11 月 23 日发布）新增 <span class="code-inline">kernel-open/nvidia-uvm/uvm_perf_dynamic_threshold.c</span>（+540 行）与配套头文件。该子系统以 PID 控制器闭环调节 UVM 页迁移阈值：订阅 VA space 迁移事件、结合 access counter 反馈，将实际迁移速率维持在目标带宽区间内（默认 10–1000 MiB/s）。默认启用（module param <span class="code-inline">uvm_perf_dynamic_threshold_enable=1</span>），这是 UVM 驱动内存管理近几个月来最大的新特性。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/compare/620.70.06...620.70.10" target="_blank">GitHub Compare 620.70.06...620.70.10</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/blob/620.70.10/kernel-open/nvidia-uvm/uvm_perf_dynamic_threshold.c" target="_blank">uvm_perf_dynamic_threshold.c 源码</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-dynthresh" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-code mr-1"></i> 关键设计参数（源码摘录）</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>目标速率区间：<span class="code-inline">UVM_PERF_DYNAMIC_THRESHOLD_MIN_RATE_MIB_PER_SEC_DEFAULT 10</span> ～ <span class="code-inline">MAX_RATE 1000</span>（MiB/s），上限 1 TiB/s（高于任何互连）。</li>
+                            <li>PID 增益（单位 1/100）：<span class="code-inline">KP=20 (0.20)、KI=5 (0.05)、KD=10 (0.10)</span>；积分限幅 <span class="code-inline">PID_INTEGRAL_ERROR_LIMIT 10000</span> 防止积分饱和。</li>
+                            <li>阈值下限 <span class="code-inline">FLOOR 192</span>：迁移接近空闲时按默认阈值的 25% 放宽准入；上限受 16 位硬件字段限制（65535）。</li>
+                            <li>模块参数：<span class="code-inline">uvm_perf_dynamic_threshold_enable</span>、<span class="code-inline">uvm_perf_dynamic_threshold_min_rate_mib_per_sec</span>、<span class="code-inline">uvm_perf_dynamic_threshold_max_rate_mib_per_sec</span>（均 S_IRUGO）。</li>
+                            <li>配套改动：<span class="code-inline">uvm_gpu_access_counters.c</span> +101 行（迁移速率采样接入）、<span class="code-inline">uvm_perf_heuristics.c</span> +17、<span class="code-inline">uvm_test_ioctl.h</span> +25（新增测试 ioctl）。</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-diagram-project mr-1"></i> 技术意义</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>此前 UVM 迁移阈值是静态/启发式调节；PID 闭环让阈值随负载自适应，缓解「迁移风暴」与「迁移不足」两个极端，对 HMM/sysmem backends 与 C2C 一致性平台（配合 CDMM）均有收益。</li>
+                            <li>积分限幅、输入/输出限幅（error 上限 2^29、单次调整上限 8192）体现保守设计，避免阈值震荡。</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 620.73.04 UVM fixes -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-uvmfix', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-fix">FIX</span>
+                            <h3 class="font-bold text-white">620.73.04 UVM 修复：device P2P VMA 生命周期防护 + Linux 7.4 hugetlb API 兼容</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>620.73.04（11 月 18 日发布，主分支提交 <span class="code-inline">a4b95f6a</span>，60 个文件变更）中 UVM 相关修复：</p>
+                            <ul class="space-y-1 text-slate-300 list-disc list-inside mt-2">
+                                <li><span class="code-inline">kernel-open/nvidia-uvm/uvm.c</span> (+29/-15)：新增 <span class="code-inline">va_range_matches_vma()</span>，在 fork/mremap 触发 <span class="code-inline">uvm_vm_open_device_p2p()</span> 时校验底层 va_range 是否仍存在/匹配（UVM_FREE 或 GPU 移除后 VMA 仍可能经 munmap 路径进入），不匹配则禁用该 VMA。</li>
+                                <li><span class="code-inline">uvm_va_range_device_p2p.c</span> (+11/-4)：deinit 时置空 <span class="code-inline">p2p_mem</span>/<span class="code-inline">gpu</span> 指针，<span class="code-inline">uvm_va_range_map_cpu()</span> 增加 GPU 注销后的 NULL 检查（返回 <span class="code-inline">NV_ERR_INVALID_STATE</span>），修复 use-after-free 风险。</li>
+                                <li><span class="code-inline">uvm_hmm.c</span> (+23/-9) 与 <span class="code-inline">nvidia-uvm.Kbuild</span>：适配 Linux 7.4-rc1 的 <span class="code-inline">is_vm_hugetlb_page()</span> → <span class="code-inline">vma_is_hugetlb()</span> 重命名（新增 conftest <span class="code-inline">NV_VMA_IS_HUGETLB_PRESENT</span>），并同步更新 migrate_vma 对 non-mergable/non-mlockable VMA 的注释。</li>
+                            </ul>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/commit/a4b95f6a2db0" target="_blank">620.73.04 提交详情</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/620.73.04" target="_blank">GitHub Release 620.73.04</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+            </div>
+
+            <!-- Issue 1582 -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-1582', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-bug">BUG</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">#1582：N1X pageable cudaMemcpy H2D 从 4 KiB 分页文件映射读取随映射增长劣化至 ~35 MB/s</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>RTX Spark N1X（仅开源模块支持）上，pageable（非 pinned）cudaMemcpy H2D 从 4 KiB 分页的文件映射拷贝时，随着映射文件范围增大，吞吐从正常水平跌至约 35 MB/s。报告者使用 620.70.06 DKMS 构建（Arch Linux ARM，内核 7.3.0-75-omarchy aarch64），模块参数默认（<span class="code-inline">NVreg_EnableSystemMemoryPools=0</span>）。该问题指向 pageable 内存路径（内核页 → GMMU 映射）在文件映射场景下的性能缺陷。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1582" target="_blank">Issue #1582</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-1582" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-magnifying-glass mr-1"></i> 相关活跃内存类 Issue</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>#1516：<span class="code-inline">nv_drm_atomic_state_alloc()</span> 每次原子提交做 order-3 kzalloc，引发内核内存碎片压力（本周持续活跃）。</li>
+                            <li>#1513：Chromium GPU 映射导致 <span class="code-inline">dmaAllocMapping_GM107</span> VA 空间耗尽 → RC watchdog GPU 锁死（本周更新）。</li>
+                            <li>#1540：<span class="code-inline">_gvaspaceMappingInsert</span> 返回 NV_ERR 后 <span class="code-inline">btreeUnlink</span> 内核页错误（nvidia 模块，本周更新）。</li>
+                        </ul>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1516" target="_blank">#1516</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1513" target="_blank">#1513</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1540" target="_blank">#1540</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PR 1592 BAR1 -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-1592', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-pr">PR</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">PR #1592：修复 2 的幂 ReBAR GPU 上 Static BAR1 自动启用失败（bus 子系统）</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>当 GPU 物理 VRAM 容量恰为 2 的幂（8/16/32 GiB SKU + ReBAR）时，PCIe BAR1 孔径与全 FB 地址空间一致（无 512 MiB padding）；<span class="code-inline">kbusIsStaticBar1Supported_TU102()</span> 的尺寸/偏移检查假设存在 padding 而误判失败。提交者以 RTX 5080 16 GiB（GB203，BAR1 16384 MiB，总 FB 16303 MiB，GSP-RM 保留 424 MiB）+ Arch 内核 7.3.5-zen + 620.73.04 复现并给出修复。BAR1 即 GPU 内存映射到 CPU 的 MMU 孔径，此修复对 HMM/CDMM 场景的 CPU 侧访问路径有直接意义。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1592" target="_blank">PR #1592</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 社区反馈 ================= -->
+        <section id="community" class="tab-content section-block space-y-4">
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-comments text-[#76b900]"></i> 社区反馈</h2>
+                <p class="text-sm text-slate-400 mt-1">本周新增 15 个 Issue / 5 个 PR。主线：620.73.04 电源管理回归（N1X 拒绝挂起）、S3/休眠类问题集中爆发、Linux 7.4 构建破裂提前报告、Xid 79 系列延续</p>
+            </div>
+
+            <!-- N1X suspend regression -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-1577', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-bug">REGRESSION</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">#1577：620.73.04 在 RTX Spark N1X 笔记本上拒绝系统挂起（GB20B 被列入 PM-unsupported）</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>620.73.04 上 N1X 笔记本每次 s2idle 都在 PM notifier 阶段失败（<span class="code-inline">NVRM: PM suspend notifier failed: 0x56</span>），任何设备尚未挂起即退出；同机 615 分支可正常挂起/恢复。报告者定位根因：620.73.04 以 <span class="code-inline">gpuIsPowerManagementUnsupported()</span> 取代 <span class="code-inline">PDB_PROP_GPU_POWER_MANAGEMENT_UNSUPPORTED</span>，对原有芯片之外<strong>额外返回 NV_TRUE 的 GB20B/GB20C</strong>（见 <span class="code-inline">src/nvidia/generated/g_gpu_nvoc.c</span>）。社区已有本地 patch 强制开启 GB20B/GB20C 电源管理（Arch N1X 补丁集流传）。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1577" target="_blank">Issue #1577</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-1577" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-power-off mr-1"></i> 本周 S3/休眠问题集群</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>#1587：620.73.04 进入 S3 时 GSP 超时挂起（RTX 2080 SUPER，Arch 7.3.5）。</li>
+                            <li>#1579：休眠永不掉电——<span class="code-inline">nv_pci_shutdown</span> 在 <span class="code-inline">nvkms_ioctl_from_kapi</span> 中死锁（PM 锁持有方阻塞）。</li>
+                            <li>#1586：615.78.08 S3 恢复后 semsurf fence 错误 → eglMakeCurrent 死循环。</li>
+                            <li>#905（长期）：GPU 结束 D3Cold 转换后立刻回到 D0，RTD3 失效，本周持续活跃。</li>
+                        </ul>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1587" target="_blank">#1587</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1579" target="_blank">#1579</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1586" target="_blank">#1586</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/905" target="_blank">#905</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Linux 7.4 build break -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-1581', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-bug">COMPAT</span><span class="badge-new">NEW</span>
+                            <h3 class="font-bold text-white">#1581：Linux 7.4 / linux-next 构建破裂——procfs 重写（proc_show/proc_write_buf）与 dma_fence_init 签名变更</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>nvidia-open 620.73.04 在 linux-next / 7.4-rc* 上因两处独立内核 API 变更编译失败：① Christian Brauner 的 procfs 重写使 <span class="code-inline">struct proc_ops</span> 不再有接受 __user 指针的 <span class="code-inline">proc_read/proc_write</span>，需改用 <span class="code-inline">proc_show + proc_write_buf</span> 且 <span class="code-inline">proc_open/proc_release</span> 不得调用 <span class="code-inline">single_open()/single_release()</span>；② <span class="code-inline">dma_fence_init()</span> 5 参数形式移除，必须传入初始 flags（<span class="code-inline">BIT(DMA_FENCE_FLAG_SEQNO64_BIT)</span>），<span class="code-inline">dma_fence_ops.use_64bit_seqno</span> 已删除。社区在 7.4-rc 阶段即提交了精确诊断，为上游适配争取了时间。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1581" target="_blank">Issue #1581</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+            </div>
+
+            <!-- GSP RPC blocking + PR 1578 -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-1576', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-bug">BUG</span><span class="badge-pr">PR FIX</span>
+                            <h3 class="font-bold text-white">#1576 + PR #1578：vblank 恢复 watchdog 在错误上下文调用阻塞 GSP RPC → 社区提交 workitem 延迟执行修复</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>#1576 报告 <span class="code-inline">krcWatchdogCallbackVblankRecovery_IMPL → gpuLogOobXidMessage_KERNEL</span> 在不允许阻塞的上下文（raised IRQL / recursive poll）调用阻塞 GSP RPC。社区随后提交 PR #1578「gpu: defer OOB XID GSP RPC to workitem at raised IRQL or recursive poll」，将 OOB XID 的 GSP RPC 转移到 workitem 执行。同模式的一组社区修复 PR 本周集中出现（详见右栏展开），显示社区对 GSP RPC 上下文违规类缺陷的系统性排查。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1576" target="_blank">Issue #1576</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1578" target="_blank">PR #1578</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+                <div id="d-1576" class="detail-section mt-4 space-y-3 text-sm">
+                    <div class="detail-block">
+                        <h4 class="font-semibold text-[#76b900] mb-2"><i class="fas fa-code-branch mr-1"></i> 本周新增社区 PR 一览（5 个）</h4>
+                        <ul class="space-y-2 text-slate-300 list-disc list-inside">
+                            <li>PR #1592：bus — 修复 2 的幂 ReBAR GPU 的 Static BAR1 自动启用。</li>
+                            <li>PR #1588：DPLib — DPMS 唤醒与长 HPD 脉冲后恢复 sink DSC 使能（对应 #1593/#1553 flip timeout 系列问题的候选修复）。</li>
+                            <li>PR #1583：intr — 不重挂/重排刚被判定为卡死的中断。</li>
+                            <li>PR #1578：gpu — raised IRQL / recursive poll 下将 OOB XID GSP RPC 延迟到 workitem。</li>
+                            <li>PR #1575：nvidia-drm — GPU 热移除后 <span class="code-inline">master_drop</span> NULL 解引用修复。</li>
+                        </ul>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/pulls?q=is%3Apr+sort%3Acreated-desc" target="_blank">仓库 PR 列表</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Xid 79 + display cluster -->
+            <div class="module-card rounded-xl p-5" onclick="toggleDetail('d-xid79', event)">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge-bug">ONGOING</span>
+                            <h3 class="font-bold text-white">Xid 79 系列与显示子问题持续：本周新增 #1591（RTX 3070 Laptop）/ #1590（时间线信号量硬中断占用）/ #1593（DPMS 唤醒 flip 超时）</h3>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-300">
+                            <p>#1591：RTX 3070 Laptop（HP OMEN 15）游戏中随机 Xid 79，卡死 RPC 恒为 <span class="code-inline">GSP_RM_CONTROL</span>（GB206M 系列 Xid 79 长期议题的又一实例，相关：#1562 USB4 eGPU、#1151 GB203）。#1590：应用持有大量 timeline semaphore 时，每中断硬中断耗时增长。#1593：RTX 3090 + 620.70.06 DPMS 唤醒时 head 0 flip event 超时 → 持久性 RGB 错位 + WARN 于 <span class="code-inline">nvidia-drm-crtc.h:371</span>（PR #1588 为候选修复）。620.73.04 发布亦获媒体覆盖：IT 之家 11 月 21 日报道该版本为「小幅 Bug 修复与改进」。</p>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1591" target="_blank">#1591</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1590" target="_blank">#1590</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1593" target="_blank">#1593</a> | <a class="ref-link" href="https://www.ithome.com/1/030/280.htm" target="_blank">IT之家 620.73.04 报道</a></p>
+                    </div>
+                    <i class="fas fa-chevron-down expand-icon text-slate-500 mt-1"></i>
+                </div>
+            </div>
+
+            <!-- NVK context -->
+            <div class="glass-card rounded-xl p-4">
+                <p class="text-sm text-slate-400"><i class="fas fa-circle-info text-slate-500 mr-2"></i>生态对照：Mesa NVK（Nouveau 系开源 Vulkan 驱动，与 open-gpu-kernel-modules 平行的社区路线）本周合并 TTU 树遍历单元指令基础代码至 Mesa 27.0 开发分支，为 VK_KHR_ray_tracing 铺路，完整可用光追预计 2027 年。<a class="ref-link" href="https://news.t0001.com/newsflash/202611/1466038.html" target="_blank">来源报道</a></p>
+            </div>
+        </section>
+
+        <!-- ================= 技术对比 ================= -->
+        <section id="comparison" class="tab-content section-block space-y-4">
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-balance-scale text-[#76b900]"></i> 技术对比</h2>
+                <p class="text-sm text-slate-400 mt-1">本周四版本定位对比、电源管理问题按分支分布、以及 UVM 子系统变更规模对比</p>
+            </div>
+
+            <div class="glass-card rounded-xl p-5 overflow-x-auto">
+                <h3 class="font-bold text-white mb-3 text-sm">本周发布版本对比</h3>
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-700">
+                            <th class="text-left py-2 pr-4">版本</th>
+                            <th class="text-left py-2 pr-4">发布日期</th>
+                            <th class="text-left py-2 pr-4">分支定位</th>
+                            <th class="text-left py-2 pr-4">UVM/内存变更</th>
+                            <th class="text-left py-2">其他重点</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><span class="badge-release">620.73.04</span></td>
+                            <td class="py-3 pr-4">2026-11-18</td>
+                            <td class="py-3 pr-4">620.73 生产分支（GeForce/开放内核）</td>
+                            <td class="py-3 pr-4">device P2P VMA 生命周期修复、HMM hugetlb 兼容 Linux 7.4</td>
+                            <td class="py-3">DP MST/connector 修复、DRM color pipeline、GR100 GSP 固件刷新</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><span class="badge-release">620.70.10</span></td>
+                            <td class="py-3 pr-4">2026-11-23</td>
+                            <td class="py-3 pr-4">620 数据中心 LTS 分支</td>
+                            <td class="py-3 pr-4"><strong>新增动态迁移阈值子系统（+540 行）</strong>、access counters 扩展</td>
+                            <td class="py-3">SM debugger session、kernel channel/RM API 扩展；Fixed Issues: None</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><span class="badge-release">595.112.13</span></td>
+                            <td class="py-3 pr-4">2026-11-23</td>
+                            <td class="py-3 pr-4">595 数据中心分支（前代）</td>
+                            <td class="py-3 pr-4">—</td>
+                            <td class="py-3">常规维护更新（数据中心发布说明）</td>
+                        </tr>
+                        <tr class="table-row-hover">
+                            <td class="py-3 pr-4"><span class="badge-release">580.196.11</span></td>
+                            <td class="py-3 pr-4">2026-11-23</td>
+                            <td class="py-3 pr-4">580 数据中心长生命周期分支</td>
+                            <td class="py-3 pr-4">—</td>
+                            <td class="py-3">常规维护更新（数据中心发布说明）</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-slate-500 mt-3">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/releases" target="_blank">GitHub Releases</a> | <a class="ref-link" href="https://docs.nvidia.com/datacenter/tesla/tesla-release-notes-620-70-10/index.html" target="_blank">620.70.10 发布说明</a></p>
+            </div>
+
+            <div class="glass-card rounded-xl p-5 overflow-x-auto">
+                <h3 class="font-bold text-white mb-3 text-sm">电源管理/挂起问题按分支分布（本周活跃）</h3>
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-700">
+                            <th class="text-left py-2 pr-4">Issue</th>
+                            <th class="text-left py-2 pr-4">影响分支</th>
+                            <th class="text-left py-2 pr-4">症状</th>
+                            <th class="text-left py-2 pr-4">严重度</th>
+                            <th class="text-left py-2">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1577" target="_blank">#1577</a></td>
+                            <td class="py-3 pr-4">620.73.04</td>
+                            <td class="py-3 pr-4">N1X (GB20B) s2idle 被 PM notifier 拒绝（615 正常）</td>
+                            <td class="py-3 pr-4"><span class="badge-bug">高</span></td>
+                            <td class="py-3">根因已定位（g_gpu_nvoc.c）</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1587" target="_blank">#1587</a></td>
+                            <td class="py-3 pr-4">620.73.04</td>
+                            <td class="py-3 pr-4">S3 进入时 GSP 超时（RTX 2080 SUPER）</td>
+                            <td class="py-3 pr-4"><span class="badge-bug">高</span></td>
+                            <td class="py-3">新报告</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1579" target="_blank">#1579</a></td>
+                            <td class="py-3 pr-4">—</td>
+                            <td class="py-3 pr-4">休眠不关机：nv_pci_shutdown 死锁</td>
+                            <td class="py-3 pr-4"><span class="badge-bug">中高</span></td>
+                            <td class="py-3">新报告</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1584" target="_blank">#1584</a></td>
+                            <td class="py-3 pr-4">—</td>
+                            <td class="py-3 pr-4">RTX 4070 Laptop AC 切换后功率锁 ≤35W</td>
+                            <td class="py-3 pr-4"><span class="badge-bug">中</span></td>
+                            <td class="py-3">新报告</td>
+                        </tr>
+                        <tr class="table-row-hover">
+                            <td class="py-3 pr-4"><a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/1586" target="_blank">#1586</a></td>
+                            <td class="py-3 pr-4">615.78.08</td>
+                            <td class="py-3 pr-4">S3 恢复后 semsurf fence 错误 + egl 死循环</td>
+                            <td class="py-3 pr-4"><span class="badge-bug">中</span></td>
+                            <td class="py-3">新报告</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="glass-card rounded-xl p-5 overflow-x-auto">
+                <h3 class="font-bold text-white mb-3 text-sm">本周 UVM 子系统变更规模（按文件）</h3>
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-700">
+                            <th class="text-left py-2 pr-4">文件</th>
+                            <th class="text-left py-2 pr-4">版本</th>
+                            <th class="text-left py-2 pr-4">规模</th>
+                            <th class="text-left py-2">性质</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><span class="code-inline">uvm_perf_dynamic_threshold.c</span></td>
+                            <td class="py-3 pr-4">620.70.10</td>
+                            <td class="py-3 pr-4 text-green-400">+540（新增）</td>
+                            <td class="py-3">新特性：PID 动态迁移阈值</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><span class="code-inline">uvm_gpu_access_counters.c</span></td>
+                            <td class="py-3 pr-4">620.70.10</td>
+                            <td class="py-3 pr-4 text-green-400">+101</td>
+                            <td class="py-3">迁移速率采样接入</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><span class="code-inline">uvm.c</span></td>
+                            <td class="py-3 pr-4">620.73.04</td>
+                            <td class="py-3 pr-4 text-green-400">+29 / -15</td>
+                            <td class="py-3">device P2P VMA 校验修复</td>
+                        </tr>
+                        <tr class="table-row-hover border-b border-slate-800">
+                            <td class="py-3 pr-4"><span class="code-inline">uvm_hmm.c</span></td>
+                            <td class="py-3 pr-4">620.73.04</td>
+                            <td class="py-3 pr-4 text-green-400">+23 / -9</td>
+                            <td class="py-3">Linux 7.4 hugetlb 兼容</td>
+                        </tr>
+                        <tr class="table-row-hover">
+                            <td class="py-3 pr-4"><span class="code-inline">uvm_va_range_device_p2p.c</span></td>
+                            <td class="py-3 pr-4">620.73.04</td>
+                            <td class="py-3 pr-4 text-green-400">+11 / -4</td>
+                            <td class="py-3">GPU 注销后 NULL 防护</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-slate-500 mt-3">来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/commit/a4b95f6a2db0" target="_blank">620.73.04 提交</a> | <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules/compare/620.70.06...620.70.10" target="_blank">620.70.10 对比</a></p>
+            </div>
+        </section>
+
+        <!-- ================= 趋势展望 ================= -->
+        <section id="trends" class="tab-content section-block space-y-4">
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-chart-line text-[#76b900]"></i> 趋势展望</h2>
+                <p class="text-sm text-slate-400 mt-1">基于本周数据的短期（1-2 月）/中期（2027-2028）趋势与核心洞察</p>
+            </div>
+
+            <div class="module-card rounded-xl p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="trend-arrow text-[#76b900]"><i class="fas fa-arrow-trend-up"></i></span>
+                    <h3 class="font-bold text-white text-sm">短期趋势（未来 1-2 个月）</h3>
+                </div>
+                <ul class="space-y-2 text-sm text-slate-300 list-disc list-inside">
+                    <li><strong>UVM 动态迁移阈值将向下/横向回移</strong>：620.70.10 引入的 PID 控制器子系统大概率随数据中心分支成熟后进入 620.73/620 后续消费级版本；关注 <span class="code-inline">uvm_perf_dynamic_threshold</span> 是否出现在 620.73.xx 的 compare diff 中。</li>
+                    <li><strong>620.73 分支进入高频修复期</strong>：发布首周即暴露 #1577（N1X 挂起拒绝）与 #1587（GSP S3 超时）两类电源管理问题，预计 1-2 个版本内回归 <span class="code-inline">gpuIsPowerManagementUnsupported()</span> 的芯片范围。</li>
+                    <li><strong>Linux 7.4 适配补丁将落地</strong>：#1581 提前给出 procfs/dma_fence_init 两处 API 破裂的完整诊断，配合 620.73.04 已合入的 <span class="code-inline">vma_is_hugetlb</span> conftest，7.4-rc 适配窗口期正在缩短。</li>
+                    <li><strong>社区修复 PR 集中涌现</strong>：#1575/#1578/#1583/#1588/#1592 五个 PR 均针对 GSP RPC 上下文、中断处理、DP 唤醒等长尾问题，NVIDIA 评审合入节奏值得关注。</li>
+                </ul>
+            </div>
+
+            <div class="module-card rounded-xl p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="trend-arrow text-amber-400"><i class="fas fa-arrow-trend-up"></i></span>
+                    <h3 class="font-bold text-white text-sm">中期趋势（2027-2028）</h3>
+                </div>
+                <ul class="space-y-2 text-sm text-slate-300 list-disc list-inside">
+                    <li><strong>NVLink 7 与 Rubin HPC（2028）</strong>：第七代 NVLink 已随 Rubin HPC GPU 公布；开源内核当前仅到 <span class="code-inline">NVLINK_DEVICE_VERSION_60</span>，NVLink 7 枚举与运行时预计 2027 年末-2028 年进入 open-gpu-kernel-modules。</li>
+                    <li><strong>Vera HPC 机架（2027 初）</strong>：Dell/HPE/Lenovo/Supermicro 供货的 192-CPU 机架将扩大 NVLink-C2C 一致性平台装机量，CDMM + 动态迁移阈值的组合成为该平台 UVM 软件栈标配。</li>
+                    <li><strong>纵向扩展网络竞争</strong>：UALink/开放方案专用交换芯片 2027 年试用、2028 年量产（Arista 口径），此前 NVLink 主导地位不变；CPO 光交换在万卡集群的渗透是网络侧最大变量。</li>
+                    <li><strong>开源双轨并行</strong>：open-gpu-kernel-modules（官方开源内核）持续消化 Rubin/GR100 固件与 GSP RPC 稳定性问题；Mesa NVK 光追（TTU 已合入，完整能力预期 2027）在图形侧提供第二条开源路线。</li>
+                </ul>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="font-bold text-white text-sm mb-2"><i class="fas fa-lightbulb text-[#76b900] mr-1"></i> 核心洞察</h3>
+                <ul class="space-y-2 text-sm text-slate-300 list-disc list-inside">
+                    <li>本周是「数据中心分支领跑内存管理、GeForce 分支修复稳定性」的典型分化周：620.70.10 的 UVM 动态迁移阈值（PID 控制器）是数月来 UVM 最大的算法级新特性，而 620.73.04 把精力放在 device P2P 生命周期与内核 7.4 兼容。</li>
+                    <li>GR100（Rubin）GSP 固件已在 620.73.04 与 620 分支 CoRIM 修复中反复出现——开源驱动的 Vera Rubin 平台软件准备在「固件先行、运行时后至」的节奏推进，与 NVLink 6 → 7 的硬件节奏一致。</li>
+                    <li>社区报告质量显著提升：#1577 直接给出 nvoc 生成代码级根因，#1581 在 7.4-rc 阶段完成 procfs/dma-fence 双 API 破裂诊断——外部贡献正从「报症状」进化为「给 patch」。</li>
+                    <li>CDMM 默认化 + 动态迁移阈值同版本出现并非巧合：C2C 一致性平台上「驱动接管内存管理 + 自适应迁移」的组合，指向 NVIDIA 在为 Grace/Vera 世代的统一内存体验做软件栈定型。</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-slate-700/50 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-xs text-slate-500 space-y-1">
+            <p><i class="fas fa-database mr-1"></i>数据来源: <a class="ref-link" href="https://github.com/NVIDIA/open-gpu-kernel-modules" target="_blank">NVIDIA/open-gpu-kernel-modules (GitHub)</a> | <a class="ref-link" href="https://docs.nvidia.com/datacenter/tesla/" target="_blank">NVIDIA Data Center Driver Docs</a> | NVIDIA SC26 官方发布（经媒体报道） | IT之家 / Phoronix 相关报道</p>
+            <p><i class="fas fa-shield-halved mr-1"></i>所有条目均附可验证参考链接；报告周期 2026-11-18 ~ 2026-11-25 (Asia/Shanghai)。生成于 2026-11-25。</p>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        function toggleDetail(id, event) {
+            if (event.target.tagName === 'A') return;
+            const el = document.getElementById(id);
+            const icon = el.previousElementSibling.querySelector('.expand-icon') || el.closest('.module-card').querySelector('.expand-icon');
+            el.classList.toggle('expanded');
+            if (icon) icon.classList.toggle('rotated');
+        }
+    </script>
+</body>
+</html>
